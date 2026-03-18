@@ -7,11 +7,14 @@ import os
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 from contextlib import asynccontextmanager
+from routes_oridata import router as oridata_router
 import database
 import json
 from datetime import datetime
 import shutil
 import zipfile
+
+
 
 # 数据存储目录
 DATA_BATCH_STORAGE = "data_batch_storage"
@@ -48,6 +51,8 @@ async def lifespan(app: FastAPI):
     print("👋 系统关闭")
 
 app = FastAPI(lifespan=lifespan)
+
+app.include_router(oridata_router)
 
 # 配置CORS
 app.add_middleware(

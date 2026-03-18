@@ -1,521 +1,556 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - Challenge</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f5f7fa;
-            min-height: 100vh;
-        }
-
-        /* 顶部导航栏 */
-        .navbar {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 15px 30px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        }
-
-        .navbar-title {
-            font-size: 24px;
-            font-weight: 600;
-        }
-
-        .navbar-user {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .user-name {
-            font-size: 14px;
-        }
-
-        .logout-btn {
-            background: rgba(255, 255, 255, 0.2);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            color: white;
-            padding: 8px 20px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: all 0.3s ease;
-        }
-
-        .logout-btn:hover {
-            background: rgba(255, 255, 255, 0.3);
-        }
-
-        /* 主容器 */
-        .main-container {
-            display: flex;
-            gap: 30px;
-            padding: 30px;
-            max-width: 1400px;
-            margin: 0 auto;
-            min-height: calc(100vh - 60px); /* 减去导航栏高度 */
-        }
-
-        /* 左侧团队信息 */
-        .team-info-section {
-            flex: 0 0 350px;
-        }
-
-        .card {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-            padding: 25px;
-            margin-bottom: 20px;
-        }
-
-        .card-title {
-            font-size: 18px;
-            font-weight: 600;
-            color: #333;
-            margin-bottom: 20px;
-            padding-bottom: 12px;
-            border-bottom: 2px solid #667eea;
-        }
-
-        .info-group {
-            margin-bottom: 18px;
-        }
-
-        .info-label {
-            font-size: 13px;
-            color: #666;
-            margin-bottom: 5px;
-            font-weight: 500;
-        }
-
-        .info-value {
-            font-size: 15px;
-            color: #333;
-            font-weight: 600;
-        }
-
-        .team-name {
-            color: #667eea;
-            font-size: 20px;
-        }
-
-        .task-item {
-            padding: 20px 24px;
-            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-            border-radius: 12px;
-            margin-bottom: 16px;
-            border: 2px solid #e9ecef;
-            border-left: 5px solid #667eea;
-            cursor: pointer;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            width: 100%;
-            text-align: left;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .task-item::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
-            opacity: 0;
-            transition: opacity 0.4s ease;
-        }
-
-        .task-item:hover {
-            background: linear-gradient(135deg, #ffffff 0%, #f0f2ff 100%);
-            border-color: #667eea;
-            transform: translateY(-3px) scale(1.01);
-            box-shadow: 0 8px 24px rgba(102, 126, 234, 0.15), 0 4px 12px rgba(0, 0, 0, 0.08);
-        }
-
-        .task-item:hover::before {
-            opacity: 1;
-        }
-
-        .task-item:active {
-            transform: translateY(-1px) scale(1.005);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.12);
-        }
-
-        .task-header {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 10px;
-            position: relative;
-            z-index: 1;
-        }
-
-        .task-icon {
-            width: 40px;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-            flex-shrink: 0;
-        }
-
-        .task-title {
-            font-weight: 600;
-            color: #2d3748;
-            font-size: 17px;
-            flex: 1;
-            position: relative;
-            z-index: 1;
-        }
-
-        .task-arrow {
-            color: #667eea;
-            font-size: 18px;
-            opacity: 0;
-            transform: translateX(-10px);
-            transition: all 0.3s ease;
-        }
-
-        .task-item:hover .task-arrow {
-            opacity: 1;
-            transform: translateX(0);
-        }
-
-        .task-description {
-            color: #718096;
-            font-size: 14px;
-            line-height: 1.7;
-            padding-left: 52px;
-            position: relative;
-            z-index: 1;
-        }
-
-        .task-folder-badge {
-            display: inline-block;
-            padding: 3px 10px;
-            background: rgba(102, 126, 234, 0.1);
-            color: #667eea;
-            border-radius: 6px;
-            font-size: 11px;
-            font-weight: 500;
-            margin-left: 52px;
-            margin-top: 8px;
-            position: relative;
-            z-index: 1;
-        }
-
-        .task-status-badge {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 6px;
-            font-size: 11px;
-            font-weight: 600;
-            margin-left: 8px;
-            position: relative;
-            z-index: 1;
-        }
-
-        .status-completed {
-            background: rgba(34, 197, 94, 0.15);
-            color: #16a34a;
-            border: 1px solid rgba(34, 197, 94, 0.3);
-        }
-
-        .status-pending {
-            background: rgba(251, 191, 36, 0.15);
-            color: #d97706;
-            border: 1px solid rgba(251, 191, 36, 0.3);
-        }
-
-        .task-item.completed {
-            border-left-color: #22c55e;
-            opacity: 0.85;
-        }
-
-        .task-item.completed:hover {
-            opacity: 1;
-        }
-
-        .task-completion-info {
-            color: #16a34a;
-            font-size: 12px;
-            padding-left: 52px;
-            margin-top: 6px;
-            position: relative;
-            z-index: 1;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        /* 右侧任务区域 */
-        .submission-section {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .submission-section > .card {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .submission-section .info-group {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-        }
-
-        #taskList {
-            flex: 1;
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            color: #999;
-        }
-
-        .empty-icon {
-            font-size: 64px;
-            margin-bottom: 15px;
-        }
-
-        .dataset-description {
-            color: #666;
-            font-size: 14px;
-            margin-bottom: 20px;
-            line-height: 1.6;
-        }
-
-        /* 响应式设计 */
-        @media (max-width: 968px) {
-            .main-container {
-                flex-direction: column;
-            }
-
-            .team-info-section {
-                flex: 1;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .navbar {
-                padding: 12px 15px;
-            }
-
-            .navbar-title {
-                font-size: 18px;
-            }
-
-            .main-container {
-                padding: 15px;
-                gap: 15px;
-            }
-        }
-    </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>任务批次接收 - 儿童先心病诊断平台</title>
+  <style>
+    /* 基本样式沿用原项目样式（保留你现有的全局 CSS） */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:#f5f7fa; color:#333; min-height:100vh; }
+    .container { max-width:1200px; margin: 30px auto; padding: 0 20px; }
+    .navbar { background: linear-gradient(135deg,#667eea 0%,#764ba2 100%); color:white; padding:12px 20px; border-radius:8px; display:flex; justify-content:space-between; align-items:center; }
+    .navbar a { color:white; text-decoration:none; padding:6px 12px; background:rgba(255,255,255,0.12); border-radius:6px; }
+    .card { background:white; border-radius:12px; padding:20px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); margin-top:20px; }
+    h1 { font-size:20px; margin-bottom:12px; }
+    .dropzone { border: 2px dashed #c9d7ff; border-radius:12px; padding:30px; text-align:center; cursor:pointer; background:linear-gradient(180deg, #ffffff, #fbfdff); transition: all .15s; }
+    .dropzone.dragover { border-color:#667eea; background: #eef4ff; transform: translateY(-2px); }
+    .controls { display:flex; gap:12px; align-items:center; margin-bottom:16px; flex-wrap:wrap; }
+    .btn { padding:8px 14px; border-radius:8px; border:none; cursor:pointer; background:#667eea; color:white; }
+    .btn.secondary { background:#6c757d; }
+    .hint { color:#666; font-size:13px; }
+    .rows { margin-top:16px; display:flex; flex-direction:column; gap:12px; }
+    .row-card { border:1px solid #e6eefc; border-radius:10px; padding:12px; background:white; display:flex; gap:12px; align-items:flex-start; justify-content:space-between; }
+    .row-left { flex:1; display:flex; flex-direction:column; gap:8px; }
+    .case-name { display:flex; gap:8px; align-items:center; }
+    .case-name input { padding:8px 10px; border-radius:6px; border:1px solid #d7e2ff; }
+    .thumbs { display:flex; gap:8px; flex-wrap:wrap; }
+    .thumb { width:160px; border-radius:6px; overflow:hidden; border:1px solid #eee; background:#000; color:white; position:relative; }
+    .thumb img, .thumb canvas { display:block; width:100%; height:90px; object-fit:cover; }
+    .thumb .label { padding:6px; font-size:12px; background:white; color:#333; text-align:center; }
+    .row-actions { display:flex; gap:8px; align-items:center; }
+    .remove-row { background:#ff4d4f; color:white; border-radius:8px; padding:6px 8px; border:none; cursor:pointer; }
+    .add-file-btn { background:#28a745; color:white; border-radius:8px; padding:6px 8px; border:none; cursor:pointer; }
+    .bottom-actions { display:flex; gap:12px; margin-top:16px; justify-content:flex-end; }
+    .alert { padding:10px 12px; border-radius:8px; background:#fff3cd; color:#856404; margin-top:10px; }
+    .hidden { display:none; }
+    /* responsive */
+    @media (max-width:760px) {
+      .thumb { width:120px; }
+    }
+  </style>
 </head>
 <body>
-    <!-- 顶部导航栏 -->
+  <div class="container">
     <div class="navbar">
-        <div class="navbar-title">🩺 儿童先心病诊断平台</div>
-        <div class="navbar-user">
-            <span class="user-name" id="navUsername">Loading...</span>
-            <button class="logout-btn" onclick="logout()">登出</button>
-        </div>
+      <div>👩‍⚕️ 任务批次接收（独立上传）</div>
+      <div><a href="/admin">管理</a></div>
     </div>
 
-    <!-- 主内容区 -->
-    <div class="main-container">
-        <!-- 左侧：团队信息 -->
-        <div class="team-info-section">
-            <div class="card">
-                <h2 class="card-title">账户信息</h2>
-                <div class="info-group">
-                    <div class="info-label">医师</div>
-                    <div class="info-value team-name" id="doctor">Loading...</div>
-                </div>
-                <div class="info-group">
-                    <div class="info-label">所属医院</div>
-                    <div class="info-value" id="organization">Loading...</div>
-                </div>
-            </div>
-        </div>
+    <div class="card">
+      <h1>上传任务（文件夹 / 多视频）</h1>
 
-        <!-- 右侧：任务区域 -->
-        <div class="submission-section">
-            <div class="card">
-                <h2 class="card-title">任务批次</h2>
-                <div class="info-group">
-                    <div id="taskList">
-                        <div class="empty-state">
-                            <div class="empty-icon">📋</div>
-                            <p>Loading tasks...</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+      <div class="controls">
+        <label class="hint">提交者：</label>
+        <select id="usernameSelect"></select>
+
+        <button id="chooseFolderBtn" class="btn secondary">选择文件夹</button>
+        <input id="folderInput" type="file" webkitdirectory directory multiple style="display:none" />
+
+        <button id="chooseFilesBtn" class="btn secondary">选择视频文件</button>
+        <input id="fileInput" type="file" accept="video/*" multiple style="display:none" />
+
+        <div style="flex:1"></div>
+
+        <div id="statusHint" class="hint">提示：支持拖拽文件夹或视频到下方区域（现代浏览器支持）</div>
+      </div>
+
+      <div id="dropzone" class="dropzone">
+        将文件或文件夹拖放到此处，或点击选择。<br/>
+        说明：文件夹的结构应为：请求目录（一级）/ 病例目录（二级）/ 视频文件（仅二级下为视频）。
+      </div>
+
+      <div id="messages"></div>
+
+      <div id="rowsContainer" class="rows"></div>
+
+      <div class="bottom-actions">
+        <button id="clearBtn" class="btn secondary">取消上传</button>
+        <button id="uploadBtn" class="btn">确认上传</button>
+      </div>
     </div>
+  </div>
 
-    <script>
-    // 用户数据
-    let userData = null;
+  <script>
+    // dashboard: 前端接收逻辑与分组、预览、提交
+    (function(){
+      const MAX_VIDEOS_PER_CASE = 5;
+      const ALLOWED_EXT = ['.mp4', '.avi', '.mov', '.mkv'];
 
-    // 页面加载时获取用户信息
-    window.addEventListener('DOMContentLoaded', async () => {
-        // 检查是否已登录
-        const userDataStr = localStorage.getItem('userData');
+      // UI elements
+      const usernameSelect = document.getElementById('usernameSelect');
+      const folderInput = document.getElementById('folderInput');
+      const fileInput = document.getElementById('fileInput');
+      const chooseFolderBtn = document.getElementById('chooseFolderBtn');
+      const chooseFilesBtn = document.getElementById('chooseFilesBtn');
+      const dropzone = document.getElementById('dropzone');
+      const rowsContainer = document.getElementById('rowsContainer');
+      const messages = document.getElementById('messages');
+      const uploadBtn = document.getElementById('uploadBtn');
+      const clearBtn = document.getElementById('clearBtn');
 
-        // 检查登录状态
-        if (!userDataStr) {
-            alert('请先登录');
-            window.location.href = '/login';
-            return;
-        }
+      // Staging structure: array of { caseName, files: [ { file:File, relativePath?:string, thumbDataUrl?:string } ] }
+      let staging = [];
 
-        // 解析用户数据
-        userData = JSON.parse(userDataStr);
-        
-        // 显示用户信息
-        displayUserInfo();
-        
-        // 加载团队成员
-        await loadTeamMembers();
-        
-        // 加载提交历史
-        await loadSubmissionHistory();
-    });
-
-    // 显示用户信息
-    function displayUserInfo() {
-        document.getElementById('navUsername').textContent = userData.username;
-        document.getElementById('doctor').textContent = userData.doctor;
-        document.getElementById('organization').textContent = userData.organization;
-    }
-
-    // 加载团队成员（已移除）
-    async function loadTeamMembers() {
-        // 功能已移除
-    }
-
-    // 加载任务列表
-    async function loadSubmissionHistory() {
-        const taskList = document.getElementById('taskList');
-        
+      // load users for usernameSelect
+      async function loadUsers(){
         try {
-            // 从API获取任务列表
-            const response = await fetch(`/api/tasks/${userData.username}`);
-            
-            if (!response.ok) {
-                throw new Error('获取任务列表失败');
-            }
-            
-            const result = await response.json();
-            const tasks = result.data;
-            
-            if (tasks.length === 0) {
-                taskList.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-icon">📋</div>
-                        <p>暂无任务</p>
-                    </div>
-                `;
-                return;
-            }
-
-            // 按文件夹名称排序（数字排序）
-            tasks.sort((a, b) => {
-                // 提取文件夹名称中的数字部分
-                const numA = parseInt(a.folder.match(/\d+/)?.[0] || '0');
-                const numB = parseInt(b.folder.match(/\d+/)?.[0] || '0');
-                return numA - numB;
-            });
-            
-            // 渲染任务列表
-            taskList.innerHTML = tasks.map(task => {
-                const completedClass = task.completed ? 'completed' : '';
-                const statusBadge = task.completed 
-                    ? `<span class="task-status-badge status-completed">✓ 已完成</span>`
-                    : `<span class="task-status-badge status-pending">⏳ 待完成</span>`;
-                
-                const completionInfo = task.completed 
-                    ? `<div class="task-completion-info">
-                        <span>✅</span>
-                        <span>完成时间: ${task.completionTime}</span>
-                       </div>`
-                    : '';
-                
-                return `
-                    <button class="task-item ${completedClass}" onclick="openTask('${task.folder}', '${escapeHtml(task.name)}', ${task.completed})">
-                        <div class="task-header">
-                            <div class="task-icon">${task.completed ? '✅' : '📋'}</div>
-                            <div class="task-title">${task.name}</div>
-                            ${statusBadge}
-                            <div class="task-arrow">→</div>
-                        </div>
-                        <div class="task-description">${task.description}</div>
-                        <div class="task-folder-badge">📁 ${task.folder}</div>
-                        ${completionInfo}
-                    </button>
-                `;
-            }).join('');
-            
-        } catch (error) {
-            console.error('加载任务列表失败:', error);
-            taskList.innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-icon">❌</div>
-                    <p>加载任务失败，请刷新页面重试</p>
-                </div>
-            `;
+          const resp = await fetch('/api/users');
+          const data = await resp.json();
+          const users = data.data || [];
+          usernameSelect.innerHTML = users.map(u => `<option value="${u.username}">${u.username} (${u.doctor || ''})</option>`).join('');
+          if (users.length === 0) {
+            usernameSelect.innerHTML = '<option value="admin">admin</option>';
+          }
+        } catch (e) {
+          usernameSelect.innerHTML = '<option value="admin">admin</option>';
         }
-    }
+      }
 
-    // HTML转义函数
-    function escapeHtml(text) {
+      // util: show message
+      function showMessage(text, type = 'info', timeout = 4000) {
         const div = document.createElement('div');
+        div.className = 'alert';
         div.textContent = text;
-        return div.innerHTML;
-    }
+        messages.appendChild(div);
+        if (timeout > 0) setTimeout(()=>div.remove(), timeout);
+      }
 
-    // 打开任务
-    function openTask(taskFolder, taskName, isCompleted) {
-        if (isCompleted) {
-            if (!confirm('该任务已完成，确定要重新诊断吗？')) {
-                return;
+      function extOf(name) {
+        return (name.lastIndexOf('.') !== -1) ? name.slice(name.lastIndexOf('.')).toLowerCase() : '';
+      }
+
+      function isAllowedFile(name) {
+        return ALLOWED_EXT.includes(extOf(name));
+      }
+
+      // generate random 16 char alnum string for case name
+      function genCaseName() {
+        const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let s = '';
+        for (let i=0;i<16;i++) s += chars[Math.floor(Math.random()*chars.length)];
+        return s;
+      }
+
+      // create thumbnail from video File -> returns Promise<dataURL>
+      function createVideoThumbnail(file) {
+        return new Promise((resolve, reject) => {
+          const url = URL.createObjectURL(file);
+          const video = document.createElement('video');
+          video.preload = 'metadata';
+          video.muted = true;
+          video.src = url;
+          video.playsInline = true;
+          video.crossOrigin = 'anonymous';
+
+          video.addEventListener('loadeddata', () => {
+            // seek to 0
+            try {
+              const canvas = document.createElement('canvas');
+              const w = Math.min(320, video.videoWidth);
+              const h = Math.min(180, video.videoHeight);
+              canvas.width = w;
+              canvas.height = h;
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(video, 0, 0, w, h);
+              const dataURL = canvas.toDataURL('image/jpeg', 0.7);
+              URL.revokeObjectURL(url);
+              resolve(dataURL);
+            } catch (err) {
+              URL.revokeObjectURL(url);
+              resolve(''); // don't fail whole flow; return empty thumbnail
             }
-        }
-        
-        console.log(`打开任务: ${taskName} (文件夹: ${taskFolder})`);
-        // 跳转到诊断页面，传递用户名和任务文件夹
-        window.location.href = `/diagnosis?username=${encodeURIComponent(userData.username)}&task=${encodeURIComponent(taskFolder)}&taskName=${encodeURIComponent(taskName)}`;
-    }
+          });
 
-    // 登出
-    function logout() {
-        if (confirm('确认退出登录吗？')) {
-            localStorage.removeItem('userData');
-            window.location.href = '/login';
-        }
-    }
-</script>
+          video.addEventListener('error', () => {
+            URL.revokeObjectURL(url);
+            resolve('');
+          });
 
+        });
+      }
+
+      // UI: render staging rows
+      function renderRows() {
+        rowsContainer.innerHTML = '';
+        staging.forEach((caseItem, idx) => {
+          const row = document.createElement('div');
+          row.className = 'row-card';
+          // left
+          const left = document.createElement('div'); left.className = 'row-left';
+          const caseDiv = document.createElement('div'); caseDiv.className = 'case-name';
+          const input = document.createElement('input'); input.value = caseItem.caseName;
+          input.addEventListener('input', (e)=> caseItem.caseName = e.target.value.trim() || caseItem.caseName);
+          caseDiv.appendChild(document.createTextNode('病例名：'));
+          caseDiv.appendChild(input);
+          left.appendChild(caseDiv);
+
+          const thumbs = document.createElement('div'); thumbs.className = 'thumbs';
+          caseItem.files.forEach((fobj, fi) => {
+            const t = document.createElement('div'); t.className = 'thumb';
+            const img = document.createElement('img');
+            if (fobj.thumbDataUrl) img.src = fobj.thumbDataUrl;
+            else img.style.background = '#333'; // placeholder
+            const lbl = document.createElement('div'); lbl.className = 'label';
+            lbl.textContent = fobj.file.name;
+            t.appendChild(img);
+            t.appendChild(lbl);
+            thumbs.appendChild(t);
+          });
+          left.appendChild(thumbs);
+
+          // right actions
+          const ra = document.createElement('div'); ra.className = 'row-actions';
+          const addBtn = document.createElement('button'); addBtn.className = 'add-file-btn'; addBtn.textContent = '添加视频';
+          addBtn.addEventListener('click', ()=> {
+            // create hidden input to choose files and attach them to this case
+            const tmp = document.createElement('input');
+            tmp.type = 'file';
+            tmp.accept = 'video/*';
+            tmp.multiple = true;
+            tmp.onchange = async (ev) => {
+              const files = Array.from(ev.target.files || []);
+              if (!files.length) return;
+              if (caseItem.files.length + files.length > MAX_VIDEOS_PER_CASE) {
+                showMessage(`病例最多允许 ${MAX_VIDEOS_PER_CASE} 个视频`, 'warn');
+                return;
+              }
+              for (const f of files) {
+                if (!isAllowedFile(f.name)) {
+                  showMessage(`不支持的文件格式：${f.name}`, 'warn');
+                  continue;
+                }
+                const thumb = await createVideoThumbnail(f);
+                caseItem.files.push({ file: f, relativePath: null, thumbDataUrl: thumb });
+              }
+              renderRows();
+            };
+            tmp.click();
+          });
+
+          const remBtn = document.createElement('button'); remBtn.className = 'remove-row'; remBtn.textContent = '✕';
+          remBtn.title = '取消该病例上传';
+          remBtn.addEventListener('click', ()=> {
+            if (!confirm('确认删除该病例及其所有待上传视频吗？')) return;
+            staging.splice(idx, 1);
+            renderRows();
+          });
+
+          ra.appendChild(addBtn);
+          ra.appendChild(remBtn);
+
+          row.appendChild(left);
+          row.appendChild(ra);
+
+          rowsContainer.appendChild(row);
+        });
+      }
+
+      // clear staging
+      function clearAll() {
+        if (!confirm('确认取消并清空当前所有待上传数据？')) return;
+        staging = [];
+        renderRows();
+        messages.innerHTML = '';
+      }
+
+      // handle files that come from input or drop (files array, and optional webkitRelativePath available on file)
+      async function handleIncomingFiles(fileList, fromEntries = false) {
+        // Normalize into array of objects: { file: File, relativePath?: string }
+        const fileObjs = [];
+        for (const f of fileList) {
+          // some drag/drop directory traversal code might return FileSystemFileEntry with fullPath stored in f.fullPath;
+          let rel = f.webkitRelativePath || f.relativePath || f.fullPath || f.name;
+          // normalize
+          rel = (rel || f.name).replace(/^\/+/, '');
+          fileObjs.push({ file: f, relativePath: rel });
+        }
+
+        // Determine whether these are folder-structured (have '/')
+        const anyHasSlash = fileObjs.some(o => o.relativePath && o.relativePath.includes('/'));
+
+        // Mixed content (some with relative paths, some not) is considered unsupported per spec
+        const someWith = fileObjs.some(o => o.relativePath && o.relativePath.includes('/'));
+        const someWithout = fileObjs.some(o => !o.relativePath || !o.relativePath.includes('/'));
+        if (someWith && someWithout) {
+          showMessage('检测到混合上传（文件夹与独立文件同时上传），当前不支持，请分别上传', 'warn', 6000);
+          return;
+        }
+
+        if (anyHasSlash) {
+          // Expect structure: requestDir / caseName / videoFile
+          // collect parts and ensure first component is identical
+          const partsList = fileObjs.map(o => o.relativePath.split('/').filter(p => p && p !== '.'));
+          // ensure all have length >=3
+          if (partsList.some(p => p.length < 3)) {
+            showMessage('检测到不符合 request/case/video 结构的文件，请检查上传内容', 'warn', 6000);
+            return;
+          }
+          const firstSet = new Set(partsList.map(p => p[0]));
+          if (firstSet.size !== 1) {
+            showMessage('上传文件来自多个一级目录（请求），请仅上传同一请求目录内容', 'warn', 6000);
+            return;
+          }
+          // group by second component (caseName)
+          const groups = {};
+          fileObjs.forEach((o, idx) => {
+            const parts = o.relativePath.split('/').filter(p => p && p !== '.');
+            const caseName = parts[1];
+            const relUnderCase = parts.slice(2).join('/');
+            const fname = relUnderCase.split('/').pop();
+            if (!isAllowedFile(fname)) {
+              // reject unsupported extension
+              showMessage(`不支持的文件格式：${fname}`, 'warn', 6000);
+              return;
+            }
+            groups[caseName] = groups[caseName] || [];
+            groups[caseName].push({ file: o.file, relativePath: relUnderCase });
+          });
+          // validate per-case count
+          for (const [caseName, files] of Object.entries(groups)) {
+            if (files.length > MAX_VIDEOS_PER_CASE) {
+              showMessage(`病例 ${caseName} 包含 ${files.length} 个视频，超过上限 ${MAX_VIDEOS_PER_CASE}`, 'warn', 6000);
+              return;
+            }
+          }
+          // push to staging
+          for (const [caseName, files] of Object.entries(groups)) {
+            const rowFiles = [];
+            for (const it of files) {
+              const thumb = await createVideoThumbnail(it.file).catch(()=>'');
+              rowFiles.push({ file: it.file, relativePath: it.relativePath, thumbDataUrl: thumb });
+            }
+            staging.push({ caseName: caseName, files: rowFiles });
+          }
+          renderRows();
+        } else {
+          // all are standalone files -> treat as single case (if <= MAX_VIDEOS_PER_CASE)
+          if (fileObjs.length > MAX_VIDEOS_PER_CASE) {
+            showMessage(`一次上传的独立视频数量为 ${fileObjs.length}，超过上限 ${MAX_VIDEOS_PER_CASE}`, 'warn', 6000);
+            return;
+          }
+          const caseName = genCaseName();
+          const rowFiles = [];
+          for (const it of fileObjs) {
+            if (!isAllowedFile(it.file.name)) {
+              showMessage(`不支持的文件格式：${it.file.name}`, 'warn', 6000);
+              return;
+            }
+            const thumb = await createVideoThumbnail(it.file).catch(()=>'');
+            rowFiles.push({ file: it.file, relativePath: null, thumbDataUrl: thumb });
+          }
+          staging.push({ caseName: caseName, files: rowFiles });
+          renderRows();
+        }
+      }
+
+      // drag & drop handling (including directory entries)
+      function setupDropzone() {
+        dropzone.addEventListener('dragover', (e)=> {
+          e.preventDefault();
+          dropzone.classList.add('dragover');
+        });
+        dropzone.addEventListener('dragleave', (e)=> {
+          dropzone.classList.remove('dragover');
+        });
+
+        dropzone.addEventListener('drop', async (e)=> {
+          e.preventDefault();
+          dropzone.classList.remove('dragover');
+          const items = e.dataTransfer.items;
+          // If items support webkitGetAsEntry, traverse directories
+          if (items && items.length > 0 && items[0].webkitGetAsEntry) {
+            const entries = [];
+            for (let i=0;i<items.length;i++) entries.push(items[i].webkitGetAsEntry());
+            const files = [];
+            let aborted = false;
+            const traverse = (entry, pathPrefix) => {
+              return new Promise((resolve) => {
+                if (entry.isFile) {
+                  entry.file(file => {
+                    // create a fake File object with relativePath
+                    // Some browsers pass File with fullPath directly when dragging folders; but here we set property directly
+                    // We'll later read file.webkitRelativePath if present; else attach relativePath custom property
+                    file.relativePath = (pathPrefix ? pathPrefix + '/' : '') + file.name;
+                    files.push(file);
+                    resolve();
+                  }, () => resolve());
+                } else if (entry.isDirectory) {
+                  const reader = entry.createReader();
+                  reader.readEntries(async (entries) => {
+                    // process each entry recursively
+                    const promises = entries.map(en => traverse(en, pathPrefix ? pathPrefix + '/' + entry.name : entry.name));
+                    await Promise.all(promises);
+                    resolve();
+                  }, () => resolve());
+                } else {
+                  resolve();
+                }
+              });
+            };
+
+            // For each top-level entry
+            const tasks = entries.map(en => traverse(en, ''));
+            await Promise.all(tasks);
+            if (files.length === 0) {
+              showMessage('未获取到文件，请尝试使用“选择文件夹”按钮或单独选择视频文件', 'warn', 4000);
+              return;
+            }
+            await handleIncomingFiles(files, true);
+          } else {
+            // Fallback: use DataTransfer.files
+            const farr = Array.from(e.dataTransfer.files || []);
+            await handleIncomingFiles(farr, false);
+          }
+        });
+      }
+
+      // wire inputs
+      chooseFolderBtn.addEventListener('click', ()=> folderInput.click());
+      folderInput.addEventListener('change', async (e) => {
+        const files = Array.from(e.target.files || []);
+        if (!files.length) return;
+        await handleIncomingFiles(files, true);
+        folderInput.value = '';
+      });
+
+      chooseFilesBtn.addEventListener('click', ()=> fileInput.click());
+      fileInput.addEventListener('change', async (e) => {
+        const files = Array.from(e.target.files || []);
+        if (!files.length) return;
+        await handleIncomingFiles(files, false);
+        fileInput.value = '';
+      });
+
+      // upload action
+      uploadBtn.addEventListener('click', async () => {
+        if (staging.length === 0) {
+          showMessage('没有待上传内容', 'warn', 3000);
+          return;
+        }
+        const username = usernameSelect.value;
+        if (!username) {
+          showMessage('请选择提交者用户名', 'warn', 3000);
+          return;
+        }
+        // validate: totals & per-case checks
+        for (const c of staging) {
+          if (c.files.length === 0) {
+            showMessage(`病例 ${c.caseName} 没有包含视频，无法上传`, 'warn', 4000);
+            return;
+          }
+          if (c.files.length > MAX_VIDEOS_PER_CASE) {
+            showMessage(`病例 ${c.caseName} 包含 ${c.files.length} 个视频，超过上限 ${MAX_VIDEOS_PER_CASE}`, 'warn', 4000);
+            return;
+          }
+        }
+
+        // Block upload if staging contains items with both relativePath (folder upload) and without
+        const hasRel = staging.some(c => c.files.some(f => f.relativePath));
+        const hasNoRel = staging.some(c => c.files.some(f => !f.relativePath));
+        if (hasRel && hasNoRel) {
+          showMessage('检测到混合上传（文件夹结构与独立文件混合），当前不支持，请分别上传', 'warn', 6000);
+          return;
+        }
+
+        // Build FormData
+        const form = new FormData();
+        // If relativePath present, we need to preserve requestDir/caseName/file structure
+        // But per our server contract, server expects files whose filename contains the original relative path; here we will set filename in append accordingly.
+        for (const caseItem of staging) {
+          for (const fobj of caseItem.files) {
+            const f = fobj.file;
+            // if relativePath exists (e.g., 'requestDir/caseName/file.mp4' or 'caseSubPath/file.mp4'), we must reconstruct to 'requestDir/caseName/file' style.
+            if (fobj.relativePath) {
+              // The relativePath here is path under requestDir (i.e., after first two components in client logic we used)
+              // But actual UploadFile.filename that the server will read should be something like: requestDir/caseName/<relUnderCase>
+              // To reconstruct, we don't necessarily have the requestDir root name on the client side (because webkitdirectory may present full webkitRelativePath like 'requestDir/case/file')
+              // To keep it simple, if the file object has webkitRelativePath, prefer using it; else we will prepend a synthetic requestDir name
+              let fullRel = f.webkitRelativePath || f.relativePath || f.name;
+              // Normalize
+              fullRel = fullRel.replace(/^\/+/, '');
+              // If fullRel already contains at least two components, keep as is; else we create synthetic prefix
+              const parts = fullRel.split('/');
+              if (parts.length >= 3) {
+                // use as-is
+                form.append('files', f, fullRel);
+              } else {
+                // fallback: prefix artificial request dir
+                const reqDir = 'request';
+                const constructed = `${reqDir}/${caseItem.caseName}/${f.name}`;
+                form.append('files', f, constructed);
+              }
+            } else {
+              // no relative path -> append as caseName/filename so server treats as standalone-case files
+              const constructed = `${caseItem.caseName}/${f.name}`;
+              form.append('files', f, constructed);
+            }
+          }
+        }
+
+        // Perform upload via XMLHttpRequest to track progress if desired
+        uploadBtn.disabled = true;
+        uploadBtn.textContent = '上传中...';
+        showMessage('开始上传，请稍候（请勿关闭页面）', 'info', 3000);
+        try {
+          await uploadFormData(`/api/users/${encodeURIComponent(username)}/upload-oridata`, form, (percent) => {
+            uploadBtn.textContent = `上传中 ${Math.round(percent)}%`;
+          });
+          showMessage('上传成功，服务器已接收', 'info', 4000);
+          staging = [];
+          renderRows();
+        } catch (err) {
+          showMessage('上传失败：' + (err.message || err), 'warn', 6000);
+        } finally {
+          uploadBtn.disabled = false;
+          uploadBtn.textContent = '确认上传';
+        }
+      });
+
+      // helper: upload with XHR to get progress
+      function uploadFormData(url, formData, onProgress) {
+        return new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', url, true);
+          xhr.responseType = 'json';
+          xhr.onload = function() {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve(xhr.response);
+            } else {
+              const msg = xhr.response && xhr.response.detail ? xhr.response.detail : ('HTTP ' + xhr.status);
+              reject(new Error(msg));
+            }
+          };
+          xhr.onerror = function() { reject(new Error('网络错误')); };
+          if (xhr.upload && onProgress) {
+            xhr.upload.onprogress = function(e) {
+              if (e.lengthComputable) {
+                const pct = (e.loaded / e.total) * 100;
+                onProgress(pct);
+              }
+            };
+          }
+          xhr.send(formData);
+        });
+      }
+
+      // clear handler
+      clearBtn.addEventListener('click', clearAll);
+
+      // init
+      loadUsers();
+      setupDropzone();
+    })();
+  </script>
 </body>
 </html>
