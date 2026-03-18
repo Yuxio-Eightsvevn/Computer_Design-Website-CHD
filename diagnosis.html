@@ -1,0 +1,2430 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>诊断界面 - 儿童先心病诊断平台</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f7fa;
+            min-height: 100vh;
+        }
+
+        /* 顶部导航栏 */
+        .navbar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .navbar-title {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .navbar-user {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .user-name {
+            font-size: 14px;
+        }
+
+        .navbar-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 8px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            text-decoration: none;
+        }
+
+        .navbar-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        /* 主容器 */
+        .main-container {
+            display: flex;
+            gap: 30px;
+            padding: 30px;
+            max-width: 1600px;
+            margin: 0 auto;
+            min-height: calc(100vh - 60px);
+        }
+
+        /* 左侧视频区域 */
+        .video-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+            padding: 25px;
+        }
+
+        .video-container {
+            flex: 1;
+            background: #1a1a1a;
+            border-radius: 12px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(2, 1fr);
+            gap: 10px;
+            padding: 10px;
+            min-height: 500px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .video-item {
+            background: #2a2a2a;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #999;
+            font-size: 14px;
+            position: relative;
+            overflow: hidden;
+            border: 2px solid #3a3a3a;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .video-item:hover {
+            border-color: #667eea;
+            transform: scale(1.02);
+        }
+
+        .video-item:hover .video-expand-hint {
+            opacity: 1;
+        }
+
+        .video-expand-hint {
+            position: absolute;
+            bottom: 8px;
+            right: 8px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .video-item:last-child {
+            grid-column: 2 / 3;
+        }
+
+        .video-item video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .video-label {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            z-index: 10;
+        }
+
+        .video-placeholder {
+            text-align: center;
+        }
+
+        .video-placeholder-icon {
+            font-size: 32px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .video-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .control-btn {
+            flex: 0 0 120px;
+            padding: 12px 24px;
+            border: 2px solid #e9ecef;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            color: #495057;
+            transition: all 0.3s ease;
+        }
+
+        .control-btn:hover {
+            border-color: #667eea;
+            color: #667eea;
+            background: #f8f9ff;
+        }
+
+        .progress-bar {
+            flex: 1;
+            height: 50px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 2px solid #e9ecef;
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .progress-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 15px;
+            color: #495057;
+            font-weight: 500;
+            padding: 0 4px;
+        }
+
+        .progress-percentage {
+            color: #667eea;
+            font-weight: 600;
+            font-size: 15px;
+        }
+
+        .progress-track {
+            flex: 1;
+            background: #e9ecef;
+            border-radius: 6px;
+            height: 12px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            border-radius: 6px;
+            transition: width 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(
+                90deg,
+                transparent 0%,
+                rgba(255, 255, 255, 0.3) 50%,
+                transparent 100%
+            );
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% {
+                transform: translateX(-100%);
+            }
+            100% {
+                transform: translateX(100%);
+            }
+        }
+
+        /* 右侧诊断面板 */
+        .diagnosis-section {
+            flex: 0 0 450px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            height: calc(100vh - 60px);
+        }
+
+        .diagnosis-panel {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+            height: 100%;
+        }
+
+        .panel-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #2d3748;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .diagnosis-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .group-label {
+            font-size: 14px;
+            font-weight: 500;
+            color: #4a5568;
+            margin-bottom: 5px;
+        }
+
+        .diagnosis-options {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .diagnosis-options.four-cols {
+            grid-template-columns: repeat(4, 1fr);
+        }
+
+        .option-btn {
+            padding: 12px 16px;
+            border: 2px solid #e9ecef;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            color: #495057;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        .option-btn:hover {
+            border-color: #667eea;
+            color: #667eea;
+            background: #f8f9ff;
+        }
+
+        .option-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-color: #667eea;
+            color: white;
+        }
+
+        /* 诊断标准区域 */
+        .diagnosis-standard-trigger {
+            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(72, 187, 120, 0.3);
+            position: relative;
+            user-select: none;
+        }
+
+        /* 当前选择显示 */
+        .current-selection {
+            background: #f0f4ff;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            padding: 10px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .selection-label {
+            font-size: 12px;
+            color: #667eea;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .selection-value {
+            font-size: 13px;
+            color: #2d3748;
+            line-height: 1.5;
+            background: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .selection-value .level-number {
+            display: inline-block;
+            color: #667eea;
+            font-weight: 700;
+            margin-right: 4px;
+            font-size: 14px;
+        }
+
+        .selection-value .level-name {
+            font-weight: 600;
+            color: #667eea;
+            margin-right: 6px;
+        }
+
+        .diagnosis-standard-trigger:hover {
+            box-shadow: 0 4px 12px rgba(72, 187, 120, 0.4);
+        }
+
+        .diagnosis-standard-trigger::after {
+            content: '▼';
+            margin-left: 8px;
+            font-size: 12px;
+            transition: transform 0.3s ease;
+        }
+
+        .diagnosis-standard-trigger.active::after {
+            transform: rotate(180deg);
+        }
+
+        /* 诊断标准内容面板 */
+        .diagnosis-standard-content {
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .diagnosis-standard-content.active {
+            display: flex;
+            max-height: 400px;
+        }
+
+        .standard-list {
+            flex: 1;
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+
+        .standard-item {
+            margin-bottom: 6px;
+            padding: 6px 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+
+        .standard-item:hover {
+            background: #e9ecef;
+            transform: translateX(2px);
+            border-color: #667eea;
+        }
+
+        .standard-item.selected {
+            background: #f0f4ff;
+            border-color: #667eea;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+        }
+
+        .standard-number {
+            flex-shrink: 0;
+            font-weight: 600;
+            color: #667eea;
+            font-size: 16px;
+            min-width: 18px;
+        }
+
+        .standard-text {
+            flex: 1;
+            line-height: 1.4;
+            color: #2d3748;
+            font-size: 14px
+        }
+
+        .standard-level {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 16px;
+            font-weight: 600;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .level-absolutely-normal { background: #e6f7ff; color: #1890ff; }
+        .level-basically-normal { background: #e6fffb; color: #13c2c2; }
+        .level-tends-normal { background: #f6ffed; color: #52c41a; }
+        .level-suspected { background: #fff7e6; color: #fa8c16; }
+        .level-cannot-judge { background: #fff1f0; color: #f5222d; }
+        .level-highly-suspected { background: #fff0f6; color: #eb2f96; }
+        .level-basically-confirmed { background: #f9f0ff; color: #722ed1; }
+        .level-completely-confirmed { background: #e6f7ff; color: #1890ff; }
+        .level-typically-confirmed { background: #fff7e6; color: #fa8c16; }
+
+        /* 自定义滚动条 */
+        .standard-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .standard-list::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 3px;
+        }
+
+        .standard-list::-webkit-scrollbar-thumb {
+            background: #667eea;
+            border-radius: 3px;
+        }
+
+        .standard-list::-webkit-scrollbar-thumb:hover {
+            background: #764ba2;
+        }
+
+        /* 模型置信度进度条样式 */
+        .model-confidence-bars {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            padding: 8px 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-top: 8px;
+        }
+
+        .confidence-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .confidence-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #2d3748;
+            min-width: 55px;
+            flex-shrink: 0;
+        }
+
+        .confidence-bar {
+            flex: 1;
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .confidence-value {
+            font-size: 11px;
+            font-weight: 700;
+            color: #667eea;
+            min-width: 40px;
+            text-align: right;
+            flex-shrink: 0;
+        }
+
+        .confidence-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+
+        .timer-button-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .timer-btn {
+            padding: 14px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            white-space: nowrap;
+        }
+
+        .timer-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .timer-text {
+            font-size: 18px;
+            font-weight: 600;
+            color: #2d3748;
+        }
+
+        .action-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .action-btn {
+            padding: 14px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+
+        .btn-submit {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-submit:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-submit-green {
+            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+            color: white;
+            padding: 14px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            width: 100%;
+            box-shadow: 0 2px 8px rgba(72, 187, 120, 0.3);
+        }
+
+        .btn-submit-green:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(72, 187, 120, 0.5);
+        }
+
+        .content-spacer {
+            flex: 1;
+        }
+
+        .navigation-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        /* 视频弹窗样式 */
+        .video-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .video-modal.active {
+            display: flex;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        .video-modal-content {
+            position: relative;
+            width: 95%;
+            max-width: 1600px;
+            max-height: 85vh;
+            background: #1a1a1a;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            animation: scaleIn 0.3s ease;
+        }
+
+        @keyframes scaleIn {
+            from {
+                transform: scale(0.9);
+                opacity: 0;
+            }
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .video-modal-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .video-modal-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .video-modal-close {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            font-size: 32px;
+            line-height: 1;
+            padding: 0;
+            transition: all 0.3s ease;
+        }
+
+        .video-modal-close:hover {
+            color: #e0e0e0;
+            transform: scale(1.1);
+        }
+
+        .video-modal-close::before {
+            content: '×';
+            display: block;
+        }
+
+        .video-modal-body {
+            background: #2a2a2a;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: calc(85vh - 60px);
+            position: relative;
+        }
+
+        /* 3D显示容器 - 分割布局 */
+        .video-3d-container {
+            display: flex;
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+
+        /* 左侧2D视频区域 */
+        .video-2d-section {
+            flex: 0 0 60%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #1a1a1a;
+            padding: 20px;
+            position: relative;
+        }
+
+        .video-2d-wrapper {
+            width: 100%;
+            max-width: 100%;
+            aspect-ratio: 16/9;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        .video-2d-section video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        /* 分隔线 */
+        .video-3d-divider {
+            width: 2px;
+            background: linear-gradient(180deg, transparent 0%, #7c6fd6 50%, transparent 100%);
+            box-shadow: 0 0 10px #7c6fd6;
+            position: relative;
+            z-index: 10;
+        }
+
+        /* 右侧3D区域 */
+        .video-3d-section {
+            flex: 1;
+            min-width: 0;
+            position: relative;
+            background: #1a0a2e;
+            overflow: hidden;
+        }
+
+        .video-3d-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* 3D显示信息面板 */
+        .video-3d-info {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(26, 26, 26, 0.85);
+            backdrop-filter: blur(10px);
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid rgba(124, 111, 214, 0.4);
+            font-size: 11px;
+            color: #cccccc;
+            z-index: 100;
+        }
+
+        /* 3D控制提示 */
+        .video-3d-controls-hint {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 16px;
+            background: rgba(26, 26, 26, 0.7);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            border: 1px solid rgba(124, 111, 214, 0.3);
+            color: #cccccc;
+            font-size: 12px;
+            z-index: 100;
+        }
+
+        /* 兼容旧版只有2D视频的样式 */
+        .video-modal-body video {
+            width: 100%;
+            height: 100%;
+            max-height: calc(98vh - 60px);
+            object-fit: contain;
+        }
+
+        .video-modal-placeholder {
+            text-align: center;
+            color: #999;
+            padding: 60px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .video-modal-placeholder-icon {
+            font-size: 64px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 1200px) {
+            .main-container {
+                flex-direction: column;
+            }
+
+            .diagnosis-section {
+                flex: 1;
+            }
+
+            .video-container {
+                grid-template-columns: repeat(2, 1fr);
+                grid-template-rows: repeat(3, 1fr);
+            }
+
+            .video-item:last-child {
+                grid-column: 1 / 3;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .navbar {
+                padding: 12px 15px;
+            }
+
+            .navbar-title {
+                font-size: 18px;
+            }
+
+            .main-container {
+                padding: 15px;
+                gap: 15px;
+            }
+
+            .diagnosis-options {
+                grid-template-columns: 1fr;
+            }
+
+            .diagnosis-options.four-cols {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .video-controls {
+                flex-direction: column;
+            }
+
+            .control-btn {
+                flex: 1;
+                width: 100%;
+            }
+
+            .video-container {
+                grid-template-columns: 1fr;
+                grid-template-rows: repeat(5, 1fr);
+                min-height: 600px;
+            }
+
+            .video-item:last-child {
+                grid-column: 1 / 2;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 顶部导航栏 -->
+    <div class="navbar">
+        <div class="navbar-title">🩺 儿童先心病诊断平台 - 诊断模式</div>
+        <div class="navbar-user">
+            <span class="user-name" id="navUsername">Loading...</span>
+            <a href="javascript:void(0)" class="navbar-btn" onclick="returnToDashboard()">返回主页</a>
+        </div>
+    </div>
+
+    <!-- 主容器 -->
+    <div class="main-container">
+
+        <!-- 左侧：视频播放区域 -->
+        <div class="video-section">
+            <div class="card">
+                <div class="video-controls">
+                    <div class="progress-bar">
+                        <div class="progress-info">
+                            <span id="progressText">病人 0 / 0</span>
+                            <span class="progress-percentage" id="progressPercentage">0%</span>
+                        </div>
+                        <div class="progress-track">
+                            <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card" style="flex: 1; display: flex; flex-direction: column; padding: 0;">
+                <div class="video-container">
+                    <!-- 视频1 -->
+                    <div class="video-item" onclick="openVideoModal(1)">
+                        <div class="video-label">视频 1</div>
+                        <div class="video-placeholder">
+                            <div class="video-placeholder-icon">🎥</div>
+                            <p>超声视图 1</p>
+                        </div>
+                        <div class="video-expand-hint">🔍 点击放大</div>
+                    </div>
+                    <!-- 视频2 -->
+                    <div class="video-item" onclick="openVideoModal(2)">
+                        <div class="video-label">视频 2</div>
+                        <div class="video-placeholder">
+                            <div class="video-placeholder-icon">🎥</div>
+                            <p>超声视图 2</p>
+                        </div>
+                        <div class="video-expand-hint">🔍 点击放大</div>
+                    </div>
+                    <!-- 视频3 -->
+                    <div class="video-item" onclick="openVideoModal(3)">
+                        <div class="video-label">视频 3</div>
+                        <div class="video-placeholder">
+                            <div class="video-placeholder-icon">🎥</div>
+                            <p>超声视图 3</p>
+                        </div>
+                        <div class="video-expand-hint">🔍 点击放大</div>
+                    </div>
+                    <!-- 视频4 -->
+                    <div class="video-item" onclick="openVideoModal(4)">
+                        <div class="video-label">视频 4</div>
+                        <div class="video-placeholder">
+                            <div class="video-placeholder-icon">🎥</div>
+                            <p>超声视图 4</p>
+                        </div>
+                        <div class="video-expand-hint">🔍 点击放大</div>
+                    </div>
+                    <!-- 视频5 -->
+                    <div class="video-item" onclick="openVideoModal(5)">
+                        <div class="video-label">视频 5</div>
+                        <div class="video-placeholder">
+                            <div class="video-placeholder-icon">🎥</div>
+                            <p>超声视图 5</p>
+                        </div>
+                        <div class="video-expand-hint">🔍 点击放大</div>
+                    </div>
+                </div>
+            </div>
+            
+        </div>
+
+        <!-- 右侧：诊断面板 -->
+        <div class="diagnosis-section">
+            <div class="diagnosis-panel">
+                <!-- 暂停计时 -->
+                <div class="timer-button-container">
+                    <button class="timer-btn" onclick="toggleTimer()">暂停计时</button>
+                    <span class="timer-text" id="timerText">00:00</span>
+                </div>
+
+                <!-- 模态切换 -->
+                <div class="diagnosis-group">
+                    <div class="group-label">诊断模态:</div>
+                    <div class="diagnosis-options" style="grid-template-columns: repeat(3, 1fr);">
+                        <button class="option-btn active" onclick="selectOption(this, 'modality')">普通</button>
+                        <button class="option-btn" onclick="selectOption(this, 'modality')">热力图</button>
+                        <button class="option-btn" onclick="selectOption(this, 'modality')">模型识别框</button>
+                    </div>
+                </div>
+
+                <!-- 模型预测置信度 -->
+                <div class="model-confidence-bars" id="modelConfidence">
+                    <div class="group-label" style="font-size: 13px; margin-bottom: 2px;">模型预测置信度</div>
+                    <div class="confidence-item">
+                        <span class="confidence-label">Normal</span>
+                        <div class="confidence-bar">
+                            <div class="confidence-fill" id="fill-normal" style="width: 0%; background: #10b981;"></div>
+                        </div>
+                        <span class="confidence-value" id="conf-normal">0.0%</span>
+                    </div>
+                    <div class="confidence-item">
+                        <span class="confidence-label">VSD</span>
+                        <div class="confidence-bar">
+                            <div class="confidence-fill" id="fill-vsd" style="width: 0%; background: #f59e0b;"></div>
+                        </div>
+                        <span class="confidence-value" id="conf-vsd">0.0%</span>
+                    </div>
+                    <div class="confidence-item">
+                        <span class="confidence-label">ASD</span>
+                        <div class="confidence-bar">
+                            <div class="confidence-fill" id="fill-asd" style="width: 0%; background: #ef4444;"></div>
+                        </div>
+                        <span class="confidence-value" id="conf-asd">0.0%</span>
+                    </div>
+                    <div class="confidence-item">
+                        <span class="confidence-label">PDA</span>
+                        <div class="confidence-bar">
+                            <div class="confidence-fill" id="fill-pda" style="width: 0%; background: #8b5cf6;"></div>
+                        </div>
+                        <span class="confidence-value" id="conf-pda">0.0%</span>
+                    </div>
+                </div>
+
+                <!-- 临床判断 -->
+                <div class="diagnosis-group">
+                    <div class="group-label">临床判断:</div>
+                    <div class="diagnosis-options four-cols">
+                        <button class="option-btn active" onclick="selectOption(this, 'diagnosis')">Normal</button>
+                        <button class="option-btn" onclick="selectOption(this, 'diagnosis')">VSD</button>
+                        <button class="option-btn" onclick="selectOption(this, 'diagnosis')">ASD</button>
+                        <button class="option-btn" onclick="selectOption(this, 'diagnosis')">PDA</button>
+                    </div>
+                </div>
+
+                <!-- 诊断标准触发器 -->
+                <div class="diagnosis-standard-trigger" onclick="toggleDiagnosisStandard()">
+                    📋 选择诊断标准等级
+                </div>
+
+                <!-- 当前选择显示 -->
+                <div class="current-selection" id="currentSelection" style="display: none;">
+                    <span class="selection-label">当前选择：</span>
+                    <span class="selection-value" id="selectionValue"></span>
+                </div>
+
+                <!-- 诊断标准内容面板 -->
+                    <div class="diagnosis-standard-content" id="diagnosisStandardContent">
+                        <div class="standard-list">
+                            <div class="standard-item" onclick="selectStandardLevel(1)">
+                                <div class="standard-number">1.</div>
+                                <div class="standard-text">切面标准，常见病灶区超声回声连续完整，未见过隔血流信号</div>
+                                <div class="standard-level level-absolutely-normal">完全正常</div>
+                            </div>
+                            <div class="standard-item" onclick="selectStandardLevel(2)">
+                                <div class="standard-number">2.</div>
+                                <div class="standard-text">常见病灶区域存在缺损伪影，无法完全排除微小病变，但判断为正常</div>
+                                <div class="standard-level level-basically-normal">倾向正常</div>
+                            </div>
+                            <div class="standard-item" onclick="selectStandardLevel(3)">
+                                <div class="standard-number">3.</div>
+                                <div class="standard-text">在某个切面上似乎观察到病灶区域存在微小伪彩，不确定是否真的阴性</div>
+                                <div class="standard-level level-tends-normal">可疑阴性</div>
+                            </div>
+                            <div class="standard-item" onclick="selectStandardLevel(4)">
+                                <div class="standard-number">4.</div>
+                                <div class="standard-text">解剖结构较模糊，无法定位到病灶可能存在的区域，无法做出肯定或者否定的判断</div>
+                                <div class="standard-level level-suspected">无法判断</div>
+                            </div>
+                            <div class="standard-item" onclick="selectStandardLevel(5)">
+                                <div class="standard-number">5.</div>
+                                <div class="standard-text">在某个切面上似乎观察到病灶区域存在微小回声淡区，且观察到不明确的分流血流信号</div>
+                                <div class="standard-level level-cannot-judge">可疑阳性</div>
+                            </div>
+                            <div class="standard-item" onclick="selectStandardLevel(6)">
+                                <div class="standard-number">6.</div>
+                                <div class="standard-text">彩色多普勒观察到可疑的分流血流束，但二维超声未观察到明确的解剖缺损口，但判断为阳性</div>
+                                <div class="standard-level level-highly-suspected">倾向阳性</div>
+                            </div>
+                            <div class="standard-item" onclick="selectStandardLevel(7)">
+                                <div class="standard-number">7.</div>
+                                <div class="standard-text">在至少一个切面上观察到解剖结构缺损，以及明确的分流血流信号</div>
+                                <div class="standard-level level-basically-confirmed">完全确诊</div>
+                            </div>
+                        </div>
+                    </div>
+
+                <!-- 占位符，将导航按钮推到底部 -->
+                <div class="content-spacer"></div>
+
+                <!-- 提交按钮（完成全部诊断后显示） -->
+                <button class="action-btn btn-submit-green" id="submitBtn" onclick="submitDiagnosis()" style="display: none;">
+                    ✅ 提交全部诊断结果
+                </button>
+
+                <!-- 导航按钮 -->
+                <div class="navigation-buttons">
+                    <button class="action-btn btn-submit" onclick="previousVideo()" style="background: #e9ecef; color: #495057;">上一个</button>
+                    <button class="action-btn btn-submit" onclick="nextVideo()">下一个</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 视频弹窗 -->
+    <div class="video-modal" id="videoModal" onclick="closeVideoModal(event)">
+        <div class="video-modal-content" onclick="event.stopPropagation()">
+            <div class="video-modal-header">
+                <div class="video-modal-title" id="modalTitle">视频 1 - 放大查看</div>
+                <button class="video-modal-close" onclick="closeVideoModal()"></button>
+            </div>
+            <div class="video-modal-body" id="modalBody">
+                <div class="video-modal-placeholder">
+                    <div class="video-modal-placeholder-icon">🎥</div>
+                    <p>超声视频播放区域</p>
+                    <p style="font-size: 12px; margin-top: 10px; color: #666;">此处将播放放大的视频</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Three.js Import Map for 3D Visualization -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <script>
+        let userData = null;
+        let video3DViewer = null; // 3D查看器实例
+        let currentSeverity = null;
+        let timerInterval = null;
+        let timerSeconds = 0;
+        let timerPaused = false;
+        let currentVideoIndex = 0;
+        let currentPatientIndex = 0;
+        let currentModality = 'original'; // 当前选择的模态：original, heatmap, bbox
+        let patients = [];
+        let diagnosisRecords = {}; // 存储所有病人的诊断记录 {patientId: {diagnosis, severity}}
+        let taskInfo = {
+            username: '',
+            taskFolder: '',
+            taskName: ''
+        };
+        let isReturningToDashboard = false; // 标记是否正在返回主页
+
+        // ========== 诊断草稿缓存（sessionStorage）==========
+        function getDraftKey() {
+            return `diagnosisDraft:${taskInfo.username}:${taskInfo.taskFolder}`;
+        }
+
+        function getCurrentUiSelection() {
+            const diagnosisGroup = document.querySelectorAll('.diagnosis-group')[1];
+            const selectedDiagnosis = diagnosisGroup?.querySelector('.option-btn.active');
+            return {
+                patientId: patients?.[currentPatientIndex]?.id ?? null,
+                diagnosis: selectedDiagnosis ? selectedDiagnosis.textContent.trim() : null,
+                severity: currentSeverity ?? null
+            };
+        }
+
+        function saveDraft(reason = '') {
+            try {
+                const draft = {
+                    v: 1,
+                    username: taskInfo.username,
+                    taskFolder: taskInfo.taskFolder,
+                    savedAt: Date.now(),
+                    timerSeconds,
+                    timerPaused,
+                    currentPatientIndex,
+                    diagnosisRecords,
+                    inProgress: getCurrentUiSelection(),
+                    reason
+                };
+                sessionStorage.setItem(getDraftKey(), JSON.stringify(draft));
+                console.log('📝 草稿已保存:', reason);
+            } catch (e) {
+                console.warn('保存草稿失败:', e);
+            }
+        }
+
+        function loadDraft() {
+            try {
+                const raw = sessionStorage.getItem(getDraftKey());
+                if (!raw) return null;
+                const draft = JSON.parse(raw);
+                if (!draft || draft.username !== taskInfo.username || draft.taskFolder !== taskInfo.taskFolder) return null;
+                console.log('📖 草稿已加载:', draft);
+                return draft;
+            } catch (e) {
+                console.warn('读取草稿失败:', e);
+                return null;
+            }
+        }
+
+        function clearDraft() {
+            try {
+                const key = getDraftKey();
+                sessionStorage.removeItem(key);
+                console.log('🗑️ 草稿已清除，Key:', key);
+                
+                // 验证是否真的清除了
+                const check = sessionStorage.getItem(key);
+                if (check) {
+                    console.error('⚠️ 草稿清除失败！');
+                } else {
+                    console.log('✅ 草稿清除成功验证');
+                }
+            } catch (e) {
+                console.error('清除草稿时出错:', e);
+            }
+        }
+
+        function applyDraft(draft) {
+            console.log('🔄 正在应用草稿...');
+            
+            // 基础变量
+            timerSeconds = Number(draft.timerSeconds || 0);
+            timerPaused = !!draft.timerPaused;
+            diagnosisRecords = draft.diagnosisRecords || {};
+            currentPatientIndex = Math.min(Math.max(Number(draft.currentPatientIndex || 0), 0), patients.length - 1);
+
+            // 先加载病例（不自动恢复诊断状态）
+            loadPatientVideos(currentPatientIndex, false);
+
+            // 恢复"当前病例未保存但已选择"的 UI
+            if (draft.inProgress && draft.inProgress.patientId === patients[currentPatientIndex]?.id) {
+                if (draft.inProgress.diagnosis) {
+                    const diagnosisGroup = document.querySelectorAll('.diagnosis-group')[1];
+                    const buttons = diagnosisGroup?.querySelectorAll('.option-btn') || [];
+                    buttons.forEach(btn => {
+                        btn.classList.toggle('active', btn.textContent.trim() === draft.inProgress.diagnosis);
+                    });
+                }
+                if (draft.inProgress.severity) {
+                    currentSeverity = draft.inProgress.severity;
+                    // 手动恢复诊断标准等级的UI
+                    const standardItems = document.querySelectorAll('.standard-item');
+                    let selectedItem = null;
+                    standardItems.forEach((item, index) => {
+                        if (index + 1 === draft.inProgress.severity) {
+                            item.classList.add('selected');
+                            selectedItem = item;
+                        } else {
+                            item.classList.remove('selected');
+                        }
+                    });
+                    
+                    // 恢复外部选中显示
+                    if (selectedItem) {
+                        const levelText = selectedItem.querySelector('.standard-level').textContent;
+                        const descText = selectedItem.querySelector('.standard-text').textContent;
+                        const currentSelection = document.getElementById('currentSelection');
+                        const selectionValue = document.getElementById('selectionValue');
+                        selectionValue.innerHTML = `<span class="level-number">${draft.inProgress.severity}</span><span class="level-name">${levelText}</span>${descText}`;
+                        currentSelection.style.display = 'flex';
+                    }
+                }
+            } else if (diagnosisRecords[patients[currentPatientIndex]?.id]) {
+                // 如果inProgress没有,但diagnosisRecords有,则恢复已保存的记录
+                restoreDiagnosisState(patients[currentPatientIndex].id);
+            }
+
+            // 更新显示
+            updateTimerDisplay();
+            updateProgressText();
+
+            // 同步"暂停/继续"按钮文案
+            const timerBtn = document.querySelector('.timer-btn');
+            if (timerBtn) timerBtn.textContent = timerPaused ? '继续计时' : '暂停计时';
+            
+            console.log('✅ 草稿应用完成');
+        }
+        // ========== 诊断草稿缓存结束 ==========
+
+        // 页面加载
+        window.addEventListener('DOMContentLoaded', async () => {
+            // 获取URL参数
+            const urlParams = new URLSearchParams(window.location.search);
+            taskInfo.username = urlParams.get('username');
+            taskInfo.taskFolder = urlParams.get('task');
+            taskInfo.taskName = urlParams.get('taskName') || '诊断任务';
+            
+            // 检查是否带有清除草稿的标记
+            const clearCache = urlParams.get('clearCache');
+            if (clearCache === 'true') {
+                console.log('🗑️ 检测到清除缓存标记，清除草稿...');
+                // 清除所有诊断相关的 sessionStorage
+                const keysToRemove = [];
+                for (let i = 0; i < sessionStorage.length; i++) {
+                    const storageKey = sessionStorage.key(i);
+                    if (storageKey && storageKey.includes('diagnosisDraft')) {
+                        keysToRemove.push(storageKey);
+                    }
+                }
+                keysToRemove.forEach(k => sessionStorage.removeItem(k));
+                console.log('✅ 已清除所有草稿');
+            }
+            
+            // 检查必要参数
+            if (!taskInfo.username || !taskInfo.taskFolder) {
+                alert('缺少必要参数，即将返回主页');
+                window.location.href = '/dashboard';
+                return;
+            }
+            
+            // 显示用户信息
+            const userDataStr = localStorage.getItem('userData');
+            if (userDataStr) {
+                userData = JSON.parse(userDataStr);
+                document.getElementById('navUsername').textContent = userData.username;
+            }
+            
+            // 加载病人列表
+            await loadPatients();
+            
+            // 尝试恢复草稿（patients 已经加载完成）
+            const draft = loadDraft();
+            if (draft) {
+                console.log('🔄 检测到草稿,正在恢复...');
+                applyDraft(draft);
+            } else {
+                console.log('📄 无草稿,从头开始');
+                updateTimerDisplay();
+                updateProgressText();
+            }
+            
+            // 启动计时器
+            startTimer();
+
+            // 自动保存：刷新/关闭时保存（但返回主页时不保存）
+            window.addEventListener('pagehide', () => {
+                if (!isReturningToDashboard) {
+                    saveDraft('pagehide');
+                }
+            });
+            window.addEventListener('beforeunload', () => {
+                if (!isReturningToDashboard) {
+                    saveDraft('beforeunload');
+                }
+            });
+
+            // 添加ESC键关闭弹窗
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    closeVideoModal();
+                }
+            });
+        });
+
+        // 加载病人列表
+        async function loadPatients() {
+            try {
+                console.log('正在加载病人列表...', {
+                    username: taskInfo.username,
+                    taskFolder: taskInfo.taskFolder
+                });
+                
+                const response = await fetch(`/api/tasks/${taskInfo.username}/${taskInfo.taskFolder}/patients`);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('API返回错误:', response.status, errorText);
+                    throw new Error(`获取病人列表失败: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                console.log('API返回数据:', result);
+                
+                patients = result.data;
+                console.log('病人列表:', patients);
+                
+                if (!patients || patients.length === 0) {
+                    alert('该任务下没有病人数据');
+                    window.location.href = '/dashboard';
+                    return;
+                }
+                
+                // 加载第一个病人的视频
+                loadPatientVideos(0);
+                updateProgressText();
+                
+            } catch (error) {
+                console.error('加载病人列表失败:', error);
+                alert('加载病人数据失败，请返回重试\n错误: ' + error.message);
+            }
+        }
+
+        // 加载指定病人的视频
+        // restoreDiagnosis: 是否恢复诊断状态，默认为true
+        function loadPatientVideos(patientIndex, restoreDiagnosis = true) {
+            console.log('✅ loadPatientVideos 调用:', {
+                patientIndex,
+                patientsLength: patients.length,
+                currentModality,
+                restoreDiagnosis
+            });
+            
+            if (patientIndex < 0 || patientIndex >= patients.length) {
+                console.error('❌ 病人索引无效:', patientIndex, '总数:', patients.length);
+                return;
+            }
+            
+            currentPatientIndex = patientIndex;
+            const patient = patients[patientIndex];
+            console.log('📋 当前病人完整数据:', JSON.stringify(patient, null, 2));
+            console.log('📹 视频数组:', patient.videos);
+            console.log('📹 视频数量:', patient.videos ? patient.videos.length : 0);
+            
+            const videoContainer = document.querySelector('.video-container');
+            
+            // 恢复该病人之前的诊断记录（如果有）
+            // 只有在真正切换病人时才恢复诊断状态
+            if (restoreDiagnosis) {
+                restoreDiagnosisState(patient.id);
+            }
+            
+            // 加载模型置信度（从第一个视频的metadata）
+            loadModelConfidence(patient);
+            
+            // 清空现有视频
+            videoContainer.innerHTML = '';
+            
+            // 创建最多5个视频项
+            const maxVideos = 5;
+            for (let i = 0; i < maxVideos; i++) {
+                const videoDiv = document.createElement('div');
+                videoDiv.className = 'video-item';
+                videoDiv.onclick = () => openVideoModal(i + 1);
+                
+                const label = document.createElement('div');
+                label.className = 'video-label';
+                label.textContent = `视频 ${i + 1}`;
+                videoDiv.appendChild(label);
+                
+                if (i < patient.videos.length) {
+                    // 有视频的情况
+                    const videoGroup = patient.videos[i];
+                    console.log(`🎬 视频 ${i + 1} 组完整数据:`, JSON.stringify(videoGroup, null, 2));
+                    console.log(`🔍 当前选择的模态: ${currentModality}`);
+                    console.log(`🔍 可用的模态:`, videoGroup.modalities ? Object.keys(videoGroup.modalities) : 'modalities不存在');
+                    
+                    // 检查 videoGroup 和 modalities 是否存在
+                    if (!videoGroup || !videoGroup.modalities) {
+                        console.error(`❌ 视频 ${i + 1} 数据格式错误:`, videoGroup);
+                        const placeholder = document.createElement('div');
+                        placeholder.className = 'video-placeholder';
+                        placeholder.innerHTML = `
+                            <div class="video-placeholder-icon">❌</div>
+                            <p>视频数据错误</p>
+                        `;
+                        videoDiv.appendChild(placeholder);
+                    } else {
+                        // 只使用当前选择的模态，如果不存在则显示占位符
+                        const videoPath = videoGroup.modalities[currentModality];
+                        
+                        if (videoPath) {
+                            console.log(`✅ 使用 ${currentModality} 模态:`, videoPath);
+                            const video = document.createElement('video');
+                            video.loop = true;
+                            video.muted = true;
+                            video.playsInline = true;
+                            video.controls = false;
+                            video.preload = 'metadata';
+                            
+                            // 添加错误处理
+                            video.onerror = function(e) {
+                                console.error('视频加载失败:', videoPath, e);
+                                console.error('错误详情:', video.error);
+                                // 显示错误信息
+                                const errorDiv = document.createElement('div');
+                                errorDiv.className = 'video-placeholder';
+                                errorDiv.innerHTML = `
+                                    <div class="video-placeholder-icon">⚠️</div>
+                                    <p style="font-size: 12px;">视频加载失败</p>
+                                    <p style="font-size: 10px; color: #666;">${video.error ? video.error.message : '未知错误'}</p>
+                                `;
+                                videoDiv.replaceChild(errorDiv, video);
+                            };
+                            
+                            video.onloadedmetadata = function() {
+                                console.log('✅ 视频元数据加载成功:', videoPath);
+                                // 尝试自动播放
+                                video.play().catch(err => {
+                                    console.warn('自动播放失败:', err);
+                                });
+                            };
+                            
+                            video.onloadeddata = function() {
+                                console.log('✅ 视频数据加载成功:', videoPath);
+                            };
+                            
+                            videoDiv.appendChild(video);
+                            
+                            // 设置视频源（在添加到DOM后）
+                            video.src = videoPath;
+                        } else {
+                            // 该模态不存在，显示占位符
+                            console.warn(`❌ 视频 ${i + 1} 的 ${currentModality} 模态不存在`);
+                            const placeholder = document.createElement('div');
+                            placeholder.className = 'video-placeholder';
+                            placeholder.innerHTML = `
+                                <div class="video-placeholder-icon">📹</div>
+                                <p>${currentModality === 'original' ? '原始视频' : currentModality === 'heatmap' ? '热力图' : '模型检测阴性'}</p>
+                            `;
+                            videoDiv.appendChild(placeholder);
+                        }
+                    }
+                } else {
+                    // 没有视频的情况，显示占位符
+                    const placeholder = document.createElement('div');
+                    placeholder.className = 'video-placeholder';
+                    placeholder.innerHTML = `
+                        <div class="video-placeholder-icon">🎥</div>
+                        <p>无视频</p>
+                    `;
+                    videoDiv.appendChild(placeholder);
+                }
+                
+                const hint = document.createElement('div');
+                hint.className = 'video-expand-hint';
+                hint.textContent = '🔍 点击放大';
+                videoDiv.appendChild(hint);
+                
+                videoContainer.appendChild(videoDiv);
+            }
+        }
+
+        // 更新进度文本和进度条
+        function updateProgressText() {
+            const progressText = document.getElementById('progressText');
+            const progressPercentage = document.getElementById('progressPercentage');
+            const progressFill = document.getElementById('progressFill');
+            const submitBtn = document.getElementById('submitBtn');
+            
+            const completedCount = Object.keys(diagnosisRecords).length;
+            const percentage = patients.length > 0 ? Math.round((completedCount / patients.length) * 100) : 0;
+            
+            progressText.textContent = `病人 ${currentPatientIndex + 1} / ${patients.length} (已完成: ${completedCount})`;
+            progressPercentage.textContent = `${percentage}%`;
+            progressFill.style.width = `${percentage}%`;
+            
+            // 如果完成全部诊断，显示提交按钮
+            if (completedCount === patients.length && patients.length > 0) {
+                submitBtn.style.display = 'block';
+            } else {
+                submitBtn.style.display = 'none';
+            }
+        }
+
+        // 打开视频弹窗
+        async function openVideoModal(videoIndex) {
+            const patient = patients[currentPatientIndex];
+            const videoArrayIndex = videoIndex - 1;
+
+            // 检查是否有该视频
+            if (videoArrayIndex >= patient.videos.length) {
+                return; // 没有视频，不打开弹窗
+            }
+
+            currentVideoIndex = videoIndex;
+            const modal = document.getElementById('videoModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalBody = document.getElementById('modalBody');
+
+            const videoGroup = patient.videos[videoArrayIndex];
+
+            // 检查 videoGroup 和 modalities 是否存在
+            if (!videoGroup || !videoGroup.modalities) {
+                alert('视频数据格式错误');
+                return;
+            }
+
+            // 只使用当前选择的模态
+            const videoPath = videoGroup.modalities[currentModality];
+
+            if (!videoPath) {
+                const modalityNames = {
+                    'original': '原始视频',
+                    'heatmap': '热力图',
+                    'bbox': '识别框'
+                };
+                alert(`${modalityNames[currentModality] || currentModality}模态不可用`);
+                return;
+            }
+
+            // 获取模态名称
+            const modalityNames = {
+                'original': '原始',
+                'heatmap': '热力图',
+                'bbox': '诊断框'
+            };
+            const modalityName = modalityNames[currentModality] || currentModality;
+
+            modalTitle.textContent = `病人 ${patient.id} - 视频 ${videoIndex} (${modalityName})`;
+
+            // 清理之前的3D查看器
+            if (video3DViewer) {
+                video3DViewer.destroy();
+                video3DViewer = null;
+            }
+
+            // 推导frames文件夹路径
+            // 视频路径示例: /static/data_batch_storage/username/task/patient_id/video1/original/xxx.mp4
+            // 新的frames路径规则: {video_name}/frames/
+            // 即: /static/data_batch_storage/username/task/patient_id/video1/original/xxx/frames/
+            let framesDir = null;
+            const pathParts = videoPath.split('/');
+            const videoFileName = pathParts[pathParts.length - 1]; // xxx.mp4
+            const videoName = videoFileName.replace(/\.[^/.]+$/, ''); // 去掉扩展名 -> xxx
+            const parentDir = pathParts.slice(0, -1).join('/'); // /path/to/video1/original
+
+            // 新的目录结构：在视频同级目录创建 {video_name}/frames/
+            framesDir = `${parentDir}/${videoName}/frames`;
+
+            console.log('🔍 检查frames文件夹:', framesDir);
+            console.log('📹 视频文件名:', videoFileName);
+            console.log('📁 推导的frames目录:', framesDir);
+
+            // 检查frames文件夹是否存在
+            let hasFrames = false;
+            try {
+                const response = await fetch(framesDir + '/frame_0000.png', { method: 'HEAD' });
+                hasFrames = response.ok;
+                console.log('✅ Frames文件夹存在:', hasFrames);
+            } catch (error) {
+                console.warn('⚠️ 无法访问frames文件夹:', error);
+                hasFrames = false;
+            }
+
+            modalBody.innerHTML = '';
+
+            if (hasFrames) {
+                // 创建2D+3D分割布局
+                console.log('🎬 创建2D+3D分割布局');
+
+                const container = document.createElement('div');
+                container.className = 'video-3d-container';
+
+                // 左侧2D视频区域
+                const video2dSection = document.createElement('div');
+                video2dSection.className = 'video-2d-section';
+
+                const video2dWrapper = document.createElement('div');
+                video2dWrapper.className = 'video-2d-wrapper';
+
+                const videoElement = document.createElement('video');
+                videoElement.controls = true;
+                videoElement.autoplay = true;
+                videoElement.loop = true;
+                videoElement.src = videoPath;
+
+                videoElement.onerror = function(e) {
+                    console.error('弹窗视频加载失败:', videoPath, e);
+                    modalBody.innerHTML = `
+                        <div class="video-modal-placeholder">
+                            <div class="video-modal-placeholder-icon">⚠️</div>
+                            <p>视频加载失败</p>
+                        </div>
+                    `;
+                };
+
+                video2dWrapper.appendChild(videoElement);
+                video2dSection.appendChild(video2dWrapper);
+
+                // 分隔线
+                const divider = document.createElement('div');
+                divider.className = 'video-3d-divider';
+
+                // 右侧3D区域
+                const video3dSection = document.createElement('div');
+                video3dSection.className = 'video-3d-section';
+
+                const canvas3d = document.createElement('canvas');
+                canvas3d.className = 'video-3d-canvas';
+                video3dSection.appendChild(canvas3d);
+
+                // 3D信息面板
+                const infoPanel = document.createElement('div');
+                infoPanel.className = 'video-3d-info';
+                infoPanel.innerHTML = '<div>3D切片可视化</div><div>拖拽旋转</div>';
+                video3dSection.appendChild(infoPanel);
+
+                // 控制提示
+                const controlsHint = document.createElement('div');
+                controlsHint.className = 'video-3d-controls-hint';
+                controlsHint.innerHTML = '🖱️ 拖拽旋转';
+                video3dSection.appendChild(controlsHint);
+
+                // 组装布局
+                container.appendChild(video2dSection);
+                container.appendChild(divider);
+                container.appendChild(video3dSection);
+                modalBody.appendChild(container);
+
+                modal.classList.add('active');
+                document.body.style.overflow = 'hidden';
+
+                // 初始化3D显示
+                try {
+                    // 动态导入3D模块
+                    const { default: Video3DModalClass } = await import('/video_3d_modal.js');
+
+                    // 检测frames文件夹中实际有多少帧
+                    console.log('🔍 检测实际帧数...');
+                    const actualFrameCount = await detectFrameCount(framesDir);
+                    console.log(`✅ 检测到 ${actualFrameCount} 帧`);
+
+                    // 读取metadata.json获取关键帧索引
+                    let highlightFrame = Math.floor(actualFrameCount / 2); // 默认中间值
+
+                    if (videoGroup.metadataPath) {
+                        try {
+                            console.log('📄 读取metadata.json...');
+                            const metadataResponse = await fetch(videoGroup.metadataPath);
+                            if (metadataResponse.ok) {
+                                const metadata = await metadataResponse.json();
+                                if (metadata.key_frame_index !== undefined && metadata.key_frame_index !== null) {
+                                    highlightFrame = metadata.key_frame_index;
+                                    console.log(`✅ 从metadata获取关键帧索引: ${highlightFrame}`);
+                                } else {
+                                    console.warn('⚠️ metadata中没有key_frame_index字段，使用默认值');
+                                }
+                            } else {
+                                console.warn('⚠️ 无法加载metadata.json，使用默认值');
+                            }
+                        } catch (error) {
+                            console.warn('⚠️ 读取metadata失败:', error, '使用默认值');
+                        }
+                    } else {
+                        console.log('ℹ️ 该视频没有metadata，使用默认高亮帧');
+                    }
+
+                    video3DViewer = new Video3DModalClass(canvas3d, {
+                        videoElement: videoElement,
+                        framesDir: framesDir,
+                        metadataPath: videoGroup.metadataPath,  // 添加metadata路径
+                        frameCount: actualFrameCount,  // 使用实际检测到的帧数
+                        fps: 15.15,
+                        highlightFrame: highlightFrame
+                    });
+
+                    await video3DViewer.init();
+
+                    console.log('✅ 3D显示初始化完成');
+
+                } catch (error) {
+                    console.error('❌ 3D显示初始化失败:', error);
+                    // 如果3D初始化失败,仍然保留2D视频
+                }
+
+            } else {
+                // 只有2D视频
+                console.log('🎬 仅显示2D视频');
+
+                const videoElement = document.createElement('video');
+                videoElement.controls = true;
+                videoElement.autoplay = true;
+                videoElement.loop = true;
+                videoElement.style.cssText = 'width: 100%; height: 100%; max-height: calc(85vh - 60px); object-fit: contain;';
+                videoElement.src = videoPath;
+
+                videoElement.onerror = function(e) {
+                    console.error('弹窗视频加载失败:', videoPath, e);
+                    modalBody.innerHTML = `
+                        <div class="video-modal-placeholder">
+                            <div class="video-modal-placeholder-icon">⚠️</div>
+                            <p>视频加载失败</p>
+                            <p style="font-size: 12px; margin-top: 10px; color: #666;">该视频格式不被浏览器支持</p>
+                            <p style="font-size: 11px; margin-top: 5px; color: #555;">建议：转换为H.264编码的MP4格式</p>
+                        </div>
+                    `;
+                };
+
+                modalBody.appendChild(videoElement);
+
+                modal.classList.add('active');
+                document.body.style.overflow = 'hidden';
+            }
+        }
+
+        // 检测frames文件夹中的实际帧数
+        async function detectFrameCount(framesDir) {
+            let frameCount = 0;
+            const maxFrames = 100; // 最大检测100帧，避免无限循环
+
+            for (let i = 0; i < maxFrames; i++) {
+                const framePath = `${framesDir}/frame_${String(i).padStart(4, '0')}.png`;
+
+                try {
+                    const response = await fetch(framePath, { method: 'HEAD' });
+                    if (response.ok) {
+                        frameCount = i + 1; // 更新找到的帧数
+                    } else {
+                        // 找不到这一帧，说明已经到末尾了
+                        break;
+                    }
+                } catch (error) {
+                    // 发生错误，也认为到末尾了
+                    break;
+                }
+            }
+
+            return frameCount;
+        }
+
+        // 关闭视频弹窗
+        function closeVideoModal(event) {
+            // 如果点击的是背景或者直接调用，则关闭
+            if (!event || event.target.id === 'videoModal') {
+                const modal = document.getElementById('videoModal');
+                modal.classList.remove('active');
+                document.body.style.overflow = ''; // 恢复滚动
+
+                // 清理3D查看器
+                if (video3DViewer) {
+                    video3DViewer.destroy();
+                    video3DViewer = null;
+                }
+
+                // 停止视频播放
+                const video = modal.querySelector('video');
+                if (video) {
+                    video.pause();
+                    video.currentTime = 0;
+                }
+            }
+        }
+
+        // 启动计时器
+        function startTimer() {
+            timerInterval = setInterval(() => {
+                if (!timerPaused) {
+                    timerSeconds++;
+                    updateTimerDisplay();
+                    // 每5秒自动保存一次
+                    if (timerSeconds % 5 === 0) {
+                        saveDraft('tick');
+                    }
+                }
+            }, 1000);
+        }
+
+        // 更新计时器显示
+        function updateTimerDisplay() {
+            const minutes = Math.floor(timerSeconds / 60);
+            const seconds = timerSeconds % 60;
+            document.getElementById('timerText').textContent = 
+                `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+
+        // 切换计时器暂停/继续
+        function toggleTimer() {
+            timerPaused = !timerPaused;
+            const btn = event.target;
+            btn.textContent = timerPaused ? '继续计时' : '暂停计时';
+            saveDraft('toggleTimer');
+        }
+
+        // 选择诊断选项
+        function selectOption(element, group) {
+            const buttons = element.parentElement.querySelectorAll('.option-btn');
+            buttons.forEach(btn => btn.classList.remove('active'));
+            element.classList.add('active');
+            
+            // 如果是模态切换，重新加载视频
+            if (group === 'modality') {
+                const modalityText = element.textContent.trim();
+                if (modalityText === '普通') {
+                    currentModality = 'original';
+                } else if (modalityText === '热力图') {
+                    currentModality = 'heatmap';
+                } else if (modalityText === '模型识别框') {
+                    currentModality = 'bbox';
+                }
+                // 重新加载当前病人的视频（使用新的模态）
+                // 传入 false 表示不恢复诊断状态，保留用户当前的选择
+                loadPatientVideos(currentPatientIndex, false);
+            }
+            
+            saveDraft('selectOption');
+        }
+
+        // 选择诊断标准等级（替代原来的 selectSeverity）
+        function selectStandardLevel(level) {
+            // 检查是否已选择临床判断
+            const diagnosisGroup = document.querySelectorAll('.diagnosis-group')[1];
+            const selectedDiagnosis = diagnosisGroup.querySelector('.option-btn.active');
+            
+            if (!selectedDiagnosis) {
+                alert('请先选择临床判断！');
+                // 关闭诊断标准面板
+                const trigger = document.querySelector('.diagnosis-standard-trigger');
+                const standardContent = document.getElementById('diagnosisStandardContent');
+                trigger.classList.remove('active');
+                standardContent.classList.remove('active');
+                return;
+            }
+            
+            // 移除所有选中状态
+            document.querySelectorAll('.standard-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            // 添加选中状态到当前项
+            event.currentTarget.classList.add('selected');
+            // 记录当前选择的等级
+            currentSeverity = level;
+            
+            // 获取选中项的描述文本
+            const selectedItem = event.currentTarget;
+            const levelText = selectedItem.querySelector('.standard-level').textContent;
+            const descText = selectedItem.querySelector('.standard-text').textContent;
+            
+            // 更新外部显示的选中项（优化排版）
+            const currentSelection = document.getElementById('currentSelection');
+            const selectionValue = document.getElementById('selectionValue');
+            selectionValue.innerHTML = `<span class="level-number">${level}</span><span class="level-name">${levelText}</span>${descText}`;
+            currentSelection.style.display = 'flex';
+            
+            // 保存当前病人的诊断记录（自动保存）
+            saveCurrentDiagnosisQuietly();
+            
+            // 保存草稿
+            saveDraft('selectStandardLevel');
+            
+            // 自动隐藏下拉列表
+            setTimeout(() => {
+                const trigger = document.querySelector('.diagnosis-standard-trigger');
+                const standardContent = document.getElementById('diagnosisStandardContent');
+                trigger.classList.remove('active');
+                standardContent.classList.remove('active');
+            }, 300); // 延迟300ms，让用户能看到选中效果
+        }
+
+        // 上一个病人
+        function previousVideo() {
+            if (currentPatientIndex > 0) {
+                // 重置模态为"普通"（只改UI和变量，不加载视频）
+                resetModalityToOriginal(false);
+                
+                // 切换到上一个病人（会自动加载视频）
+                loadPatientVideos(currentPatientIndex - 1);
+                updateProgressText();
+                saveDraft('previousVideo');
+            } else {
+                alert('已经是第一个病人了');
+            }
+        }
+
+        // 下一个病人
+        function nextVideo() {
+            if (currentPatientIndex < patients.length - 1) {
+                // 验证表单：必须填写临床判断和诊断意见
+                const diagnosisGroup = document.querySelectorAll('.diagnosis-group')[1];
+                const selectedDiagnosis = diagnosisGroup.querySelector('.option-btn.active');
+                
+                if (!selectedDiagnosis) {
+                    alert('请选择临床判断后再切换病人！');
+                    return;
+                }
+                
+                if (!currentSeverity) {
+                    alert('请选择诊断意见后再切换病人！');
+                    return;
+                }
+                
+                // 保存当前病人的诊断（使用带提示的版本，确保保存成功）
+                if (!saveCurrentDiagnosis()) {
+                    return;
+                }
+                
+                // 重置模态为"普通"（只改UI和变量，不加载视频）
+                resetModalityToOriginal(false);
+                
+                // 切换到下一个病人（会自动加载视频）
+                loadPatientVideos(currentPatientIndex + 1);
+                updateProgressText();
+                saveDraft('nextVideo');
+            } else {
+                alert('已经是最后一个病人了');
+            }
+        }
+
+        // 重置诊断模态为"普通"
+        function resetModalityToOriginal(reloadVideos = true) {
+            currentModality = 'original';
+            
+            // 重置模态按钮UI
+            const modalityGroup = document.querySelectorAll('.diagnosis-group')[0];
+            const modalityButtons = modalityGroup.querySelectorAll('.option-btn');
+            modalityButtons.forEach((btn, index) => {
+                if (index === 0) { // 第一个按钮是"普通"
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+            
+            // 如果需要重新加载视频
+            if (reloadVideos) {
+                loadPatientVideos(currentPatientIndex);
+            }
+        }
+
+        // 重置诊断状态
+        function resetDiagnosisState() {
+            // 重置临床判断为全部不选中
+            const diagnosisGroup = document.querySelectorAll('.diagnosis-group')[1]; // 临床判断组
+            const diagnosisButtons = diagnosisGroup.querySelectorAll('.option-btn');
+            diagnosisButtons.forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // 重置诊断标准等级选择
+            const standardItems = document.querySelectorAll('.standard-item');
+            standardItems.forEach(item => {
+                item.classList.remove('selected');
+            });
+            currentSeverity = null;
+            
+            // 隐藏外部选中显示
+            const currentSelection = document.getElementById('currentSelection');
+            currentSelection.style.display = 'none';
+        }
+
+        // 恢复诊断状态
+        function restoreDiagnosisState(patientId) {
+            const record = diagnosisRecords[patientId];
+            
+            if (record) {
+                // 恢复临床判断
+                const diagnosisGroup = document.querySelectorAll('.diagnosis-group')[1]; // 临床判断组
+                const diagnosisButtons = diagnosisGroup.querySelectorAll('.option-btn');
+                diagnosisButtons.forEach(btn => {
+                    if (btn.textContent.trim() === record.diagnosis) {
+                        btn.classList.add('active');
+                    } else {
+                        btn.classList.remove('active');
+                    }
+                });
+                
+                // 恢复诊断标准等级选择
+                const standardItems = document.querySelectorAll('.standard-item');
+                let selectedItem = null;
+                standardItems.forEach((item, index) => {
+                    if (index + 1 === record.severity) {
+                        item.classList.add('selected');
+                        selectedItem = item;
+                    } else {
+                        item.classList.remove('selected');
+                    }
+                });
+                currentSeverity = record.severity;
+                
+                // 恢复外部选中显示
+                if (selectedItem) {
+                    const levelText = selectedItem.querySelector('.standard-level').textContent;
+                    const descText = selectedItem.querySelector('.standard-text').textContent;
+                    const currentSelection = document.getElementById('currentSelection');
+                    const selectionValue = document.getElementById('selectionValue');
+                    selectionValue.innerHTML = `<span class="level-number">${record.severity}</span><span class="level-name">${levelText}</span>${descText}`;
+                    currentSelection.style.display = 'flex';
+                }
+            } else {
+                // 如果没有记录，重置为默认状态
+                resetDiagnosisState();
+            }
+        }
+
+        // 保存当前病人的诊断记录（静默保存，不弹窗）
+        function saveCurrentDiagnosisQuietly() {
+            // 查找临床判断组的按钮
+            const diagnosisGroup = document.querySelectorAll('.diagnosis-group')[1]; // 临床判断组
+            const selectedDiagnosis = diagnosisGroup.querySelector('.option-btn.active');
+            
+            if (!selectedDiagnosis || !currentSeverity) {
+                return false;
+            }
+
+            const patient = patients[currentPatientIndex];
+            
+            diagnosisRecords[patient.id] = {
+                patientId: patient.id,
+                diagnosis: selectedDiagnosis.textContent.trim(),
+                severity: currentSeverity
+            };
+            
+            console.log('已自动保存诊断记录:', diagnosisRecords[patient.id]);
+            updateProgressText(); // 更新进度显示
+            saveDraft('saveCurrentDiagnosisQuietly');
+            return true;
+        }
+
+        // 保存当前病人的诊断记录（带提示）
+        function saveCurrentDiagnosis() {
+            // 查找临床判断组的按钮
+            const diagnosisGroup = document.querySelectorAll('.diagnosis-group')[1]; // 临床判断组
+            const selectedDiagnosis = diagnosisGroup.querySelector('.option-btn.active');
+            
+            if (!selectedDiagnosis) {
+                alert('请选择临床判断');
+                return false;
+            }
+
+            if (!currentSeverity) {
+                alert('请选择诊断意见');
+                return false;
+            }
+
+            const patient = patients[currentPatientIndex];
+            
+            diagnosisRecords[patient.id] = {
+                patientId: patient.id,
+                diagnosis: selectedDiagnosis.textContent.trim(),
+                severity: currentSeverity
+            };
+            
+            console.log('已保存诊断记录:', diagnosisRecords[patient.id]);
+            updateProgressText(); // 更新进度显示
+            saveDraft('saveCurrentDiagnosis');
+            return true;
+        }
+
+        // 提交所有诊断
+        async function submitDiagnosis() {
+            // 先保存当前病人的诊断
+            if (!saveCurrentDiagnosis()) {
+                return;
+            }
+            
+            // 检查是否所有病人都已完成诊断
+            const completedCount = Object.keys(diagnosisRecords).length;
+            if (completedCount < patients.length) {
+                const undiagnosedPatients = patients
+                    .filter(p => !diagnosisRecords[p.id])
+                    .map(p => p.id)
+                    .join(', ');
+                
+                alert(`还有 ${patients.length - completedCount} 个病人未完成诊断！\n未诊断病人ID: ${undiagnosedPatients}\n\n请完成所有病人的诊断后再提交。`);
+                return;
+            }
+            
+            
+            // 直接提交，不显示汇总信息
+            if (confirm('确定提交所有诊断结果吗？')) {
+                try {
+                    // 构建JSON格式的诊断结果
+                    const formattedMinutes = Math.floor(timerSeconds / 60);
+                    const formattedSeconds = timerSeconds % 60;
+                    const formattedTime = `${formattedMinutes}:${String(formattedSeconds).padStart(2, '0')}`;
+                    
+                    const diagnosisData = {
+                        username: taskInfo.username,
+                        taskFolder: taskInfo.taskFolder,
+                        submittedAt: new Date().toLocaleString('zh-CN', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                            hour12: false
+                        }).replace(/\//g, '-').replace(/,/g, ''),
+                        totalTime: {
+                            seconds: timerSeconds,
+                            formatted: formattedTime
+                        },
+                        patientCount: Object.keys(diagnosisRecords).length,
+                        records: Object.values(diagnosisRecords).map(record => ({
+                            patientId: record.patientId,
+                            diagnosis: record.diagnosis,
+                            severity: record.severity
+                        }))
+                    };
+                    
+                    // 调用后端API保存诊断结果(JSON格式)
+                    const response = await fetch('/api/diagnosis/submit-json', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(diagnosisData)
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error('提交失败');
+                    }
+                    
+                    const result = await response.json();
+                    alert('诊断结果已提交并保存！');
+                    console.log('提交成功:', result);
+                    
+                    // 提交成功后清除草稿
+                    clearDraft();
+                    
+                    window.location.href = '/dashboard';
+                } catch (error) {
+                    console.error('提交失败:', error);
+                    alert('提交失败，请重试');
+                }
+            }
+        }
+
+        // 切换诊断标准显示
+        function toggleDiagnosisStandard() {
+            // 检查是否已选择临床判断
+            const diagnosisGroup = document.querySelectorAll('.diagnosis-group')[1];
+            const selectedDiagnosis = diagnosisGroup.querySelector('.option-btn.active');
+            
+            if (!selectedDiagnosis) {
+                alert('请先选择临床判断！');
+                return;
+            }
+            
+            const trigger = document.querySelector('.diagnosis-standard-trigger');
+            const standardContent = document.getElementById('diagnosisStandardContent');
+            
+            // 切换激活状态
+            trigger.classList.toggle('active');
+            standardContent.classList.toggle('active');
+        }
+
+        // 返回主页（清理缓存）
+        function returnToDashboard() {
+            // 检查是否有未保存的诊断
+            const completedCount = Object.keys(diagnosisRecords).length;
+            
+            if (completedCount > 0 && completedCount < patients.length) {
+                // 有部分诊断，提示用户
+                if (!confirm(`您已完成 ${completedCount}/${patients.length} 个病人的诊断。\n\n返回主页将清除所有未提交的诊断记录。\n\n确定要返回吗？`)) {
+                    return;
+                }
+            } else if (completedCount > 0) {
+                // 全部完成但未提交，提示用户
+                if (!confirm('您已完成全部诊断但尚未提交。\n\n返回主页将清除所有未提交的诊断记录。\n\n确定要返回吗？')) {
+                    return;
+                }
+            }
+            
+            // 设置标记，防止在页面卸载时保存草稿
+            isReturningToDashboard = true;
+            
+            // 停止计时器
+            if (timerInterval) {
+                clearInterval(timerInterval);
+            }
+            
+            // 强制清除所有相关的 sessionStorage 数据
+            try {
+                const key = getDraftKey();
+                console.log('🗑️ 准备清除草稿，Key:', key);
+                
+                // 清除特定的草稿
+                sessionStorage.removeItem(key);
+                
+                // 额外清除：遍历所有 sessionStorage，清除所有诊断相关的数据
+                const keysToRemove = [];
+                for (let i = 0; i < sessionStorage.length; i++) {
+                    const storageKey = sessionStorage.key(i);
+                    if (storageKey && storageKey.includes('diagnosisDraft')) {
+                        keysToRemove.push(storageKey);
+                    }
+                }
+                
+                keysToRemove.forEach(k => {
+                    sessionStorage.removeItem(k);
+                    console.log('🗑️ 清除了:', k);
+                });
+                
+                // 最终验证
+                const check = sessionStorage.getItem(key);
+                if (check) {
+                    console.error('⚠️ 主草稿清除失败！尝试再次清除...');
+                    sessionStorage.removeItem(key);
+                } else {
+                    console.log('✅ 主草稿清除成功');
+                }
+                
+                console.log('✅ 所有诊断草稿已清除');
+            } catch (e) {
+                console.error('清除草稿时出错:', e);
+            }
+            
+            // 延迟一下，确保清除操作完成
+            setTimeout(() => {
+                console.log('🏠 跳转到主页');
+                window.location.href = '/dashboard';
+            }, 100);
+        }
+
+        // 加载模型置信度
+        async function loadModelConfidence(patient) {
+            try {
+                // 从第一个视频的metadata获取置信度
+                if (!patient.videos || patient.videos.length === 0) {
+                    console.warn('该病人没有视频数据');
+                    resetModelConfidence();
+                    return;
+                }
+                
+                const firstVideo = patient.videos[0];
+                if (!firstVideo.metadataPath) {
+                    console.warn('第一个视频没有metadata路径');
+                    resetModelConfidence();
+                    return;
+                }
+                
+                // 获取metadata
+                const response = await fetch(firstVideo.metadataPath);
+                if (!response.ok) {
+                    throw new Error('无法加载metadata');
+                }
+                
+                const metadata = await response.json();
+                console.log('📊 加载的metadata:', metadata);
+                
+                // 更新置信度显示
+                if (metadata.confidence_scores) {
+                    updateModelConfidence(metadata.confidence_scores);
+                } else {
+                    console.warn('metadata中没有confidence_scores字段');
+                    resetModelConfidence();
+                }
+            } catch (error) {
+                console.error('加载模型置信度失败:', error);
+                resetModelConfidence();
+            }
+        }
+
+        // 更新模型置信度显示
+        function updateModelConfidence(scores) {
+            const categories = ['normal', 'vsd', 'asd', 'pda'];
+            const scoreKeys = ['Normal', 'VSD', 'ASD', 'PDA'];
+            
+            categories.forEach((cat, index) => {
+                const scoreKey = scoreKeys[index];
+                const score = scores[scoreKey] || 0;
+                const percentage = (score * 100).toFixed(1);
+                
+                // 更新文字
+                const valueElem = document.getElementById(`conf-${cat}`);
+                if (valueElem) {
+                    valueElem.textContent = `${percentage}%`;
+                }
+                
+                // 更新进度条
+                const fillElem = document.getElementById(`fill-${cat}`);
+                if (fillElem) {
+                    fillElem.style.width = `${percentage}%`;
+                }
+            });
+            
+            console.log('✅ 模型置信度已更新:', scores);
+        }
+
+        // 重置模型置信度显示
+        function resetModelConfidence() {
+            const categories = ['normal', 'vsd', 'asd', 'pda'];
+            
+            categories.forEach(cat => {
+                const valueElem = document.getElementById(`conf-${cat}`);
+                if (valueElem) {
+                    valueElem.textContent = '0.0%';
+                }
+                
+                const fillElem = document.getElementById(`fill-${cat}`);
+                if (fillElem) {
+                    fillElem.style.width = '0%';
+                }
+            });
+        }
+    </script>
+</body>
+</html>
