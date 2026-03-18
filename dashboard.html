@@ -7,7 +7,9 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:#f5f7fa; color:#333; min-height:100vh; }
-    .container { max-width:1200px; margin: 30px auto; padding: 0 20px; }
+    .container { max-width:1200px; margin: 30px auto; padding: 0 20px; display:flex; gap:16px; align-items:flex-start; }
+    .sidebar { width:220px; }
+    .main { flex:1; }
     .navbar { background: linear-gradient(135deg,#667eea 0%,#764ba2 100%); color:white; padding:12px 20px; border-radius:8px; display:flex; justify-content:space-between; align-items:center; }
     .card { background:white; border-radius:12px; padding:20px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); margin-top:20px; }
     h1 { font-size:20px; margin-bottom:12px; }
@@ -19,12 +21,13 @@
     .hint { color:#666; font-size:13px; }
     .rows { margin-top:16px; display:flex; flex-direction:column; gap:12px; }
     .row-card { border:1px solid #e6eefc; border-radius:10px; padding:12px; background:white; display:flex; gap:12px; align-items:flex-start; justify-content:space-between; }
+    .row-card.dragover { box-shadow: inset 0 0 0 3px rgba(102,126,234,0.08); border-color:#667eea; }
     .row-left { flex:1; display:flex; flex-direction:column; gap:8px; }
     .case-name { display:flex; gap:8px; align-items:center; }
     .case-name input { padding:8px 10px; border-radius:6px; border:1px solid #d7e2ff; }
     .thumbs { display:flex; gap:8px; flex-wrap:wrap; }
     .thumb { width:160px; border-radius:6px; overflow:hidden; border:1px solid #eee; background:#000; color:white; position:relative; }
-    .thumb img, .thumb canvas { display:block; width:100%; height:90px; object-fit:cover; }
+    .thumb img, .thumb canvas { display:block; width:100%; height:90px; object-fit:cover; background:#000; }
     .thumb .label { padding:6px; font-size:12px; background:white; color:#333; text-align:center; }
     .thumb .del-single { position:absolute; top:6px; right:6px; background:rgba(0,0,0,0.6); color:white; border-radius:12px; width:24px; height:24px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-weight:bold; }
     .row-actions { display:flex; gap:8px; align-items:center; }
@@ -34,48 +37,66 @@
     .alert { padding:10px 12px; border-radius:8px; background:#fff3cd; color:#856404; margin-top:10px; }
     .hidden { display:none; }
     .add-case-btn { background:#20c997; color:white; border-radius:8px; padding:6px 8px; border:none; cursor:pointer; }
-    @media (max-width:760px) { .thumb { width:120px; } }
+    @media (max-width:960px) { .container { flex-direction:column; } .sidebar { width:100%; } .thumb { width:120px; } }
   </style>
 </head>
 <body>
   <div class="container">
-    <div class="navbar">
-      <div>👩‍⚕️ 任务批次接收（独立上传）</div>
-      <div><a href="/admin" style="color:white;text-decoration:none">管理</a></div>
+    <div class="sidebar">
+      <div class="card" style="margin-top:0">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:48px;height:48px;border-radius:24px;background:#e9eefc;display:flex;align-items:center;justify-content:center;color:#4b6; font-weight:700;">U</div>
+          <div>
+            <div id="currentUserName" style="font-weight:700">loading...</div>
+            <div id="currentUserOrg" style="font-size:13px;color:#666">...</div>
+          </div>
+        </div>
+        <hr style="margin:12px 0;border:none;border-top:1px solid #f0f3ff;">
+        <div style="font-size:13px;color:#555">说明：</div>
+        <ul style="margin-top:8px;color:#666;font-size:13px;line-height:1.6">
+          <li>每个病例最少1个视频，最多5个视频。</li>
+          <li>拖放到行或使用“添加视频”按钮添加。</li>
+          <li>短视频可能无法稳定预览，服务器端可生成正式缩略图（若安装 ffmpeg）。</li>
+        </ul>
+      </div>
     </div>
 
-    <div class="card">
-      <h1>上传任务（文件夹 / 多视频）</h1>
-
-      <div class="controls">
-        <label class="hint">提交者：</label>
-        <select id="usernameSelect"></select>
-
-        <button id="chooseFolderBtn" class="btn secondary">选择文件夹</button>
-        <input id="folderInput" type="file" webkitdirectory directory multiple style="display:none" />
-
-        <button id="chooseFilesBtn" class="btn secondary">选择视频文件</button>
-        <input id="fileInput" type="file" accept="video/*" multiple style="display:none" />
-
-        <button id="addCaseBtn" class="add-case-btn">新增病例</button>
-
-        <div style="flex:1"></div>
-
-        <div id="statusHint" class="hint">提示：支持拖拽文件夹或视频到下方区域（现代浏览器支持）</div>
+    <div class="main">
+      <div class="navbar">
+        <div>👩‍⚕️ 任务批次接收（独立上传）</div>
+        <div><a href="/admin" style="color:white;text-decoration:none">管理</a></div>
       </div>
 
-      <div id="dropzone" class="dropzone">
-        将文件或文件夹拖放到此处，或点击选择。<br/>
-        说明：文件夹的结构应为：请求目录（一级）/ 病例目录（二级）/ 视频文件（仅二级下为视频）。
-      </div>
+      <div class="card" style="margin-top:20px">
+        <h1>上传任务（文件夹 / 多视频）</h1>
 
-      <div id="messages"></div>
+        <div class="controls">
+          <button id="chooseFolderBtn" class="btn secondary">选择文件夹</button>
+          <input id="folderInput" type="file" webkitdirectory directory multiple style="display:none" />
 
-      <div id="rowsContainer" class="rows"></div>
+          <button id="chooseFilesBtn" class="btn secondary">选择视频文件</button>
+          <input id="fileInput" type="file" accept="video/*" multiple style="display:none" />
 
-      <div class="bottom-actions">
-        <button id="clearBtn" class="btn secondary">取消上传</button>
-        <button id="uploadBtn" class="btn">确认上传</button>
+          <button id="addCaseBtn" class="add-case-btn">新增病例</button>
+
+          <div style="flex:1"></div>
+
+          <div id="statusHint" class="hint">提示：支持拖拽文件夹或视频到下方区域</div>
+        </div>
+
+        <div id="dropzone" class="dropzone">
+          将文件或文件夹拖放到此处，或点击选择。<br/>
+          说明：文件夹结构应为 requestDir/case/file 或 case/file 或直接上传视频（会被放入 patient N）。
+        </div>
+
+        <div id="messages"></div>
+
+        <div id="rowsContainer" class="rows"></div>
+
+        <div class="bottom-actions">
+          <button id="clearBtn" class="btn secondary">取消上传</button>
+          <button id="uploadBtn" class="btn">确认上传</button>
+        </div>
       </div>
     </div>
   </div>
@@ -85,7 +106,6 @@
       const MAX_VIDEOS_PER_CASE = 5;
       const ALLOWED_EXT = ['.mp4', '.avi', '.mov', '.mkv'];
 
-      const usernameSelect = document.getElementById('usernameSelect');
       const folderInput = document.getElementById('folderInput');
       const fileInput = document.getElementById('fileInput');
       const chooseFolderBtn = document.getElementById('chooseFolderBtn');
@@ -97,19 +117,29 @@
       const uploadBtn = document.getElementById('uploadBtn');
       const clearBtn = document.getElementById('clearBtn');
 
+      let currentUser = null;
+
       // staging: array of { caseName, files: [ { file, relativePath|null, thumbDataUrl } ], createdAt }
       let staging = [];
 
-      async function loadUsers(){
-        try {
-          const resp = await fetch('/api/users');
-          const data = await resp.json();
-          const users = data.data || [];
-          usernameSelect.innerHTML = users.map(u => `<option value="${u.username}">${u.username}</option>`).join('');
-          if (users.length === 0) usernameSelect.innerHTML = '<option value="admin">admin</option>';
-        } catch (e) {
-          usernameSelect.innerHTML = '<option value="admin">admin</option>';
+      // load current user for display and upload use
+      async function loadCurrentUser(){
+        let usr = null;
+        const endpoints = ['/api/users/current', '/api/users/me', '/api/users?current=1', '/api/users'];
+        for (const ep of endpoints) {
+          try {
+            const r = await fetch(ep);
+            if (!r.ok) continue;
+            const d = await r.json();
+            if (d.username) { usr = { username: d.username, org: d.org || d.department || '' }; break; }
+            if (d.data && Array.isArray(d.data) && d.data.length) { usr = { username: d.data[0].username, org: d.data[0].org || '' }; break; }
+            if (d.data && d.data.username) { usr = { username: d.data.username, org: d.data.org || '' }; break; }
+          } catch (e) { /* try next */ }
         }
+        if (!usr) usr = { username: 'unknown', org: '' };
+        currentUser = usr;
+        document.getElementById('currentUserName').textContent = currentUser.username;
+        document.getElementById('currentUserOrg').textContent = currentUser.org || '';
       }
 
       function showMessage(text, timeout = 4000) {
@@ -133,7 +163,6 @@
       }
 
       function nextPatientIndex() {
-        // count existing patient N to determine next index
         let max = 0;
         staging.forEach(s => {
           const m = s.caseName.match(/^patient (\d+)$/);
@@ -145,7 +174,7 @@
         return max + 1;
       }
 
-      // improved thumbnail generation: wait for loadedmetadata then seek then draw
+      // client-side thumbnail: try to capture a frame (may fail for some short videos)
       function createVideoThumbnail(file) {
         return new Promise((resolve) => {
           const url = URL.createObjectURL(file);
@@ -157,18 +186,13 @@
           video.crossOrigin = 'anonymous';
 
           const cleanup = () => {
-            try { video.pause(); } catch(e){ }
+            try { video.pause(); } catch(e){}
             URL.revokeObjectURL(url);
           };
 
-          const onError = () => {
-            cleanup();
-            resolve('');
-          };
-
           video.addEventListener('loadedmetadata', () => {
-            // choose a tiny offset to avoid black first frame in some codecs
-            const seekTo = Math.min(0.05, Math.max(0, (video.duration && video.duration > 0) ? 0.05 : 0));
+            const duration = video.duration || 0;
+            const seekTo = Math.min(0.05, Math.max(0, duration > 0 ? Math.min(0.05, duration / 2) : 0.05));
             const onSeeked = () => {
               try {
                 const canvas = document.createElement('canvas');
@@ -178,7 +202,7 @@
                 canvas.height = h;
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(video, 0, 0, w, h);
-                const dataURL = canvas.toDataURL('image/jpeg', 0.7);
+                const dataURL = canvas.toDataURL('image/jpeg', 0.75);
                 cleanup();
                 resolve(dataURL);
               } catch (err) {
@@ -186,43 +210,37 @@
                 resolve('');
               }
             };
-            const onSeekErr = () => {
-              cleanup();
-              resolve('');
-            };
-            // try seeking
             try {
               video.currentTime = seekTo;
               video.addEventListener('seeked', onSeeked, { once: true });
               // fallback timeout
-              setTimeout(() => { resolve(''); cleanup(); }, 2000);
+              setTimeout(() => { cleanup(); resolve(''); }, 2500);
             } catch (e) {
-              onSeekErr();
-            }
-          });
-
-          video.addEventListener('error', onError);
-
-          // sometimes loadedmetadata may not fire; set a timeout guard
-          setTimeout(() => {
-            // if still not ready, try to draw frame anyway
-            try {
-              const canvas = document.createElement('canvas');
-              canvas.width = 320; canvas.height = 180;
-              const ctx = canvas.getContext('2d');
-              ctx.fillStyle = '#000';
-              ctx.fillRect(0,0,canvas.width,canvas.height);
-              cleanup();
-              resolve(canvas.toDataURL('image/jpeg'));
-            } catch (err) {
               cleanup();
               resolve('');
             }
+          });
+
+          video.addEventListener('error', () => {
+            cleanup();
+            resolve('');
+          });
+
+          // guard: if loadedmetadata not fired after some time
+          setTimeout(() => {
+            // create a black placeholder if nothing worked
+            const canvas = document.createElement('canvas');
+            canvas.width = 320; canvas.height = 180;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0,0,canvas.width,canvas.height);
+            try { cleanup(); } catch(e){}
+            resolve(canvas.toDataURL('image/jpeg'));
           }, 4000);
         });
       }
 
-      // render rows
+      // render rows and attach per-row drag/drop handlers
       function renderRows() {
         rowsContainer.innerHTML = '';
         staging.forEach((caseItem, idx) => {
@@ -251,7 +269,6 @@
             delSingle.title = '删除该视频';
             delSingle.textContent = '×';
             delSingle.addEventListener('click', () => {
-              // remove this file from caseItem.files
               caseItem.files.splice(fi, 1);
               renderRows();
             });
@@ -296,9 +313,33 @@
           ra.appendChild(addBtn);
           ra.appendChild(remBtn);
 
+          // per-row drag/drop: accept files only (no recursion)
+          row.addEventListener('dragover', (ev) => {
+            ev.preventDefault(); row.classList.add('dragover');
+          });
+          row.addEventListener('dragleave', (ev) => { row.classList.remove('dragover'); });
+          row.addEventListener('drop', async (ev) => {
+            ev.preventDefault(); row.classList.remove('dragover');
+            const dt = ev.dataTransfer;
+            if (!dt) return;
+            const files = Array.from(dt.files || []).filter(f => f && isAllowedFile(f.name));
+            if (files.length === 0) {
+              showMessage('未检测到有效的视频文件或格式不支持', 3000);
+              return;
+            }
+            if ((caseItem.files.length + files.length) > MAX_VIDEOS_PER_CASE) {
+              showMessage(`该病例最多允许 ${MAX_VIDEOS_PER_CASE} 个视频`, 4000);
+              return;
+            }
+            for (const f of files) {
+              const thumb = await createVideoThumbnail(f).catch(()=> '');
+              caseItem.files.push({ file: f, relativePath: null, thumbDataUrl: thumb });
+            }
+            renderRows();
+          });
+
           row.appendChild(left);
           row.appendChild(ra);
-
           rowsContainer.appendChild(row);
         });
       }
@@ -327,13 +368,11 @@
         }
 
         if (anyHasSlash) {
-          // check parts
           const partsList = fileObjs.map(o => o.relativePath.split('/').filter(p => p && p !== '.'));
           if (partsList.some(p => p.length < 2)) {
             showMessage('检测到不符合路径结构的文件，请检查', 6000);
             return;
           }
-          // If all lengths >=3 => requestDir/caseName/...
           if (partsList.every(p => p.length >= 3)) {
             const firstSet = new Set(partsList.map(p => p[0]));
             if (firstSet.size !== 1) {
@@ -350,7 +389,6 @@
               groups[caseName] = groups[caseName] || [];
               groups[caseName].push({ file: o.file, relativePath: relUnderCase });
             }
-            // validate & push (patient numbering by insertion order)
             const baseIndex = nextPatientIndex();
             let idx = 0;
             for (const [caseName, files] of Object.entries(groups)) {
@@ -360,14 +398,12 @@
                 const thumb = await createVideoThumbnail(it.file).catch(()=> '');
                 rowFiles.push({ file: it.file, relativePath: it.relativePath, thumbDataUrl: thumb });
               }
-              // default case name: preserve folder name but if empty use patient N
               const defaultName = caseName || genPatientName(baseIndex + idx);
               staging.push({ caseName: defaultName, files: rowFiles, createdAt: Date.now() });
               idx++;
             }
             renderRows();
           } else if (partsList.every(p => p.length === 2)) {
-            // treat as caseName/file
             const groups = {};
             for (const o of fileObjs) {
               const parts = o.relativePath.split('/').filter(p => p && p !== '.');
@@ -396,7 +432,6 @@
             return;
           }
         } else {
-          // standalone files -> all into one case
           if (fileObjs.length > MAX_VIDEOS_PER_CASE) {
             showMessage(`一次上传的独立视频数量为 ${fileObjs.length}，超过上限 ${MAX_VIDEOS_PER_CASE}`, 6000);
             return;
@@ -490,9 +525,8 @@
 
       uploadBtn.addEventListener('click', async () => {
         if (staging.length === 0) { showMessage('没有待上传内容'); return; }
-        const username = usernameSelect.value;
-        if (!username) { showMessage('请选择提交者用户名'); return; }
-        // validate each row has at least one file
+        const username = currentUser && currentUser.username ? currentUser.username : null;
+        if (!username) { showMessage('无法识别当前用户，上传被阻止'); return; }
         for (const c of staging) {
           if (!c.files || c.files.length === 0) {
             showMessage(`病例 ${c.caseName} 没有视频，至少需要一个视频才可上传`, 6000);
@@ -503,7 +537,6 @@
             return;
           }
         }
-        // check for mixed (some relativePath some not)
         const hasRel = staging.some(c => c.files.some(f => f.relativePath));
         const hasNoRel = staging.some(c => c.files.some(f => !f.relativePath));
         if (hasRel && hasNoRel) {
@@ -516,7 +549,6 @@
           for (const fobj of caseItem.files) {
             const f = fobj.file;
             if (fobj.relativePath) {
-              // use existing relative path if contains multiple segments; otherwise construct caseName/file
               const rel = f.webkitRelativePath || f.relativePath || f.name;
               const parts = rel.split('/').filter(p=>p && p!=='.');
               if (parts.length >= 3) {
@@ -585,7 +617,7 @@
 
       clearBtn.addEventListener('click', clearAll);
 
-      loadUsers();
+      loadCurrentUser();
       setupDropzone();
     })();
   </script>
