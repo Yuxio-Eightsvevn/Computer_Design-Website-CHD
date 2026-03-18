@@ -5,12 +5,10 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>任务批次接收 - 儿童先心病诊断平台</title>
   <style>
-    /* 基本样式沿用原项目样式（保留你现有的全局 CSS） */
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:#f5f7fa; color:#333; min-height:100vh; }
     .container { max-width:1200px; margin: 30px auto; padding: 0 20px; }
     .navbar { background: linear-gradient(135deg,#667eea 0%,#764ba2 100%); color:white; padding:12px 20px; border-radius:8px; display:flex; justify-content:space-between; align-items:center; }
-    .navbar a { color:white; text-decoration:none; padding:6px 12px; background:rgba(255,255,255,0.12); border-radius:6px; }
     .card { background:white; border-radius:12px; padding:20px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); margin-top:20px; }
     h1 { font-size:20px; margin-bottom:12px; }
     .dropzone { border: 2px dashed #c9d7ff; border-radius:12px; padding:30px; text-align:center; cursor:pointer; background:linear-gradient(180deg, #ffffff, #fbfdff); transition: all .15s; }
@@ -28,23 +26,22 @@
     .thumb { width:160px; border-radius:6px; overflow:hidden; border:1px solid #eee; background:#000; color:white; position:relative; }
     .thumb img, .thumb canvas { display:block; width:100%; height:90px; object-fit:cover; }
     .thumb .label { padding:6px; font-size:12px; background:white; color:#333; text-align:center; }
+    .thumb .del-single { position:absolute; top:6px; right:6px; background:rgba(0,0,0,0.6); color:white; border-radius:12px; width:24px; height:24px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-weight:bold; }
     .row-actions { display:flex; gap:8px; align-items:center; }
     .remove-row { background:#ff4d4f; color:white; border-radius:8px; padding:6px 8px; border:none; cursor:pointer; }
     .add-file-btn { background:#28a745; color:white; border-radius:8px; padding:6px 8px; border:none; cursor:pointer; }
     .bottom-actions { display:flex; gap:12px; margin-top:16px; justify-content:flex-end; }
     .alert { padding:10px 12px; border-radius:8px; background:#fff3cd; color:#856404; margin-top:10px; }
     .hidden { display:none; }
-    /* responsive */
-    @media (max-width:760px) {
-      .thumb { width:120px; }
-    }
+    .add-case-btn { background:#20c997; color:white; border-radius:8px; padding:6px 8px; border:none; cursor:pointer; }
+    @media (max-width:760px) { .thumb { width:120px; } }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="navbar">
       <div>👩‍⚕️ 任务批次接收（独立上传）</div>
-      <div><a href="/admin">管理</a></div>
+      <div><a href="/admin" style="color:white;text-decoration:none">管理</a></div>
     </div>
 
     <div class="card">
@@ -59,6 +56,8 @@
 
         <button id="chooseFilesBtn" class="btn secondary">选择视频文件</button>
         <input id="fileInput" type="file" accept="video/*" multiple style="display:none" />
+
+        <button id="addCaseBtn" class="add-case-btn">新增病例</button>
 
         <div style="flex:1"></div>
 
@@ -82,43 +81,38 @@
   </div>
 
   <script>
-    // dashboard: 前端接收逻辑与分组、预览、提交
     (function(){
       const MAX_VIDEOS_PER_CASE = 5;
       const ALLOWED_EXT = ['.mp4', '.avi', '.mov', '.mkv'];
 
-      // UI elements
       const usernameSelect = document.getElementById('usernameSelect');
       const folderInput = document.getElementById('folderInput');
       const fileInput = document.getElementById('fileInput');
       const chooseFolderBtn = document.getElementById('chooseFolderBtn');
       const chooseFilesBtn = document.getElementById('chooseFilesBtn');
+      const addCaseBtn = document.getElementById('addCaseBtn');
       const dropzone = document.getElementById('dropzone');
       const rowsContainer = document.getElementById('rowsContainer');
       const messages = document.getElementById('messages');
       const uploadBtn = document.getElementById('uploadBtn');
       const clearBtn = document.getElementById('clearBtn');
 
-      // Staging structure: array of { caseName, files: [ { file:File, relativePath?:string, thumbDataUrl?:string } ] }
+      // staging: array of { caseName, files: [ { file, relativePath|null, thumbDataUrl } ], createdAt }
       let staging = [];
 
-      // load users for usernameSelect
       async function loadUsers(){
         try {
           const resp = await fetch('/api/users');
           const data = await resp.json();
           const users = data.data || [];
-          usernameSelect.innerHTML = users.map(u => `<option value="${u.username}">${u.username} (${u.doctor || ''})</option>`).join('');
-          if (users.length === 0) {
-            usernameSelect.innerHTML = '<option value="admin">admin</option>';
-          }
+          usernameSelect.innerHTML = users.map(u => `<option value="${u.username}">${u.username}</option>`).join('');
+          if (users.length === 0) usernameSelect.innerHTML = '<option value="admin">admin</option>';
         } catch (e) {
           usernameSelect.innerHTML = '<option value="admin">admin</option>';
         }
       }
 
-      // util: show message
-      function showMessage(text, type = 'info', timeout = 4000) {
+      function showMessage(text, timeout = 4000) {
         const div = document.createElement('div');
         div.className = 'alert';
         div.textContent = text;
@@ -134,17 +128,26 @@
         return ALLOWED_EXT.includes(extOf(name));
       }
 
-      // generate random 16 char alnum string for case name
-      function genCaseName() {
-        const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-        let s = '';
-        for (let i=0;i<16;i++) s += chars[Math.floor(Math.random()*chars.length)];
-        return s;
+      function genPatientName(idx) {
+        return `patient ${idx}`;
       }
 
-      // create thumbnail from video File -> returns Promise<dataURL>
+      function nextPatientIndex() {
+        // count existing patient N to determine next index
+        let max = 0;
+        staging.forEach(s => {
+          const m = s.caseName.match(/^patient (\d+)$/);
+          if (m) {
+            const n = parseInt(m[1], 10);
+            if (!isNaN(n) && n > max) max = n;
+          }
+        });
+        return max + 1;
+      }
+
+      // improved thumbnail generation: wait for loadedmetadata then seek then draw
       function createVideoThumbnail(file) {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
           const url = URL.createObjectURL(file);
           const video = document.createElement('video');
           video.preload = 'metadata';
@@ -153,40 +156,79 @@
           video.playsInline = true;
           video.crossOrigin = 'anonymous';
 
-          video.addEventListener('loadeddata', () => {
-            // seek to 0
+          const cleanup = () => {
+            try { video.pause(); } catch(e){ }
+            URL.revokeObjectURL(url);
+          };
+
+          const onError = () => {
+            cleanup();
+            resolve('');
+          };
+
+          video.addEventListener('loadedmetadata', () => {
+            // choose a tiny offset to avoid black first frame in some codecs
+            const seekTo = Math.min(0.05, Math.max(0, (video.duration && video.duration > 0) ? 0.05 : 0));
+            const onSeeked = () => {
+              try {
+                const canvas = document.createElement('canvas');
+                const w = Math.min(320, video.videoWidth || 320);
+                const h = Math.min(180, video.videoHeight || 180);
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, w, h);
+                const dataURL = canvas.toDataURL('image/jpeg', 0.7);
+                cleanup();
+                resolve(dataURL);
+              } catch (err) {
+                cleanup();
+                resolve('');
+              }
+            };
+            const onSeekErr = () => {
+              cleanup();
+              resolve('');
+            };
+            // try seeking
             try {
-              const canvas = document.createElement('canvas');
-              const w = Math.min(320, video.videoWidth);
-              const h = Math.min(180, video.videoHeight);
-              canvas.width = w;
-              canvas.height = h;
-              const ctx = canvas.getContext('2d');
-              ctx.drawImage(video, 0, 0, w, h);
-              const dataURL = canvas.toDataURL('image/jpeg', 0.7);
-              URL.revokeObjectURL(url);
-              resolve(dataURL);
-            } catch (err) {
-              URL.revokeObjectURL(url);
-              resolve(''); // don't fail whole flow; return empty thumbnail
+              video.currentTime = seekTo;
+              video.addEventListener('seeked', onSeeked, { once: true });
+              // fallback timeout
+              setTimeout(() => { resolve(''); cleanup(); }, 2000);
+            } catch (e) {
+              onSeekErr();
             }
           });
 
-          video.addEventListener('error', () => {
-            URL.revokeObjectURL(url);
-            resolve('');
-          });
+          video.addEventListener('error', onError);
 
+          // sometimes loadedmetadata may not fire; set a timeout guard
+          setTimeout(() => {
+            // if still not ready, try to draw frame anyway
+            try {
+              const canvas = document.createElement('canvas');
+              canvas.width = 320; canvas.height = 180;
+              const ctx = canvas.getContext('2d');
+              ctx.fillStyle = '#000';
+              ctx.fillRect(0,0,canvas.width,canvas.height);
+              cleanup();
+              resolve(canvas.toDataURL('image/jpeg'));
+            } catch (err) {
+              cleanup();
+              resolve('');
+            }
+          }, 4000);
         });
       }
 
-      // UI: render staging rows
+      // render rows
       function renderRows() {
         rowsContainer.innerHTML = '';
         staging.forEach((caseItem, idx) => {
           const row = document.createElement('div');
           row.className = 'row-card';
-          // left
+
           const left = document.createElement('div'); left.className = 'row-left';
           const caseDiv = document.createElement('div'); caseDiv.className = 'case-name';
           const input = document.createElement('input'); input.value = caseItem.caseName;
@@ -200,36 +242,41 @@
             const t = document.createElement('div'); t.className = 'thumb';
             const img = document.createElement('img');
             if (fobj.thumbDataUrl) img.src = fobj.thumbDataUrl;
-            else img.style.background = '#333'; // placeholder
+            else { img.style.background = '#333'; img.alt = fobj.file.name; }
             const lbl = document.createElement('div'); lbl.className = 'label';
             lbl.textContent = fobj.file.name;
+
+            const delSingle = document.createElement('div');
+            delSingle.className = 'del-single';
+            delSingle.title = '删除该视频';
+            delSingle.textContent = '×';
+            delSingle.addEventListener('click', () => {
+              // remove this file from caseItem.files
+              caseItem.files.splice(fi, 1);
+              renderRows();
+            });
+
             t.appendChild(img);
             t.appendChild(lbl);
+            t.appendChild(delSingle);
             thumbs.appendChild(t);
           });
           left.appendChild(thumbs);
 
-          // right actions
           const ra = document.createElement('div'); ra.className = 'row-actions';
           const addBtn = document.createElement('button'); addBtn.className = 'add-file-btn'; addBtn.textContent = '添加视频';
           addBtn.addEventListener('click', ()=> {
-            // create hidden input to choose files and attach them to this case
             const tmp = document.createElement('input');
-            tmp.type = 'file';
-            tmp.accept = 'video/*';
-            tmp.multiple = true;
+            tmp.type = 'file'; tmp.accept = 'video/*'; tmp.multiple = true;
             tmp.onchange = async (ev) => {
               const files = Array.from(ev.target.files || []);
               if (!files.length) return;
               if (caseItem.files.length + files.length > MAX_VIDEOS_PER_CASE) {
-                showMessage(`病例最多允许 ${MAX_VIDEOS_PER_CASE} 个视频`, 'warn');
+                showMessage(`病例最多允许 ${MAX_VIDEOS_PER_CASE} 个视频`);
                 return;
               }
               for (const f of files) {
-                if (!isAllowedFile(f.name)) {
-                  showMessage(`不支持的文件格式：${f.name}`, 'warn');
-                  continue;
-                }
+                if (!isAllowedFile(f.name)) { showMessage(`不支持的文件格式：${f.name}`); continue; }
                 const thumb = await createVideoThumbnail(f);
                 caseItem.files.push({ file: f, relativePath: null, thumbDataUrl: thumb });
               }
@@ -238,7 +285,7 @@
             tmp.click();
           });
 
-          const remBtn = document.createElement('button'); remBtn.className = 'remove-row'; remBtn.textContent = '✕';
+          const remBtn = document.createElement('button'); remBtn.className = 'remove-row'; remBtn.textContent = '删除病例';
           remBtn.title = '取消该病例上传';
           remBtn.addEventListener('click', ()=> {
             if (!confirm('确认删除该病例及其所有待上传视频吗？')) return;
@@ -256,7 +303,6 @@
         });
       }
 
-      // clear staging
       function clearAll() {
         if (!confirm('确认取消并清空当前所有待上传数据？')) return;
         staging = [];
@@ -264,97 +310,110 @@
         messages.innerHTML = '';
       }
 
-      // handle files that come from input or drop (files array, and optional webkitRelativePath available on file)
       async function handleIncomingFiles(fileList, fromEntries = false) {
-        // Normalize into array of objects: { file: File, relativePath?: string }
         const fileObjs = [];
         for (const f of fileList) {
-          // some drag/drop directory traversal code might return FileSystemFileEntry with fullPath stored in f.fullPath;
           let rel = f.webkitRelativePath || f.relativePath || f.fullPath || f.name;
-          // normalize
           rel = (rel || f.name).replace(/^\/+/, '');
           fileObjs.push({ file: f, relativePath: rel });
         }
 
-        // Determine whether these are folder-structured (have '/')
         const anyHasSlash = fileObjs.some(o => o.relativePath && o.relativePath.includes('/'));
-
-        // Mixed content (some with relative paths, some not) is considered unsupported per spec
         const someWith = fileObjs.some(o => o.relativePath && o.relativePath.includes('/'));
         const someWithout = fileObjs.some(o => !o.relativePath || !o.relativePath.includes('/'));
         if (someWith && someWithout) {
-          showMessage('检测到混合上传（文件夹与独立文件同时上传），当前不支持，请分别上传', 'warn', 6000);
+          showMessage('检测到混合上传（文件夹与独立文件同时上传），当前不支持，请分别上传', 6000);
           return;
         }
 
         if (anyHasSlash) {
-          // Expect structure: requestDir / caseName / videoFile
-          // collect parts and ensure first component is identical
+          // check parts
           const partsList = fileObjs.map(o => o.relativePath.split('/').filter(p => p && p !== '.'));
-          // ensure all have length >=3
-          if (partsList.some(p => p.length < 3)) {
-            showMessage('检测到不符合 request/case/video 结构的文件，请检查上传内容', 'warn', 6000);
+          if (partsList.some(p => p.length < 2)) {
+            showMessage('检测到不符合路径结构的文件，请检查', 6000);
             return;
           }
-          const firstSet = new Set(partsList.map(p => p[0]));
-          if (firstSet.size !== 1) {
-            showMessage('上传文件来自多个一级目录（请求），请仅上传同一请求目录内容', 'warn', 6000);
+          // If all lengths >=3 => requestDir/caseName/...
+          if (partsList.every(p => p.length >= 3)) {
+            const firstSet = new Set(partsList.map(p => p[0]));
+            if (firstSet.size !== 1) {
+              showMessage('一次上传应来自同一请求目录，请仅上传同一目录', 6000);
+              return;
+            }
+            const groups = {};
+            for (const o of fileObjs) {
+              const parts = o.relativePath.split('/').filter(p => p && p !== '.');
+              const caseName = parts[1];
+              const relUnderCase = parts.slice(2).join('/');
+              const fname = relUnderCase.split('/').pop();
+              if (!isAllowedFile(fname)) { showMessage(`不支持的文件格式：${fname}`); return; }
+              groups[caseName] = groups[caseName] || [];
+              groups[caseName].push({ file: o.file, relativePath: relUnderCase });
+            }
+            // validate & push (patient numbering by insertion order)
+            const baseIndex = nextPatientIndex();
+            let idx = 0;
+            for (const [caseName, files] of Object.entries(groups)) {
+              if (files.length > MAX_VIDEOS_PER_CASE) { showMessage(`病例 ${caseName} 包含 ${files.length} 个视频，超过上限 ${MAX_VIDEOS_PER_CASE}`); return; }
+              const rowFiles = [];
+              for (const it of files) {
+                const thumb = await createVideoThumbnail(it.file).catch(()=> '');
+                rowFiles.push({ file: it.file, relativePath: it.relativePath, thumbDataUrl: thumb });
+              }
+              // default case name: preserve folder name but if empty use patient N
+              const defaultName = caseName || genPatientName(baseIndex + idx);
+              staging.push({ caseName: defaultName, files: rowFiles, createdAt: Date.now() });
+              idx++;
+            }
+            renderRows();
+          } else if (partsList.every(p => p.length === 2)) {
+            // treat as caseName/file
+            const groups = {};
+            for (const o of fileObjs) {
+              const parts = o.relativePath.split('/').filter(p => p && p !== '.');
+              const caseName = parts[0];
+              const fname = parts[1];
+              if (!isAllowedFile(fname)) { showMessage(`不支持的文件格式：${fname}`); return; }
+              groups[caseName] = groups[caseName] || [];
+              groups[caseName].push({ file: o.file, relativePath: fname });
+            }
+            const baseIndex = nextPatientIndex();
+            let idx = 0;
+            for (const [caseName, files] of Object.entries(groups)) {
+              if (files.length > MAX_VIDEOS_PER_CASE) { showMessage(`病例 ${caseName} 包含 ${files.length} 个视频，超过上限 ${MAX_VIDEOS_PER_CASE}`); return; }
+              const rowFiles = [];
+              for (const it of files) {
+                const thumb = await createVideoThumbnail(it.file).catch(()=> '');
+                rowFiles.push({ file: it.file, relativePath: it.relativePath, thumbDataUrl: thumb });
+              }
+              const defaultName = caseName || genPatientName(baseIndex + idx);
+              staging.push({ caseName: defaultName, files: rowFiles, createdAt: Date.now() });
+              idx++;
+            }
+            renderRows();
+          } else {
+            showMessage('上传路径结构混杂，当前不支持，请保证统一结构', 6000);
             return;
           }
-          // group by second component (caseName)
-          const groups = {};
-          fileObjs.forEach((o, idx) => {
-            const parts = o.relativePath.split('/').filter(p => p && p !== '.');
-            const caseName = parts[1];
-            const relUnderCase = parts.slice(2).join('/');
-            const fname = relUnderCase.split('/').pop();
-            if (!isAllowedFile(fname)) {
-              // reject unsupported extension
-              showMessage(`不支持的文件格式：${fname}`, 'warn', 6000);
-              return;
-            }
-            groups[caseName] = groups[caseName] || [];
-            groups[caseName].push({ file: o.file, relativePath: relUnderCase });
-          });
-          // validate per-case count
-          for (const [caseName, files] of Object.entries(groups)) {
-            if (files.length > MAX_VIDEOS_PER_CASE) {
-              showMessage(`病例 ${caseName} 包含 ${files.length} 个视频，超过上限 ${MAX_VIDEOS_PER_CASE}`, 'warn', 6000);
-              return;
-            }
-          }
-          // push to staging
-          for (const [caseName, files] of Object.entries(groups)) {
-            const rowFiles = [];
-            for (const it of files) {
-              const thumb = await createVideoThumbnail(it.file).catch(()=>'');
-              rowFiles.push({ file: it.file, relativePath: it.relativePath, thumbDataUrl: thumb });
-            }
-            staging.push({ caseName: caseName, files: rowFiles });
-          }
-          renderRows();
         } else {
-          // all are standalone files -> treat as single case (if <= MAX_VIDEOS_PER_CASE)
+          // standalone files -> all into one case
           if (fileObjs.length > MAX_VIDEOS_PER_CASE) {
-            showMessage(`一次上传的独立视频数量为 ${fileObjs.length}，超过上限 ${MAX_VIDEOS_PER_CASE}`, 'warn', 6000);
+            showMessage(`一次上传的独立视频数量为 ${fileObjs.length}，超过上限 ${MAX_VIDEOS_PER_CASE}`, 6000);
             return;
           }
-          const caseName = genCaseName();
+          const idx = nextPatientIndex();
+          const caseName = genPatientName(idx);
           const rowFiles = [];
           for (const it of fileObjs) {
-            if (!isAllowedFile(it.file.name)) {
-              showMessage(`不支持的文件格式：${it.file.name}`, 'warn', 6000);
-              return;
-            }
-            const thumb = await createVideoThumbnail(it.file).catch(()=>'');
+            if (!isAllowedFile(it.file.name)) { showMessage(`不支持的文件格式：${it.file.name}`); return; }
+            const thumb = await createVideoThumbnail(it.file).catch(()=> '');
             rowFiles.push({ file: it.file, relativePath: null, thumbDataUrl: thumb });
           }
-          staging.push({ caseName: caseName, files: rowFiles });
+          staging.push({ caseName: caseName, files: rowFiles, createdAt: Date.now() });
           renderRows();
         }
       }
 
-      // drag & drop handling (including directory entries)
       function setupDropzone() {
         dropzone.addEventListener('dragover', (e)=> {
           e.preventDefault();
@@ -368,19 +427,14 @@
           e.preventDefault();
           dropzone.classList.remove('dragover');
           const items = e.dataTransfer.items;
-          // If items support webkitGetAsEntry, traverse directories
           if (items && items.length > 0 && items[0].webkitGetAsEntry) {
             const entries = [];
             for (let i=0;i<items.length;i++) entries.push(items[i].webkitGetAsEntry());
             const files = [];
-            let aborted = false;
             const traverse = (entry, pathPrefix) => {
               return new Promise((resolve) => {
                 if (entry.isFile) {
                   entry.file(file => {
-                    // create a fake File object with relativePath
-                    // Some browsers pass File with fullPath directly when dragging folders; but here we set property directly
-                    // We'll later read file.webkitRelativePath if present; else attach relativePath custom property
                     file.relativePath = (pathPrefix ? pathPrefix + '/' : '') + file.name;
                     files.push(file);
                     resolve();
@@ -388,7 +442,6 @@
                 } else if (entry.isDirectory) {
                   const reader = entry.createReader();
                   reader.readEntries(async (entries) => {
-                    // process each entry recursively
                     const promises = entries.map(en => traverse(en, pathPrefix ? pathPrefix + '/' + entry.name : entry.name));
                     await Promise.all(promises);
                     resolve();
@@ -398,24 +451,20 @@
                 }
               });
             };
-
-            // For each top-level entry
             const tasks = entries.map(en => traverse(en, ''));
             await Promise.all(tasks);
             if (files.length === 0) {
-              showMessage('未获取到文件，请尝试使用“选择文件夹”按钮或单独选择视频文件', 'warn', 4000);
+              showMessage('未获取到文件，请尝试使用“选择文件夹”或单独选择视频', 4000);
               return;
             }
             await handleIncomingFiles(files, true);
           } else {
-            // Fallback: use DataTransfer.files
             const farr = Array.from(e.dataTransfer.files || []);
             await handleIncomingFiles(farr, false);
           }
         });
       }
 
-      // wire inputs
       chooseFolderBtn.addEventListener('click', ()=> folderInput.click());
       folderInput.addEventListener('change', async (e) => {
         const files = Array.from(e.target.files || []);
@@ -432,92 +481,78 @@
         fileInput.value = '';
       });
 
-      // upload action
+      addCaseBtn.addEventListener('click', () => {
+        const idx = nextPatientIndex();
+        const name = genPatientName(idx);
+        staging.push({ caseName: name, files: [], createdAt: Date.now() });
+        renderRows();
+      });
+
       uploadBtn.addEventListener('click', async () => {
-        if (staging.length === 0) {
-          showMessage('没有待上传内容', 'warn', 3000);
-          return;
-        }
+        if (staging.length === 0) { showMessage('没有待上传内容'); return; }
         const username = usernameSelect.value;
-        if (!username) {
-          showMessage('请选择提交者用户名', 'warn', 3000);
-          return;
-        }
-        // validate: totals & per-case checks
+        if (!username) { showMessage('请选择提交者用户名'); return; }
+        // validate each row has at least one file
         for (const c of staging) {
-          if (c.files.length === 0) {
-            showMessage(`病例 ${c.caseName} 没有包含视频，无法上传`, 'warn', 4000);
+          if (!c.files || c.files.length === 0) {
+            showMessage(`病例 ${c.caseName} 没有视频，至少需要一个视频才可上传`, 6000);
             return;
           }
           if (c.files.length > MAX_VIDEOS_PER_CASE) {
-            showMessage(`病例 ${c.caseName} 包含 ${c.files.length} 个视频，超过上限 ${MAX_VIDEOS_PER_CASE}`, 'warn', 4000);
+            showMessage(`病例 ${c.caseName} 包含 ${c.files.length} 个视频，超过上限 ${MAX_VIDEOS_PER_CASE}`, 6000);
             return;
           }
         }
-
-        // Block upload if staging contains items with both relativePath (folder upload) and without
+        // check for mixed (some relativePath some not)
         const hasRel = staging.some(c => c.files.some(f => f.relativePath));
         const hasNoRel = staging.some(c => c.files.some(f => !f.relativePath));
         if (hasRel && hasNoRel) {
-          showMessage('检测到混合上传（文件夹结构与独立文件混合），当前不支持，请分别上传', 'warn', 6000);
+          showMessage('检测到混合上传（文件夹结构与独立文件混合），当前不支持，请分别上传', 6000);
           return;
         }
 
-        // Build FormData
         const form = new FormData();
-        // If relativePath present, we need to preserve requestDir/caseName/file structure
-        // But per our server contract, server expects files whose filename contains the original relative path; here we will set filename in append accordingly.
         for (const caseItem of staging) {
           for (const fobj of caseItem.files) {
             const f = fobj.file;
-            // if relativePath exists (e.g., 'requestDir/caseName/file.mp4' or 'caseSubPath/file.mp4'), we must reconstruct to 'requestDir/caseName/file' style.
             if (fobj.relativePath) {
-              // The relativePath here is path under requestDir (i.e., after first two components in client logic we used)
-              // But actual UploadFile.filename that the server will read should be something like: requestDir/caseName/<relUnderCase>
-              // To reconstruct, we don't necessarily have the requestDir root name on the client side (because webkitdirectory may present full webkitRelativePath like 'requestDir/case/file')
-              // To keep it simple, if the file object has webkitRelativePath, prefer using it; else we will prepend a synthetic requestDir name
-              let fullRel = f.webkitRelativePath || f.relativePath || f.name;
-              // Normalize
-              fullRel = fullRel.replace(/^\/+/, '');
-              // If fullRel already contains at least two components, keep as is; else we create synthetic prefix
-              const parts = fullRel.split('/');
+              // use existing relative path if contains multiple segments; otherwise construct caseName/file
+              const rel = f.webkitRelativePath || f.relativePath || f.name;
+              const parts = rel.split('/').filter(p=>p && p!=='.');
               if (parts.length >= 3) {
-                // use as-is
-                form.append('files', f, fullRel);
+                form.append('files', f, rel);
+              } else if (parts.length === 2) {
+                form.append('files', f, rel);
               } else {
-                // fallback: prefix artificial request dir
-                const reqDir = 'request';
-                const constructed = `${reqDir}/${caseItem.caseName}/${f.name}`;
+                const constructed = `${caseItem.caseName}/${f.name}`;
                 form.append('files', f, constructed);
               }
             } else {
-              // no relative path -> append as caseName/filename so server treats as standalone-case files
               const constructed = `${caseItem.caseName}/${f.name}`;
               form.append('files', f, constructed);
             }
           }
         }
 
-        // Perform upload via XMLHttpRequest to track progress if desired
         uploadBtn.disabled = true;
         uploadBtn.textContent = '上传中...';
-        showMessage('开始上传，请稍候（请勿关闭页面）', 'info', 3000);
+        showMessage('开始上传，请稍候（请勿关闭页面）', 3000);
+
         try {
-          await uploadFormData(`/api/users/${encodeURIComponent(username)}/upload-oridata`, form, (percent) => {
-            uploadBtn.textContent = `上传中 ${Math.round(percent)}%`;
+          await uploadFormData(`/api/users/${encodeURIComponent(username)}/upload-oridata`, form, (pct) => {
+            uploadBtn.textContent = `上传中 ${Math.round(pct)}%`;
           });
-          showMessage('上传成功，服务器已接收', 'info', 4000);
+          showMessage('上传成功，服务器已接收', 4000);
           staging = [];
           renderRows();
         } catch (err) {
-          showMessage('上传失败：' + (err.message || err), 'warn', 6000);
+          showMessage('上传失败：' + (err.message || err), 6000);
         } finally {
           uploadBtn.disabled = false;
           uploadBtn.textContent = '确认上传';
         }
       });
 
-      // helper: upload with XHR to get progress
       function uploadFormData(url, formData, onProgress) {
         return new Promise((resolve, reject) => {
           const xhr = new XMLHttpRequest();
@@ -527,7 +562,11 @@
             if (xhr.status >= 200 && xhr.status < 300) {
               resolve(xhr.response);
             } else {
-              const msg = xhr.response && xhr.response.detail ? xhr.response.detail : ('HTTP ' + xhr.status);
+              let msg = 'HTTP ' + xhr.status;
+              try {
+                if (xhr.response && xhr.response.detail) msg = xhr.response.detail;
+                else if (xhr.response && xhr.response.message) msg = xhr.response.message;
+              } catch(e){}
               reject(new Error(msg));
             }
           };
@@ -544,10 +583,8 @@
         });
       }
 
-      // clear handler
       clearBtn.addEventListener('click', clearAll);
 
-      // init
       loadUsers();
       setupDropzone();
     })();
