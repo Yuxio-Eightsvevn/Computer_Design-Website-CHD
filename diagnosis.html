@@ -1358,7 +1358,7 @@
             // 检查必要参数
             if (!taskInfo.username || !taskInfo.taskFolder) {
                 alert('缺少必要参数，即将返回主页');
-                window.location.href = '/dashboard';
+                window.location.href = '/flow';
                 return;
             }
             
@@ -1430,7 +1430,7 @@
                 
                 if (!patients || patients.length === 0) {
                     alert('该任务下没有病人数据');
-                    window.location.href = '/dashboard';
+                    window.location.href = '/flow';
                     return;
                 }
                 
@@ -2249,7 +2249,7 @@
                     // 提交成功后清除草稿
                     clearDraft();
                     
-                    window.location.href = '/dashboard';
+                    window.location.href = '/flow';
                 } catch (error) {
                     console.error('提交失败:', error);
                     alert('提交失败，请重试');
@@ -2340,7 +2340,7 @@
             // 延迟一下，确保清除操作完成
             setTimeout(() => {
                 console.log('🏠 跳转到主页');
-                window.location.href = '/dashboard';
+                window.location.href = '/flow';
             }, 100);
         }
 

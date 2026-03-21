@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>欢迎 - 儿童先心病诊断平台</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(180deg, #f6f8ff 0%, #ffffff 100%);
+      color: #222;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      width: 100%;
+      max-width: 900px;
+      background: white;
+      border-radius: 12px;
+      padding: 28px;
+      box-shadow: 0 8px 30px rgba(41, 56, 86, 0.08);
+    }
+    .header {
+      display:flex;
+      align-items:center;
+      gap:18px;
+      margin-bottom:18px;
+    }
+    .avatar {
+      width:72px; height:72px; border-radius:36px;
+      background: linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+      color:white; display:flex; align-items:center; justify-content:center;
+      font-size:28px; font-weight:700;
+    }
+    .userinfo { display:flex; flex-direction:column; }
+    .welcome { font-size:20px; font-weight:700; color:#1f2937; }
+    .meta { color:#6b7280; font-size:14px; margin-top:6px; }
+    .buttons { display:flex; gap:12px; flex-wrap:wrap; margin-top:18px; }
+    .btn {
+      padding:12px 18px; border-radius:10px; border:none; cursor:pointer; font-weight:600;
+      background:linear-gradient(90deg,#667eea 0%,#5b8def 100%); color:#fff;
+      box-shadow: 0 6px 18px rgba(102,126,234,0.12);
+    }
+    .btn.secondary {
+      background: linear-gradient(90deg,#10b981 0%,#14c38e 100%);
+      box-shadow: 0 6px 18px rgba(20,195,142,0.12);
+    }
+    .btn.ghost {
+      background: transparent; border:1px solid #e6eefc; color:#374151;
+      box-shadow: none;
+    }
+    .actions { display:flex; justify-content:flex-end; margin-top:22px; gap:12px; }
+    .hint { color:#6b7280; margin-top:8px; font-size:13px; }
+    @media (max-width:720px) {
+      .header { flex-direction:column; align-items:flex-start; gap:8px; }
+      .buttons { flex-direction:column; }
+      .actions { justify-content:center; }
+    }
+  </style>
+</head>
+<body>
+  <div class="card" role="main">
+    <div class="header">
+      <div id="avatar" class="avatar">U</div>
+      <div class="userinfo">
+        <div id="welcomeText" class="welcome">欢迎回来，加载中...</div>
+        <div id="orgText" class="meta">机构：加载中...</div>
+        <div class="hint">请选择以下模式开始：</div>
+      </div>
+      <div style="flex:1"></div>
+      <div>
+        <button id="logoutBtn" class="btn ghost">退出登录</button>
+      </div>
+    </div>
+
+    <div class="buttons" role="navigation" aria-label="mode-buttons">
+      <button id="diagnoseBtn" class="btn">诊断模式</button>
+      <button id="eduBtn" class="btn secondary">教育模式</button>
+      <button id="tasksBtn" class="btn ghost">任务管理</button>
+      <button id="usersBtn" class="btn ghost">用户管理</button>
+    </div>
+
+    <div class="actions">
+      <div style="color:#6b7280;font-size:13px;">如需切换账号，请先退出再重新登录。</div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const welcomeText = document.getElementById('welcomeText');
+      const orgText = document.getElementById('orgText');
+      const avatar = document.getElementById('avatar');
+
+      const diagnoseBtn = document.getElementById('diagnoseBtn');
+      const eduBtn = document.getElementById('eduBtn');
+      const tasksBtn = document.getElementById('tasksBtn');
+      const usersBtn = document.getElementById('usersBtn');
+      const logoutBtn = document.getElementById('logoutBtn');
+
+      function getCookieValue(name) {
+        const cookies = document.cookie ? document.cookie.split('; ') : [];
+        for (let c of cookies) {
+          const [k, ...v] = c.split('=');
+          if (k === name) return decodeURIComponent(v.join('='));
+        }
+        return null;
+      }
+
+      async function loadUser() {
+        // 优先通过后端的 /api/users/current 获取
+        try {
+          const resp = await fetch('/api/users/current');
+          if (resp.ok) {
+            const body = await resp.json().catch(()=>null);
+            if (body && body.data) {
+              const u = body.data;
+              const uname = u.username || u.user || u.login || u.name || getCookieValue('username') || 'unknown';
+              const org = u.organization || u.org || u.organizationName || u.department || '';
+              applyUser(uname, org);
+              return;
+            }
+          }
+        } catch (e) {
+          // 忽略，尝试 cookie 回退
+        }
+
+        // 回退到 cookie 中读取 username（后端 login 已写入）
+        const cname = getCookieValue('username') || getCookieValue('user') || 'unknown';
+        applyUser(cname, '');
+      }
+
+      function applyUser(username, org) {
+        const uname = username || 'unknown';
+        welcomeText.textContent = `欢迎回来，${uname}`;
+        orgText.textContent = org ? `机构：${org}` : '机构：未知机构';
+        avatar.textContent = (uname && uname[0]) ? uname[0].toUpperCase() : 'U';
+      }
+
+      // 按钮导航
+      diagnoseBtn.addEventListener('click', () => { window.location.href = '/dashboard'; });
+      eduBtn.addEventListener('click', () => { window.location.href = '/diagnosis'; });
+      tasksBtn.addEventListener('click', () => { window.location.href = '/admin'; });
+      usersBtn.addEventListener('click', () => { window.location.href = '/admin'; });
+
+      // 退出登录
+      logoutBtn.addEventListener('click', async () => {
+        if (!confirm('确认退出登录？')) return;
+        try {
+          // 清理localStorage常见键
+          ['username','user','currentUser','current_user','auth','token','access_token'].forEach(k=>{ try{ localStorage.removeItem(k);}catch(e){} });
+        } catch (e) {}
+        try {
+          await fetch('/api/logout', { method: 'POST' }).catch(()=>null);
+        } catch(e){}
+        // 重定向到登录
+        window.location.href = '/login';
+      });
+
+      // 初始化加载
+      loadUser();
+    })();
+  </script>
+</body>
+</html>

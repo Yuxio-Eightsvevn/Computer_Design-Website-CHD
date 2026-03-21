@@ -399,13 +399,6 @@ async def get_task_patients(username: str, task_folder: str):
 # 提供视频文件访问
 app.mount("/videos", StaticFiles(directory=DATA_BATCH_STORAGE), name="videos")
 
-try:
-    from routes_users import router as users_router
-    app.include_router(users_router, prefix="/api")
-except Exception as _e:
-    import logging
-    logging.exception("failed to include users router: %s", _e)
-
 
 # JSON格式提交诊断结果的请求模型
 class DiagnosisRecordSimple(BaseModel):
@@ -628,11 +621,20 @@ async def serve_admin():
 
 @app.get("/diagnosis")
 async def serve_diagnosis():
+
     return FileResponse("diagnosis.html")
+
+
+@app.get("/flow")
+async def serve_flow():
+    return FileResponse("flow.html")
 
 @app.get("/")
 async def root():
     return FileResponse("login.html")
+
+
+
 
 if __name__ == "__main__":
     import uvicorn

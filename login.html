@@ -80,8 +80,6 @@
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
 
-
-
         .login-btn {
             width: 100%;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -105,8 +103,6 @@
             opacity: 0.5;
             cursor: not-allowed;
         }
-
-
 
         .error-message {
             background: #fee;
@@ -204,8 +200,9 @@
                 // 登录成功，保存用户数据
                 localStorage.setItem('userData', JSON.stringify(result.data));
 
-                // 直接跳转到个人主页
-                window.location.href = '/dashboard';
+                // 登录成功后重定向到导流页（flow），以便用户选择模式
+                // 说明：flow 页面将显示欢迎语并提供到 dashboard/diagnosis/admin 的入口
+                window.location.href = '/flow';
 
             } catch (error) {
                 console.error('登录错误:', error);

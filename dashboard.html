@@ -137,7 +137,7 @@
     <div class="main">
       <div class="navbar">
         <div>👩‍⚕️ 任务批次接收（独立上传）</div>
-        <div><button id="logoutBtn" class="btn secondary">退出登录</button></div>
+        <div><button id="logoutBtn" class="btn secondary">返回</button></div>
       </div>
 
       <div class="card" style="margin-top:20px">
@@ -194,6 +194,42 @@
       let currentUser = null;
       // staging: array of { caseName, files: [ { file, relativePath|null, thumbDataUrl } ], createdAt }
       let staging = [];
+
+      // 放在页面脚本中或公共脚本文件里
+      async function userIsLoggedIn() {
+        try {
+          const res = await fetch('/api/users/current', { method: 'GET' });
+          if (!res.ok) return false;
+          const body = await res.json().catch(()=>null);
+          return !!(body && body.data);
+        } catch (e) {
+          return false;
+        }
+      }
+
+      // 直接跳回 flow（用于 dashboard 的“返回”按钮）
+      function goToFlow() {
+        window.location.href = '/flow';
+      }
+
+      // 智能跳转：若登录 -> /flow，否则 -> /login
+      async function redirectToFlowOrLogin() {
+        const logged = await userIsLoggedIn();
+        if (logged) {
+          window.location.href = '/flow';
+        } else {
+          window.location.href = '/login';
+        }
+      }
+
+      // 如果当前按钮是既要登出又要跳转（如确实希望登出），使用此函数：
+      // 发起登出请求（忽略错误），然后跳到 login（因为登出后无登录）
+      async function logoutThenGoToLogin() {
+        try {
+          await fetch('/api/logout', { method: 'POST' });
+        } catch (e) { /* 忽略 */ }
+        window.location.href = '/login';
+      }
 
       // Try multiple localStorage keys to find stored user info (login front-end may have saved username/info)
       function readLocalUser() {
@@ -806,24 +842,43 @@
 
       clearBtn.addEventListener('click', clearAll);
 
-      // Logout handler: clear local state and attempt backend logout, then redirect to /login
+      // 替换原有的 logout handler 为智能跳转：已登录 -> /flow ，未登录 -> /login
       logoutBtn.addEventListener('click', async () => {
-        if (!confirm('确认退出登录？')) return;
+        
         logoutBtn.disabled = true;
         logoutBtn.textContent = '正在退出...';
-        // Clear common localStorage keys that might store auth/user info
+
+        // 清理本地常见的用户/认证信息
         const keysToClear = ['username', 'user', 'currentUser', 'current_user', 'auth', 'token', 'access_token'];
-        try {
-          keysToClear.forEach(k => localStorage.removeItem(k));
-        } catch (e) { /* ignore */ }
+        try { keysToClear.forEach(k => localStorage.removeItem(k)); } catch (e) { /* ignore */ }
 
-        // Try to call backend logout endpoint (if exists) - best-effort
         try {
-          await fetch('/api/logout', { method: 'POST' }).catch(() => null);
-        } catch (e) { /* ignore */ }
+          // 尝试调用 /api/users/current 判断是否仍然登录（优先）
+          let loggedIn = false;
+          try {
+            const res = await fetch('/api/users/current', { method: 'GET' });
+            if (res.ok) {
+              const body = await res.json().catch(() => null);
+              if (body && body.data) loggedIn = true;
+            }
+          } catch (e) {
+            // 若请求失败则降级为未登录（后面会跳到 login）
+            loggedIn = false;
+          }
 
-        // Redirect to login page
-        window.location.href = '/login';
+          if (loggedIn) {
+            // 如果后端认为已登录，返回 flow（不强制登出）
+            window.location.href = '/flow';
+          } else {
+            // 未登录的用户或判断失败：确保后端清理会话（最小化残留），然后跳转到登录页
+            try { await fetch('/api/logout', { method: 'POST' }).catch(() => null); } catch (e) { /* ignore */ }
+            window.location.href = '/login';
+          }
+        } finally {
+          // 由于接下来会导航页面，这里无需重置按钮。但若希望在导航失败时恢复按钮状态，可解除注释下面两行：
+          // logoutBtn.disabled = false;
+          // logoutBtn.textContent = '退出登录';
+        }
       });
 
       loadCurrentUser();
