@@ -276,18 +276,48 @@
           const cookieU = getCookieValue('username');
           if (cookieU) {
             try {
-              const r2 = await fetch(`/api/users/${encodeURIComponent(cookieU)}`);
-              if (r2.ok) {
-                const d2 = await r2.json();
-                if (d2 && d2.data) {
-                  currentUser = { username: d2.data.username || cookieU, org: d2.data.organization || d2.data.org || '' };
-                } else {
-                  currentUser = { username: cookieU, org: '' };
+              // 3a) 优先尝试单用户查询（若后端支持）
+              let gotOrg = false;
+              try {
+                const r2 = await fetch(`/api/users/${encodeURIComponent(cookieU)}`);
+                if (r2.ok) {
+                  const d2 = await r2.json();
+                  if (d2 && d2.data) {
+                    currentUser = { username: d2.data.username || cookieU, org: d2.data.organization || d2.data.org || '' };
+                    if (currentUser.org) gotOrg = true;
+                  } else {
+                    currentUser = { username: cookieU, org: '' };
+                  }
                 }
-              } else {
+              } catch (e) {
+                // ignore, will try list fallback below
+              }
+
+              // 3b) 如果单用户查询没有拿到 org，则再去 /api/users 列表中查找（兼容老接口）
+              if (!gotOrg) {
+                try {
+                  const rList = await fetch('/api/users');
+                  if (rList.ok) {
+                    const listData = await rList.json();
+                    if (listData && Array.isArray(listData.data)) {
+                      const found = listData.data.find(u => (u.username === cookieU || (u.user && u.user.username === cookieU)));
+                      if (found) {
+                        currentUser = { username: found.username || cookieU, org: found.organization || found.org || '' };
+                        gotOrg = !!currentUser.org;
+                      }
+                    }
+                  }
+                } catch (e) {
+                  // ignore
+                }
+              }
+
+              // 最后兜底：至少设 username
+              if (!currentUser || !currentUser.username) {
                 currentUser = { username: cookieU, org: '' };
               }
             } catch (e) {
+              // 任何异常都回退到仅使用 cookie username
               currentUser = { username: cookieU, org: '' };
             }
           }
