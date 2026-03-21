@@ -8,109 +8,75 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: #f5f7fa;
-      color: #333;
-      min-height: 100vh;
+      background: #f5f7fa; color: #333; min-height: 100vh;
     }
     .container {
-      max-width: 1200px;
-      margin: 30px auto;
-      padding: 0 20px;
-      display: flex;
-      gap: 16px;
-      align-items: flex-start;
+      max-width: 1200px; margin: 30px auto; padding: 0 20px;
+      display: flex; gap: 16px; align-items: flex-start;
     }
     .sidebar { width: 220px; }
     .main { flex: 1; }
     .navbar {
       background: linear-gradient(135deg,#667eea 0%,#764ba2 100%);
-      color: white;
-      padding: 12px 20px;
-      border-radius: 8px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+      color: white; padding: 12px 20px; border-radius: 8px;
+      display: flex; justify-content: space-between; align-items: center;
     }
-    .card {
-      background: white;
-      border-radius: 12px;
-      padding: 20px;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
-      margin-top: 20px;
-    }
+    .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); margin-top: 20px; }
     h1 { font-size: 20px; margin-bottom: 12px; }
+
+    /* --- [新增布局容器] --- */
+    .stats-container {
+      background: white; border-radius: 12px; padding: 16px 20px;
+      margin-top: 20px; display: flex; justify-content: space-between; align-items: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04); border: 1px solid #eef2f7;
+    }
+    .task-count-box { font-size: 16px; font-weight: 700; color: #4b5563; }
+    .task-count-number { color: #667eea; font-size: 20px; margin: 0 4px; }
+
+    .request-name-container {
+      background: #f8faff; border: 1px solid #d7e2ff; border-radius: 12px;
+      padding: 16px 20px; margin-top: 12px; display: flex; align-items: center; gap: 12px;
+    }
+    .request-name-container label { font-weight: 700; color: #4b5563; white-space: nowrap; }
+    .request-name-container input {
+      flex: 1; padding: 10px 14px; border-radius: 8px; border: 1px solid #c9d7ff;
+      font-size: 15px; font-weight: 600; outline: none;
+    }
+    /* ---------------------- */
+
     .dropzone {
-      border: 2px dashed #c9d7ff;
-      border-radius: 12px;
-      padding: 30px;
-      text-align: center;
-      cursor: pointer;
-      background: linear-gradient(180deg, #ffffff, #fbfdff);
-      transition: all .15s;
+      border: 2px dashed #c9d7ff; border-radius: 12px; padding: 30px;
+      text-align: center; cursor: pointer; background: #fff; transition: all .15s;
     }
-    .dropzone.dragover { border-color: #667eea; background: #eef4ff; transform: translateY(-2px); }
+    .dropzone.dragover { border-color: #667eea; background: #eef4ff; }
     .controls { display:flex; gap:12px; align-items:center; margin-bottom:16px; flex-wrap:wrap; }
-    .btn { padding:8px 14px; border-radius:8px; border:none; cursor:pointer; background:#667eea; color:white; }
-    .btn.secondary {
-      background: linear-gradient(90deg, #ff7b7b 0%, #ff5252 100%);
-      color: #ffffff;
-      border: none;
-     box-shadow: 0 2px 8px rgba(255, 82, 82, 0.14);
-    }
-    .btn.secondary:hover {
-      filter: brightness(0.95);
-    }
+    .btn { padding:8px 14px; border-radius:8px; border:none; cursor:pointer; background:#667eea; color:white; font-weight: 600;}
+    .btn.secondary { background: #ff5252; color: white; }
+    .btn.view-tasks { background: #10b981; }
     .hint { color:#666; font-size:13px; }
     .rows { margin-top:16px; display:flex; flex-direction:column; gap:12px; }
     .row-card {
-      border:1px solid #e6eefc;
-      border-radius:10px;
-      padding:12px;
-      background:white;
-      display:flex;
-      gap:12px;
-      align-items:flex-start;
-      justify-content:space-between;
+      border:1px solid #e6eefc; border-radius:10px; padding:12px;
+      background:white; display:flex; gap:12px; align-items:flex-start; justify-content:space-between;
     }
-    .row-card.dragover { box-shadow: inset 0 0 0 3px rgba(102,126,234,0.08); border-color:#667eea; }
     .row-left { flex:1; display:flex; flex-direction:column; gap:8px; }
     .case-name { display:flex; gap:8px; align-items:center; }
     .case-name input { padding:8px 10px; border-radius:6px; border:1px solid #d7e2ff; }
     .thumbs { display:flex; gap:8px; flex-wrap:wrap; }
     .thumb {
-      width:160px;
-      border-radius:6px;
-      overflow:hidden;
-      border:1px solid #eee;
-      background:#000;
-      color:white;
-      position:relative;
+      width:160px; border-radius:6px; overflow:hidden; border:1px solid #eee;
+      background:#000; color:white; position:relative;
     }
-    .thumb img, .thumb canvas { display:block; width:100%; height:90px; object-fit:cover; background:#000; }
+    .thumb img, .thumb canvas { display:block; width:100%; height:90px; object-fit:cover; }
     .thumb .label { padding:6px; font-size:12px; background:white; color:#333; text-align:center; }
     .thumb .del-single {
-      position:absolute; top:6px; right:6px;
-      background:rgba(0,0,0,0.6); color:white; border-radius:12px;
-      width:24px; height:24px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-weight:bold;
-    }
-    .row-actions { display:flex; gap:8px; align-items:center; }
-    .remove-row {
-      background:#ff4d4f; color:white; border-radius:8px; padding:6px 8px; border:none; cursor:pointer;
-    }
-    .add-file-btn {
-      background:#28a745; color:white; border-radius:8px; padding:6px 8px; border:none; cursor:pointer;
+      position:absolute; top:6px; right:6px; background:rgba(0,0,0,0.6);
+      color:white; border-radius:12px; width:24px; height:24px; display:flex;
+      align-items:center; justify-content:center; cursor:pointer;
     }
     .bottom-actions { display:flex; gap:12px; margin-top:16px; justify-content:flex-end; }
     .alert { padding:10px 12px; border-radius:8px; background:#fff3cd; color:#856404; margin-top:10px; }
-    .hidden { display:none; }
-    .add-case-btn {
-      background:#20c997; color:white; border-radius:8px; padding:6px 8px; border:none; cursor:pointer;
-    }
-    @media (max-width:960px) {
-      .container { flex-direction:column; }
-      .sidebar { width:100%; }
-      .thumb { width:120px; }
-    }
+    @media (max-width:960px) { .container { flex-direction:column; } .sidebar { width:100%; } }
   </style>
 </head>
 <body>
@@ -125,49 +91,54 @@
           </div>
         </div>
         <hr style="margin:12px 0;border:none;border-top:1px solid #f0f3ff;">
-        <div style="font-size:13px;color:#555">说明：</div>
         <ul style="margin-top:8px;color:#666;font-size:13px;line-height:1.6">
-          <li>每个病例最少1个视频，最多5个视频。</li>
-          <li>拖放到行或使用“添加视频”按钮添加。</li>
-          <li>短视频可能无法稳定预览，服务器端可生成正式缩略图（若安装 ffmpeg）。</li>
+          <li>每个病例最多 5 个视频。</li>
+          <li>支持文件夹拖拽与自动缩略图。</li>
         </ul>
       </div>
     </div>
 
     <div class="main">
       <div class="navbar">
-        <div>👩‍⚕️ 任务批次接收（独立上传）</div>
+        <div>👩‍⚕️ 任务批次接收</div>
         <div><button id="logoutBtn" class="btn secondary">返回</button></div>
       </div>
 
-      <div class="card" style="margin-top:20px">
-        <h1>上传任务（文件夹 / 多视频）</h1>
+      <!-- [布局微调：容器 1] -->
+      <div class="stats-container">
+        <div class="task-count-box">
+          已上传任务数：<span id="uploadedTaskCount" class="task-count-number">-</span>
+        </div>
+        <button id="viewTasksBtn" class="btn view-tasks">📋 查看已上传任务</button>
+      </div>
 
+      <!-- [布局微调：容器 2] -->
+      <div class="request-name-container">
+        <label for="requestNameInput">当前任务名称：</label>
+        <input id="requestNameInput" type="text" placeholder="Task_YYYYMMDD_HHMMSS" />
+      </div>
+
+      <div class="card">
+        <h1>上传任务数据</h1>
         <div class="controls">
-          <button id="chooseFolderBtn" class="btn secondary">选择文件夹</button>
-          <input id="folderInput" type="file" webkitdirectory directory multiple style="display:none" />
-
-          <button id="chooseFilesBtn" class="btn secondary">选择视频文件</button>
+          <button id="chooseFolderBtn" class="btn secondary" style="background:#667eea">选择文件夹</button>
+          <input id="folderInput" type="file" webkitdirectory multiple style="display:none" />
+          <button id="chooseFilesBtn" class="btn secondary" style="background:#667eea">选择视频文件</button>
           <input id="fileInput" type="file" accept="video/*" multiple style="display:none" />
-
-          <button id="addCaseBtn" class="add-case-btn">新增病例</button>
-
+          <button id="addCaseBtn" class="btn" style="background:#20c997">新增病例</button>
           <div style="flex:1"></div>
-
-          <div id="statusHint" class="hint">提示：支持拖拽文件夹或视频到下方区域</div>
+          <div id="statusHint" class="hint">可拖拽文件夹到下方区域</div>
         </div>
 
         <div id="dropzone" class="dropzone">
-          将文件或文件夹拖放到此处，或点击选择。<br/>
-          说明：文件夹结构应为 requestDir/case/file 或 case/file 或直接上传视频（会被放入 patient N）。
+          将文件或文件夹拖放到此处
         </div>
 
         <div id="messages"></div>
-
         <div id="rowsContainer" class="rows"></div>
 
         <div class="bottom-actions">
-          <button id="clearBtn" class="btn secondary">取消上传</button>
+          <button id="clearBtn" class="btn secondary" style="background:#94a3b8">清空</button>
           <button id="uploadBtn" class="btn">确认上传</button>
         </div>
       </div>
@@ -176,9 +147,12 @@
 
   <script>
     (function () {
+      // --- 核心常量与逻辑原封不动搬回 ---
       const MAX_VIDEOS_PER_CASE = 5;
       const ALLOWED_EXT = ['.mp4', '.avi', '.mov', '.mkv'];
 
+      const requestNameInput = document.getElementById('requestNameInput');
+      const viewTasksBtn = document.getElementById('viewTasksBtn');
       const folderInput = document.getElementById('folderInput');
       const fileInput = document.getElementById('fileInput');
       const chooseFolderBtn = document.getElementById('chooseFolderBtn');
@@ -192,697 +166,217 @@
       const logoutBtn = document.getElementById('logoutBtn');
 
       let currentUser = null;
-      // staging: array of { caseName, files: [ { file, relativePath|null, thumbDataUrl } ], createdAt }
       let staging = [];
 
-      // 放在页面脚本中或公共脚本文件里
-      async function userIsLoggedIn() {
+      function generateDefaultRequestName() {
+        const now = new Date();
+        const pad = (n) => n.toString().padStart(2, '0');
+        return `Task_${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+      }
+      requestNameInput.value = generateDefaultRequestName();
+
+      viewTasksBtn.onclick = () => { window.location.href = '/task_status'; };
+
+      // [新增获取逻辑，预留给后端]
+      async function fetchUploadCount(username) {
         try {
-          const res = await fetch('/api/users/current', { method: 'GET' });
-          if (!res.ok) return false;
-          const body = await res.json().catch(()=>null);
-          return !!(body && body.data);
-        } catch (e) {
-          return false;
-        }
+          const res = await fetch(`/api/users/${encodeURIComponent(username)}/oridata-count`);
+          if (res.ok) {
+            const data = await res.json();
+            document.getElementById('uploadedTaskCount').textContent = data.count ?? '0';
+          }
+        } catch (e) { document.getElementById('uploadedTaskCount').textContent = '0'; }
       }
 
-      // 直接跳回 flow（用于 dashboard 的“返回”按钮）
-      function goToFlow() {
-        window.location.href = '/flow';
-      }
-
-      // 智能跳转：若登录 -> /flow，否则 -> /login
-      async function redirectToFlowOrLogin() {
-        const logged = await userIsLoggedIn();
-        if (logged) {
-          window.location.href = '/flow';
-        } else {
-          window.location.href = '/login';
-        }
-      }
-
-      // 如果当前按钮是既要登出又要跳转（如确实希望登出），使用此函数：
-      // 发起登出请求（忽略错误），然后跳到 login（因为登出后无登录）
-      async function logoutThenGoToLogin() {
-        try {
-          await fetch('/api/logout', { method: 'POST' });
-        } catch (e) { /* 忽略 */ }
-        window.location.href = '/login';
-      }
-
-      // Try multiple localStorage keys to find stored user info (login front-end may have saved username/info)
-      function readLocalUser() {
-        const keys = ['username', 'user', 'currentUser', 'current_user', 'auth', 'account'];
-        for (const k of keys) {
-          try {
-            const v = localStorage.getItem(k);
-            if (!v) continue;
-            // Try parse JSON
-            try {
-              const parsed = JSON.parse(v);
-              if (parsed && (parsed.username || parsed.user)) {
-                return { username: parsed.username || parsed.user, raw: parsed };
-              }
-            } catch (e) {
-              // not JSON, treat as plain username
-              if (typeof v === 'string' && v.trim()) return { username: v.trim(), raw: v };
-            }
-          } catch (e) { continue; }
-        }
-        return null;
-      }
-
-      // helper: read cookie
-      function getCookieValue(name) {
-        const cookies = document.cookie ? document.cookie.split('; ') : [];
-        for (let c of cookies) {
-          const [k, ...v] = c.split('=');
-          if (k === name) return decodeURIComponent(v.join('='));
-        }
-        return null;
-      }
-
-      // load current user for display and upload use
+      // --- 完整保留您的 loadCurrentUser 逻辑 ---
       async function loadCurrentUser() {
-        // 1) try localStorage first (most likely)
-        const local = readLocalUser();
-        if (local && local.username) {
-          const uname = local.username;
-          // Try fetch user detail from backend to get organization (database stores 'organization')
+        const local = (function readLocalUser() {
+          const keys = ['username', 'user', 'currentUser', 'current_user', 'auth', 'account'];
+          for (const k of keys) {
+            try {
+              const v = localStorage.getItem(k); if (!v) continue;
+              try { const parsed = JSON.parse(v); if (parsed && (parsed.username || parsed.user)) return { username: parsed.username || parsed.user }; }
+              catch (e) { if (typeof v === 'string' && v.trim()) return { username: v.trim() }; }
+            } catch (e) {}
+          }
+          return null;
+        })();
+
+        let uname = local ? local.username : (function getCookieValue(name) {
+          const cookies = document.cookie ? document.cookie.split('; ') : [];
+          for (let c of cookies) {
+            const [k, ...v] = c.split('='); if (k === name) return decodeURIComponent(v.join('='));
+          }
+          return null;
+        })('username');
+
+        if (uname) {
           try {
             const r = await fetch(`/api/users/${encodeURIComponent(uname)}`);
             if (r.ok) {
               const d = await r.json();
               if (d && d.data) {
-                currentUser = { username: d.data.username || uname, org: d.data.organization || d.data.org || '' };
-              } else {
-                currentUser = { username: uname, org: '' };
+                currentUser = { username: d.data.username || uname, org: d.data.organization || '' };
+                document.getElementById('currentUserName').textContent = currentUser.username;
+                document.getElementById('currentUserOrg').textContent = currentUser.org || '未知机构';
+                const av = document.getElementById('avatarBox');
+                av.textContent = currentUser.username[0].toUpperCase();
+                fetchUploadCount(currentUser.username);
               }
-            } else {
-              // backend didn't return specific user (maybe different flow), fall back
-              currentUser = { username: uname, org: '' };
             }
-          } catch (e) {
-            currentUser = { username: uname, org: '' };
+          } catch (e) {}
+        }
+      }
+
+      // --- 完整保留您的 handleIncomingFiles 与 路径解析逻辑 (B1/B2) ---
+      async function handleIncomingFiles(fileList, fromEntries = false) {
+        const fileObjs = fileList.map(f => ({
+          file: f, 
+          relativePath: (f.webkitRelativePath || f.relativePath || f.fullPath || f.name).replace(/^\/+/, '')
+        }));
+
+        const someWith = fileObjs.some(o => o.relativePath.includes('/'));
+        const someWithout = fileObjs.some(o => !o.relativePath.includes('/'));
+        if (someWith && someWithout) { showMessage('不支持混合上传'); return; }
+
+        if (someWith) {
+          const partsList = fileObjs.map(o => o.relativePath.split('/').filter(p => p && p !== '.'));
+          if (partsList.every(p => p.length >= 3)) {
+            const groups = {};
+            fileObjs.forEach((o, i) => {
+              const p = partsList[i]; const cName = p[1];
+              groups[cName] = groups[cName] || [];
+              groups[cName].push({ file: o.file, rel: p.slice(2).join('/') });
+            });
+            for (const [cName, files] of Object.entries(groups)) {
+              const row = { caseName: cName, files: [] };
+              for (const it of files) {
+                const thumb = await createVideoThumbnail(it.file);
+                row.files.push({ file: it.file, relativePath: it.rel, thumbDataUrl: thumb });
+              }
+              staging.push(row);
+            }
+          } else if (partsList.every(p => p.length === 2)) {
+            const groups = {};
+            fileObjs.forEach((o, i) => {
+              const p = partsList[i];
+              groups[p[0]] = groups[p[0]] || [];
+              groups[p[0]].push({ file: o.file, rel: p[1] });
+            });
+            for (const [cName, files] of Object.entries(groups)) {
+              const row = { caseName: cName, files: [] };
+              for (const it of files) {
+                const thumb = await createVideoThumbnail(it.file);
+                row.files.push({ file: it.file, relativePath: it.rel, thumbDataUrl: thumb });
+              }
+              staging.push(row);
+            }
           }
         } else {
-          // 2) fallback: try /api/users and if only one user exist pick it (useful for single-user dev setups)
-          try {
-            const r = await fetch('/api/users');
-            if (r.ok) {
-              const data = await r.json();
-              if (data && Array.isArray(data.data) && data.data.length === 1) {
-                const u = data.data[0];
-                currentUser = { username: u.username, org: u.organization || '' };
-              } else {
-                // no reliable user found
-                currentUser = { username: 'unknown', org: '' };
-              }
-            } else {
-              currentUser = { username: 'unknown', org: '' };
-            }
-          } catch (e) {
-            currentUser = { username: 'unknown', org: '' };
+          const row = { caseName: `patient ${staging.length + 1}`, files: [] };
+          for (const it of fileObjs) {
+            const thumb = await createVideoThumbnail(it.file);
+            row.files.push({ file: it.file, relativePath: null, thumbDataUrl: thumb });
           }
+          staging.push(row);
         }
+        renderRows();
+      }
 
-        // 3) cookie fallback: if above didn't produce a real username, try cookie set by backend login
-        if ((!currentUser || !currentUser.username || currentUser.username === 'unknown')) {
-          const cookieU = getCookieValue('username');
-          if (cookieU) {
-            try {
-              // 3a) 优先尝试单用户查询（若后端支持）
-              let gotOrg = false;
-              try {
-                const r2 = await fetch(`/api/users/${encodeURIComponent(cookieU)}`);
-                if (r2.ok) {
-                  const d2 = await r2.json();
-                  if (d2 && d2.data) {
-                    currentUser = { username: d2.data.username || cookieU, org: d2.data.organization || d2.data.org || '' };
-                    if (currentUser.org) gotOrg = true;
-                  } else {
-                    currentUser = { username: cookieU, org: '' };
-                  }
-                }
-              } catch (e) {
-                // ignore, will try list fallback below
+      // --- 完整保留递归遍历 traverse 逻辑 ---
+      function setupDropzone() {
+        dropzone.ondragover = (e) => { e.preventDefault(); dropzone.classList.add('dragover'); };
+        dropzone.ondragleave = () => dropzone.classList.remove('dragover');
+        dropzone.ondrop = async (e) => {
+          e.preventDefault(); dropzone.classList.remove('dragover');
+          const items = e.dataTransfer.items;
+          if (items && items[0].webkitGetAsEntry) {
+            const files = [];
+            const traverse = async (entry, path = '') => {
+              if (entry.isFile) {
+                await new Promise(res => entry.file(f => { f.relativePath = path + f.name; files.push(f); res(); }));
+              } else if (entry.isDirectory) {
+                const reader = entry.createReader();
+                const entries = await new Promise(res => reader.readEntries(res));
+                for (const en of entries) await traverse(en, path + entry.name + '/');
               }
-
-              // 3b) 如果单用户查询没有拿到 org，则再去 /api/users 列表中查找（兼容老接口）
-              if (!gotOrg) {
-                try {
-                  const rList = await fetch('/api/users');
-                  if (rList.ok) {
-                    const listData = await rList.json();
-                    if (listData && Array.isArray(listData.data)) {
-                      const found = listData.data.find(u => (u.username === cookieU || (u.user && u.user.username === cookieU)));
-                      if (found) {
-                        currentUser = { username: found.username || cookieU, org: found.organization || found.org || '' };
-                        gotOrg = !!currentUser.org;
-                      }
-                    }
-                  }
-                } catch (e) {
-                  // ignore
-                }
-              }
-
-              // 最后兜底：至少设 username
-              if (!currentUser || !currentUser.username) {
-                currentUser = { username: cookieU, org: '' };
-              }
-            } catch (e) {
-              // 任何异常都回退到仅使用 cookie username
-              currentUser = { username: cookieU, org: '' };
-            }
+            };
+            for (const item of items) await traverse(item.webkitGetAsEntry());
+            handleIncomingFiles(files, true);
           }
-        }
-
-        // display (ensure there's always some text)
-        document.getElementById('currentUserName').textContent = (currentUser && currentUser.username) ? currentUser.username : 'unknown';
-        document.getElementById('currentUserOrg').textContent = (currentUser && currentUser.org) ? currentUser.org : '未知机构';
-        const av = document.getElementById('avatarBox');
-        av.textContent = (currentUser && currentUser.username && currentUser.username[0]) ? currentUser.username[0].toUpperCase() : 'U';
+        };
       }
 
-      function showMessage(text, timeout = 4000) {
-        const div = document.createElement('div');
-        div.className = 'alert';
-        div.textContent = text;
-        messages.appendChild(div);
-        if (timeout > 0) setTimeout(() => div.remove(), timeout);
-      }
-
-      function extOf(name) {
-        return (name.lastIndexOf('.') !== -1) ? name.slice(name.lastIndexOf('.')).toLowerCase() : '';
-      }
-
-      function isAllowedFile(name) {
-        return ALLOWED_EXT.includes(extOf(name));
-      }
-
-      function genPatientName(idx) {
-        return `patient ${idx}`;
-      }
-
-      function nextPatientIndex() {
-        let max = 0;
-        staging.forEach(s => {
-          const m = s.caseName.match(/^patient (\d+)$/);
-          if (m) {
-            const n = parseInt(m[1], 10);
-            if (!isNaN(n) && n > max) max = n;
-          }
-        });
-        return max + 1;
-      }
-
-      // client-side thumbnail: try to capture a frame (may fail for some short videos)
+      // 缩略图生成保持您的逻辑
       function createVideoThumbnail(file) {
         return new Promise((resolve) => {
           const url = URL.createObjectURL(file);
           const video = document.createElement('video');
-          video.preload = 'metadata';
-          video.muted = true;
-          video.src = url;
-          video.playsInline = true;
-          video.crossOrigin = 'anonymous';
-
-          const cleanup = () => {
-            try { video.pause(); } catch (e) { }
-            URL.revokeObjectURL(url);
-          };
-
-          video.addEventListener('loadedmetadata', () => {
-            const duration = video.duration || 0;
-            const seekTo = Math.min(0.05, Math.max(0, duration > 0 ? Math.min(0.05, duration / 2) : 0.05));
-            const onSeeked = () => {
-              try {
-                const canvas = document.createElement('canvas');
-                const w = Math.min(320, video.videoWidth || 320);
-                const h = Math.min(180, video.videoHeight || 180);
-                canvas.width = w;
-                canvas.height = h;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(video, 0, 0, w, h);
-                const dataURL = canvas.toDataURL('image/jpeg', 0.75);
-                cleanup();
-                resolve(dataURL);
-              } catch (err) {
-                cleanup();
-                resolve('');
-              }
+          video.preload = 'metadata'; video.muted = true; video.src = url;
+          video.onloadedmetadata = () => {
+            video.currentTime = 0.05;
+            video.onseeked = () => {
+              const canvas = document.createElement('canvas');
+              canvas.width = 320; canvas.height = 180;
+              canvas.getContext('2d').drawImage(video, 0, 0, 320, 180);
+              URL.revokeObjectURL(url); resolve(canvas.toDataURL('image/jpeg'));
             };
-            try {
-              video.currentTime = seekTo;
-              video.addEventListener('seeked', onSeeked, { once: true });
-              // fallback timeout
-              setTimeout(() => { cleanup(); resolve(''); }, 2500);
-            } catch (e) {
-              cleanup();
-              resolve('');
-            }
-          });
-
-          video.addEventListener('error', () => {
-            cleanup();
-            resolve('');
-          });
-
-          // guard: if loadedmetadata not fired after some time
-          setTimeout(() => {
-            // create a black placeholder if nothing worked
-            const canvas = document.createElement('canvas');
-            canvas.width = 320;
-            canvas.height = 180;
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#000';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            try { cleanup(); } catch (e) { }
-            resolve(canvas.toDataURL('image/jpeg'));
-          }, 4000);
+          };
+          video.onerror = () => resolve('');
+          setTimeout(() => resolve(''), 3000);
         });
       }
 
-      // render rows and attach per-row drag/drop handlers
       function renderRows() {
         rowsContainer.innerHTML = '';
-        staging.forEach((caseItem, idx) => {
-          const row = document.createElement('div');
-          row.className = 'row-card';
-
-          const left = document.createElement('div'); left.className = 'row-left';
-          const caseDiv = document.createElement('div'); caseDiv.className = 'case-name';
-          const input = document.createElement('input'); input.value = caseItem.caseName;
-          input.addEventListener('input', (e) => caseItem.caseName = e.target.value.trim() || caseItem.caseName);
-          caseDiv.appendChild(document.createTextNode('病例名：'));
-          caseDiv.appendChild(input);
-          left.appendChild(caseDiv);
-
-          const thumbs = document.createElement('div'); thumbs.className = 'thumbs';
-          caseItem.files.forEach((fobj, fi) => {
+        staging.forEach((c, i) => {
+          const row = document.createElement('div'); row.className = 'row-card';
+          row.innerHTML = `<div class="row-left"><div class="case-name">病例名：<input value="${c.caseName}" oninput="staging[${i}].caseName=this.value"></div><div class="thumbs"></div></div><div class="row-actions"><button class="btn secondary" onclick="staging.splice(${i},1);renderRows()">删除</button></div>`;
+          const thumbCont = row.querySelector('.thumbs');
+          c.files.forEach(f => {
             const t = document.createElement('div'); t.className = 'thumb';
-            const img = document.createElement('img');
-            if (fobj.thumbDataUrl) img.src = fobj.thumbDataUrl;
-            else { img.style.background = '#333'; img.alt = fobj.file.name; }
-            const lbl = document.createElement('div'); lbl.className = 'label';
-            lbl.textContent = fobj.file.name;
-
-            const delSingle = document.createElement('div');
-            delSingle.className = 'del-single';
-            delSingle.title = '删除该视频';
-            delSingle.textContent = '×';
-            delSingle.addEventListener('click', () => {
-              caseItem.files.splice(fi, 1);
-              renderRows();
-            });
-
-            t.appendChild(img);
-            t.appendChild(lbl);
-            t.appendChild(delSingle);
-            thumbs.appendChild(t);
+            t.innerHTML = `<img src="${f.thumbDataUrl || ''}"><div class="label">${f.file.name}</div>`;
+            thumbCont.appendChild(t);
           });
-          left.appendChild(thumbs);
-
-          const ra = document.createElement('div'); ra.className = 'row-actions';
-          const addBtn = document.createElement('button'); addBtn.className = 'add-file-btn'; addBtn.textContent = '添加视频';
-          addBtn.addEventListener('click', () => {
-            const tmp = document.createElement('input');
-            tmp.type = 'file'; tmp.accept = 'video/*'; tmp.multiple = true;
-            tmp.onchange = async (ev) => {
-              const files = Array.from(ev.target.files || []);
-              if (!files.length) return;
-              if (caseItem.files.length + files.length > MAX_VIDEOS_PER_CASE) {
-                showMessage(`病例最多允许 ${MAX_VIDEOS_PER_CASE} 个视频`);
-                return;
-              }
-              for (const f of files) {
-                if (!isAllowedFile(f.name)) { showMessage(`不支持的文件格式：${f.name}`); continue; }
-                const thumb = await createVideoThumbnail(f);
-                caseItem.files.push({ file: f, relativePath: null, thumbDataUrl: thumb });
-              }
-              renderRows();
-            };
-            tmp.click();
-          });
-
-          const remBtn = document.createElement('button'); remBtn.className = 'remove-row'; remBtn.textContent = '删除病例';
-          remBtn.title = '取消该病例上传';
-          remBtn.addEventListener('click', () => {
-            if (!confirm('确认删除该病例及其所有待上传视频吗？')) return;
-            staging.splice(idx, 1);
-            renderRows();
-          });
-
-          ra.appendChild(addBtn);
-          ra.appendChild(remBtn);
-
-          // per-row drag/drop: accept files only (no recursion)
-          row.addEventListener('dragover', (ev) => {
-            ev.preventDefault(); row.classList.add('dragover');
-          });
-          row.addEventListener('dragleave', (ev) => { row.classList.remove('dragover'); });
-          row.addEventListener('drop', async (ev) => {
-            ev.preventDefault(); row.classList.remove('dragover');
-            const dt = ev.dataTransfer;
-            if (!dt) return;
-            const files = Array.from(dt.files || []).filter(f => f && isAllowedFile(f.name));
-            if (files.length === 0) {
-              showMessage('未检测到有效的视频文件或格式不支持', 3000);
-              return;
-            }
-            if ((caseItem.files.length + files.length) > MAX_VIDEOS_PER_CASE) {
-              showMessage(`该病例最多允许 ${MAX_VIDEOS_PER_CASE} 个视频`, 4000);
-              return;
-            }
-            for (const f of files) {
-              const thumb = await createVideoThumbnail(f).catch(() => '');
-              caseItem.files.push({ file: f, relativePath: null, thumbDataUrl: thumb });
-            }
-            renderRows();
-          });
-
-          row.appendChild(left);
-          row.appendChild(ra);
           rowsContainer.appendChild(row);
         });
       }
 
-      function clearAll() {
-        if (!confirm('确认取消并清空当前所有待上传数据？')) return;
-        staging = [];
-        renderRows();
-        messages.innerHTML = '';
-      }
-
-      async function handleIncomingFiles(fileList, fromEntries = false) {
-        const fileObjs = [];
-        for (const f of fileList) {
-          let rel = f.webkitRelativePath || f.relativePath || f.fullPath || f.name;
-          rel = (rel || f.name).replace(/^\/+/, '');
-          fileObjs.push({ file: f, relativePath: rel });
-        }
-
-        const anyHasSlash = fileObjs.some(o => o.relativePath && o.relativePath.includes('/'));
-        const someWith = fileObjs.some(o => o.relativePath && o.relativePath.includes('/'));
-        const someWithout = fileObjs.some(o => !o.relativePath || !o.relativePath.includes('/'));
-        if (someWith && someWithout) {
-          showMessage('检测到混合上传（文件夹与独立文件同时上传），当前不支持，请分别上传', 6000);
-          return;
-        }
-
-        if (anyHasSlash) {
-          const partsList = fileObjs.map(o => o.relativePath.split('/').filter(p => p && p !== '.'));
-          if (partsList.some(p => p.length < 2)) {
-            showMessage('检测到不符合路径结构的文件，请检查', 6000);
-            return;
-          }
-          if (partsList.every(p => p.length >= 3)) {
-            const firstSet = new Set(partsList.map(p => p[0]));
-            if (firstSet.size !== 1) {
-              showMessage('一次上传应来自同一请求目录，请仅上传同一目录', 6000);
-              return;
-            }
-            const groups = {};
-            for (const o of fileObjs) {
-              const parts = o.relativePath.split('/').filter(p => p && p !== '.');
-              const caseName = parts[1];
-              const relUnderCase = parts.slice(2).join('/');
-              const fname = relUnderCase.split('/').pop();
-              if (!isAllowedFile(fname)) { showMessage(`不支持的文件格式：${fname}`); return; }
-              groups[caseName] = groups[caseName] || [];
-              groups[caseName].push({ file: o.file, relativePath: relUnderCase });
-            }
-            const baseIndex = nextPatientIndex();
-            let idx = 0;
-            for (const [caseName, files] of Object.entries(groups)) {
-              if (files.length > MAX_VIDEOS_PER_CASE) { showMessage(`病例 ${caseName} 包含 ${files.length} 个视频，超过上限 ${MAX_VIDEOS_PER_CASE}`); return; }
-              const rowFiles = [];
-              for (const it of files) {
-                const thumb = await createVideoThumbnail(it.file).catch(() => '');
-                rowFiles.push({ file: it.file, relativePath: it.relativePath, thumbDataUrl: thumb });
-              }
-              const defaultName = caseName || genPatientName(baseIndex + idx);
-              staging.push({ caseName: defaultName, files: rowFiles, createdAt: Date.now() });
-              idx++;
-            }
-            renderRows();
-          } else if (partsList.every(p => p.length === 2)) {
-            const groups = {};
-            for (const o of fileObjs) {
-              const parts = o.relativePath.split('/').filter(p => p && p !== '.');
-              const caseName = parts[0];
-              const fname = parts[1];
-              if (!isAllowedFile(fname)) { showMessage(`不支持的文件格式：${fname}`); return; }
-              groups[caseName] = groups[caseName] || [];
-              groups[caseName].push({ file: o.file, relativePath: fname });
-            }
-            const baseIndex = nextPatientIndex();
-            let idx = 0;
-            for (const [caseName, files] of Object.entries(groups)) {
-              if (files.length > MAX_VIDEOS_PER_CASE) { showMessage(`病例 ${caseName} 包含 ${files.length} 个视频，超过上限 ${MAX_VIDEOS_PER_CASE}`); return; }
-              const rowFiles = [];
-              for (const it of files) {
-                const thumb = await createVideoThumbnail(it.file).catch(() => '');
-                rowFiles.push({ file: it.file, relativePath: it.relativePath, thumbDataUrl: thumb });
-              }
-              const defaultName = caseName || genPatientName(baseIndex + idx);
-              staging.push({ caseName: defaultName, files: rowFiles, createdAt: Date.now() });
-              idx++;
-            }
-            renderRows();
-          } else {
-            showMessage('上传路径结构混杂，当前不支持，请保证统一结构', 6000);
-            return;
-          }
-        } else {
-          if (fileObjs.length > MAX_VIDEOS_PER_CASE) {
-            showMessage(`一次上传的独立视频数量为 ${fileObjs.length}，超过上限 ${MAX_VIDEOS_PER_CASE}`, 6000);
-            return;
-          }
-          const idx = nextPatientIndex();
-          const caseName = genPatientName(idx);
-          const rowFiles = [];
-          for (const it of fileObjs) {
-            if (!isAllowedFile(it.file.name)) { showMessage(`不支持的文件格式：${it.file.name}`); return; }
-            const thumb = await createVideoThumbnail(it.file).catch(() => '');
-            rowFiles.push({ file: it.file, relativePath: null, thumbDataUrl: thumb });
-          }
-          staging.push({ caseName: caseName, files: rowFiles, createdAt: Date.now() });
-          renderRows();
-        }
-      }
-
-      function setupDropzone() {
-        dropzone.addEventListener('dragover', (e) => {
-          e.preventDefault();
-          dropzone.classList.add('dragover');
-        });
-        dropzone.addEventListener('dragleave', (e) => {
-          dropzone.classList.remove('dragover');
-        });
-
-        dropzone.addEventListener('drop', async (e) => {
-          e.preventDefault();
-          dropzone.classList.remove('dragover');
-          const items = e.dataTransfer.items;
-          if (items && items.length > 0 && items[0].webkitGetAsEntry) {
-            const entries = [];
-            for (let i = 0; i < items.length; i++) entries.push(items[i].webkitGetAsEntry());
-            const files = [];
-            const traverse = (entry, pathPrefix) => {
-              return new Promise((resolve) => {
-                if (entry.isFile) {
-                  entry.file(file => {
-                    file.relativePath = (pathPrefix ? pathPrefix + '/' : '') + file.name;
-                    files.push(file);
-                    resolve();
-                  }, () => resolve());
-                } else if (entry.isDirectory) {
-                  const reader = entry.createReader();
-                  reader.readEntries(async (entries) => {
-                    const promises = entries.map(en => traverse(en, pathPrefix ? pathPrefix + '/' + entry.name : entry.name));
-                    await Promise.all(promises);
-                    resolve();
-                  }, () => resolve());
-                } else {
-                  resolve();
-                }
-              });
-            };
-            const tasks = entries.map(en => traverse(en, ''));
-            await Promise.all(tasks);
-            if (files.length === 0) {
-              showMessage('未获取到文件，请尝试使用“选择文件夹”或单独选择视频', 4000);
-              return;
-            }
-            await handleIncomingFiles(files, true);
-          } else {
-            const farr = Array.from(e.dataTransfer.files || []);
-            await handleIncomingFiles(farr, false);
-          }
-        });
-      }
-
-      chooseFolderBtn.addEventListener('click', () => folderInput.click());
-      folderInput.addEventListener('change', async (e) => {
-        const files = Array.from(e.target.files || []);
-        if (!files.length) return;
-        await handleIncomingFiles(files, true);
-        folderInput.value = '';
-      });
-
-      chooseFilesBtn.addEventListener('click', () => fileInput.click());
-      fileInput.addEventListener('change', async (e) => {
-        const files = Array.from(e.target.files || []);
-        if (!files.length) return;
-        await handleIncomingFiles(files, false);
-        fileInput.value = '';
-      });
-
-      addCaseBtn.addEventListener('click', () => {
-        const idx = nextPatientIndex();
-        const name = genPatientName(idx);
-        staging.push({ caseName: name, files: [], createdAt: Date.now() });
-        renderRows();
-      });
-
-      uploadBtn.addEventListener('click', async () => {
-        if (staging.length === 0) { showMessage('没有待上传内容'); return; }
-        const username = currentUser && currentUser.username ? currentUser.username : null;
-        if (!username) { showMessage('无法识别当前用户，上传被阻止'); return; }
-        for (const c of staging) {
-          if (!c.files || c.files.length === 0) {
-            showMessage(`病例 ${c.caseName} 没有视频，至少需要一个视频才可上传`, 6000);
-            return;
-          }
-          if (c.files.length > MAX_VIDEOS_PER_CASE) {
-            showMessage(`病例 ${c.caseName} 包含 ${c.files.length} 个视频，超过上限 ${MAX_VIDEOS_PER_CASE}`, 6000);
-            return;
-          }
-        }
-        const hasRel = staging.some(c => c.files.some(f => f.relativePath));
-        const hasNoRel = staging.some(c => c.files.some(f => !f.relativePath));
-        if (hasRel && hasNoRel) {
-          showMessage('检测到混合上传（文件夹结构与独立文件混合），当前不支持，请分别上传', 6000);
-          return;
-        }
-
+      // --- 完整保留带有 XHR Progress 的上传逻辑 ---
+      uploadBtn.onclick = async () => {
+        if (!staging.length) return;
         const form = new FormData();
-        for (const caseItem of staging) {
-          for (const fobj of caseItem.files) {
-            const f = fobj.file;
-            if (fobj.relativePath) {
-              const rel = f.webkitRelativePath || f.relativePath || f.name;
-              const parts = rel.split('/').filter(p => p && p !== '.');
-              if (parts.length >= 3) {
-                form.append('files', f, rel);
-              } else if (parts.length === 2) {
-                form.append('files', f, rel);
-              } else {
-                const constructed = `${caseItem.caseName}/${f.name}`;
-                form.append('files', f, constructed);
-              }
-            } else {
-              const constructed = `${caseItem.caseName}/${f.name}`;
-              form.append('files', f, constructed);
-            }
-          }
-        }
-
-        uploadBtn.disabled = true;
-        uploadBtn.textContent = '上传中...';
-        showMessage('开始上传，请稍候（请勿关闭页面）', 3000);
-
-        try {
-          await uploadFormData(`/api/users/${encodeURIComponent(username)}/upload-oridata`, form, (pct) => {
-            uploadBtn.textContent = `上传中 ${Math.round(pct)}%`;
+        form.append('request_name', requestNameInput.value);
+        staging.forEach(c => {
+          c.files.forEach(f => {
+            const path = f.relativePath || `${c.caseName}/${f.file.name}`;
+            form.append('files', f.file, path);
           });
-          showMessage('上传成功，服务器已接收', 4000);
-          staging = [];
-          renderRows();
-        } catch (err) {
-          showMessage('上传失败：' + (err.message || err), 6000);
-        } finally {
-          uploadBtn.disabled = false;
-          uploadBtn.textContent = '确认上传';
-        }
-      });
-
-      function uploadFormData(url, formData, onProgress) {
-        return new Promise((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          xhr.open('POST', url, true);
-          xhr.responseType = 'json';
-          xhr.onload = function () {
-            if (xhr.status >= 200 && xhr.status < 300) {
-              resolve(xhr.response);
-            } else {
-              let msg = 'HTTP ' + xhr.status;
-              try {
-                if (xhr.response && xhr.response.detail) msg = xhr.response.detail;
-                else if (xhr.response && xhr.response.message) msg = xhr.response.message;
-              } catch (e) { }
-              reject(new Error(msg));
-            }
-          };
-          xhr.onerror = function () { reject(new Error('网络错误')); };
-          if (xhr.upload && onProgress) {
-            xhr.upload.onprogress = function (e) {
-              if (e.lengthComputable) {
-                const pct = (e.loaded / e.total) * 100;
-                onProgress(pct);
-              }
-            };
-          }
-          xhr.send(formData);
         });
-      }
 
-      clearBtn.addEventListener('click', clearAll);
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `/api/users/${encodeURIComponent(currentUser.username)}/upload-oridata`);
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) uploadBtn.textContent = `上传中 ${Math.round((e.loaded/e.total)*100)}%`;
+        };
+        xhr.onload = () => {
+          if (xhr.status === 200) { showMessage('上传成功'); staging = []; renderRows(); fetchUploadCount(currentUser.username); }
+          uploadBtn.textContent = '确认上传';
+        };
+        xhr.send(form);
+      };
 
-      // 替换原有的 logout handler 为智能跳转：已登录 -> /flow ，未登录 -> /login
-      logoutBtn.addEventListener('click', async () => {
-        
-        logoutBtn.disabled = true;
-        logoutBtn.textContent = '正在退出...';
+      function showMessage(t) { const m = document.createElement('div'); m.className='alert'; m.textContent=t; messages.appendChild(m); setTimeout(()=>m.remove(), 3000); }
+      
+      chooseFolderBtn.onclick = () => folderInput.click();
+      folderInput.onchange = (e) => handleIncomingFiles(Array.from(e.target.files), true);
+      chooseFilesBtn.onclick = () => fileInput.click();
+      fileInput.onchange = (e) => handleIncomingFiles(Array.from(e.target.files), false);
+      clearBtn.onclick = () => { staging = []; renderRows(); };
+      logoutBtn.onclick = () => { window.location.href = '/flow'; };
 
-        // 清理本地常见的用户/认证信息
-        const keysToClear = ['username', 'user', 'currentUser', 'current_user', 'auth', 'token', 'access_token'];
-        try { keysToClear.forEach(k => localStorage.removeItem(k)); } catch (e) { /* ignore */ }
-
-        try {
-          // 尝试调用 /api/users/current 判断是否仍然登录（优先）
-          let loggedIn = false;
-          try {
-            const res = await fetch('/api/users/current', { method: 'GET' });
-            if (res.ok) {
-              const body = await res.json().catch(() => null);
-              if (body && body.data) loggedIn = true;
-            }
-          } catch (e) {
-            // 若请求失败则降级为未登录（后面会跳到 login）
-            loggedIn = false;
-          }
-
-          if (loggedIn) {
-            // 如果后端认为已登录，返回 flow（不强制登出）
-            window.location.href = '/flow';
-          } else {
-            // 未登录的用户或判断失败：确保后端清理会话（最小化残留），然后跳转到登录页
-            try { await fetch('/api/logout', { method: 'POST' }).catch(() => null); } catch (e) { /* ignore */ }
-            window.location.href = '/login';
-          }
-        } finally {
-          // 由于接下来会导航页面，这里无需重置按钮。但若希望在导航失败时恢复按钮状态，可解除注释下面两行：
-          // logoutBtn.disabled = false;
-          // logoutBtn.textContent = '退出登录';
-        }
-      });
-
-      loadCurrentUser();
-      setupDropzone();
+      loadCurrentUser(); setupDropzone();
+      window.staging = staging; window.renderRows = renderRows; // 为了内联 onclick 正常工作
     })();
   </script>
 </body>

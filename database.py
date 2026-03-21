@@ -19,31 +19,22 @@ def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode('utf-8')).hexdigest()
 
 def verify_password(stored_password: str, provided_password: str) -> bool:
-    """
-    验证密码。
-    支持两种情况：
-      - 如果 stored_password 看起来像 SHA-256（长度为64且为十六进制），则对provided_password哈希后比较。
-      - 否则，把 stored_password 当作明文，直接比较（用于向后兼容旧数据）。
-    如果检测到旧明文并匹配，将触发调用方更新数据库以存储哈希后的密码。
-    """
+    """验证密码，兼容明文与哈希"""
     if stored_password is None:
         return False
-
     # 简单判断是否为 SHA-256 的十六进制表示
     is_hashed = isinstance(stored_password, str) and len(stored_password) == 64 and all(c in "0123456789abcdef" for c in stored_password.lower())
-
     if is_hashed:
         return stored_password == hash_password(provided_password)
     else:
-        # 明文兼容分支
         return stored_password == provided_password
 
 def init_database():
-    """初始化数据库和表结构（并插入初始账户，使用哈希存储密码）"""
+    """初始化数据库和表结构（包含自动迁移逻辑）"""
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # 创建用户表
+    # [改动] 建表时增加 is_admin 字段，默认值为 0 (False)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -51,27 +42,38 @@ def init_database():
             password TEXT NOT NULL,
             doctor TEXT NOT NULL,
             organization TEXT NOT NULL,
+            is_admin BOOLEAN DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
-
     conn.commit()
+
+    # [新增] 数据库迁移逻辑：检查是否已有 is_admin 字段，如果没有则添加
+    cursor.execute("PRAGMA table_info(users)")
+    columns = [info['name'] for info in cursor.fetchall()]
+    if 'is_admin' not in columns:
+        cursor.execute("ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT 0")
+        # 将已有的 admin 账户强行提升为管理员
+        cursor.execute("UPDATE users SET is_admin = 1 WHERE username = 'admin'")
+        conn.commit()
+        print("🔄 数据库已迁移: 成功添加 is_admin 字段并更新管理员权限")
 
     # 检查是否有初始数据
     cursor.execute("SELECT COUNT(*) as count FROM users")
     count = cursor.fetchone()['count']
 
-    # 如果没有数据，插入初始医生账号（密码以哈希存储）
+    # 如果没有数据，插入初始账号
     if count == 0:
+        # [改动] 初始化时，明确指定 is_admin 的值 (1 为是，0 为否)
         initial_users = [
-            ('admin', hash_password('123456'), '管理员', '深圳大学'),
-            ('doctor1', hash_password('123456'), '张医生', '深圳大学附属医院')
+            ('admin', hash_password('123456'), '管理员', '深圳大学', 1),
+            ('doctor1', hash_password('123456'), '张医生', '深圳大学附属医院', 0)
         ]
 
         cursor.executemany('''
-            INSERT INTO users (username, password, doctor, organization)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO users (username, password, doctor, organization, is_admin)
+            VALUES (?, ?, ?, ?, ?)
         ''', initial_users)
 
         conn.commit()
@@ -80,12 +82,13 @@ def init_database():
     conn.close()
 
 def verify_user(username: str, password: str) -> Optional[Dict]:
-    """验证用户登录。若数据库中存储的是明文密码且匹配，将把密码更新为哈希值（迁移）"""
+    """验证用户登录并返回用户信息"""
     conn = get_db_connection()
     cursor = conn.cursor()
 
+    # [改动] SELECT 语句中加入 is_admin
     cursor.execute('''
-        SELECT id, username, password, doctor, organization 
+        SELECT id, username, password, doctor, organization, is_admin 
         FROM users 
         WHERE username = ?
     ''', (username,))
@@ -98,10 +101,8 @@ def verify_user(username: str, password: str) -> Optional[Dict]:
 
     stored_password = row['password']
 
-    # 验证密码，支持明文兼容
     if verify_password(stored_password, password):
         user = dict(row)
-        # 如果原来是明文（即不是哈希格式），则更新为哈希值（迁移）
         is_hashed = isinstance(stored_password, str) and len(stored_password) == 64 and all(c in "0123456789abcdef" for c in stored_password.lower())
         if not is_hashed:
             try:
@@ -111,8 +112,9 @@ def verify_user(username: str, password: str) -> Optional[Dict]:
                 print(f"🔐 已将用户 {username} 的密码迁移为哈希存储")
             except Exception as e:
                 print(f"⚠️ 更新哈希密码失败: {e}")
-        # 不返回密码字段
         user.pop('password', None)
+        # 确保布尔值格式规范
+        user['is_admin'] = bool(user['is_admin'])
         conn.close()
         return user
 
@@ -124,15 +126,20 @@ def get_all_users() -> List[Dict]:
     conn = get_db_connection()
     cursor = conn.cursor()
 
+    # [改动] SELECT 语句中加入 is_admin
     cursor.execute('''
-        SELECT id, username, doctor, organization, created_at, updated_at
+        SELECT id, username, doctor, organization, is_admin, created_at, updated_at
         FROM users
         ORDER BY id
     ''')
 
-    users = [dict(row) for row in cursor.fetchall()]
+    users = []
+    for row in cursor.fetchall():
+        user_dict = dict(row)
+        user_dict['is_admin'] = bool(user_dict['is_admin'])
+        users.append(user_dict)
+        
     conn.close()
-
     return users
 
 def get_user_by_id(user_id: int) -> Optional[Dict]:
@@ -140,8 +147,9 @@ def get_user_by_id(user_id: int) -> Optional[Dict]:
     conn = get_db_connection()
     cursor = conn.cursor()
 
+    # [改动] SELECT 语句中加入 is_admin
     cursor.execute('''
-        SELECT id, username, doctor, organization, created_at, updated_at
+        SELECT id, username, doctor, organization, is_admin, created_at, updated_at
         FROM users
         WHERE id = ?
     ''', (user_id,))
@@ -150,37 +158,63 @@ def get_user_by_id(user_id: int) -> Optional[Dict]:
     conn.close()
 
     if user:
-        return dict(user)
+        user_dict = dict(user)
+        user_dict['is_admin'] = bool(user_dict['is_admin'])
+        return user_dict
     return None
 
-def create_user(username: str, password: str, doctor: str, organization: str) -> bool:
-    """创建新用户（密码以哈希形式存储）"""
+def get_user_by_username(username: str) -> Optional[Dict]:
+    """根据用户名获取用户信息（不包含密码）"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # [改动] SELECT 语句中加入 is_admin
+    cursor.execute('''
+        SELECT id, username, doctor, organization, is_admin, created_at
+        FROM users
+        WHERE username = ?
+    ''', (username,))
+
+    user = cursor.fetchone()
+    conn.close()
+
+    if user:
+        user_dict = dict(user)
+        user_dict['is_admin'] = bool(user_dict['is_admin'])
+        return user_dict
+    return None
+
+# [改动] 增加 is_admin 参数，默认为 False (即 0)
+def create_user(username: str, password: str, doctor: str, organization: str, is_admin: bool = False) -> bool:
+    """创建新用户"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
 
         hashed = hash_password(password)
+        admin_value = 1 if is_admin else 0
+        
+        # [改动] 插入语句加入 is_admin
         cursor.execute('''
-            INSERT INTO users (username, password, doctor, organization)
-            VALUES (?, ?, ?, ?)
-        ''', (username, hashed, doctor, organization))
+            INSERT INTO users (username, password, doctor, organization, is_admin)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (username, hashed, doctor, organization, admin_value))
 
         conn.commit()
 
-        # 为新用户创建文件夹
         doctor_folder = Path("data_batch_storage") / username
         doctor_folder.mkdir(parents=True, exist_ok=True)
 
         conn.close()
         return True
     except sqlite3.IntegrityError:
-        return False  # 用户名已存在
+        return False
     except Exception as e:
         print(f"创建用户失败: {e}")
         return False
 
 def update_user(user_id: int, doctor: str, organization: str, password: Optional[str] = None) -> bool:
-    """更新用户信息；如果提供了 password，则用哈希存储"""
+    """更新用户信息"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -212,7 +246,6 @@ def delete_user(user_id: int) -> bool:
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # 先获取用户名，用于删除文件夹
         cursor.execute('SELECT username FROM users WHERE id = ?', (user_id,))
         user = cursor.fetchone()
 
@@ -220,18 +253,9 @@ def delete_user(user_id: int) -> bool:
             conn.close()
             return False
 
-        username = user['username']
-
-        # 删除数据库记录
         cursor.execute('DELETE FROM users WHERE id = ?', (user_id,))
         conn.commit()
         conn.close()
-
-        # 删除用户文件夹（可选）
-        # import shutil
-        # doctor_folder = Path("data_batch_storage") / username
-        # if doctor_folder.exists():
-        #     shutil.rmtree(doctor_folder)
 
         return True
     except Exception as e:
@@ -252,21 +276,3 @@ def check_username_exists(username: str, exclude_id: Optional[int] = None) -> bo
     conn.close()
 
     return count > 0
-
-def get_user_by_username(username: str) -> Optional[Dict]:
-    """根据用户名获取用户信息（不包含密码）"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    cursor.execute('''
-        SELECT id, username, doctor, organization, created_at
-        FROM users
-        WHERE username = ?
-    ''', (username,))
-
-    user = cursor.fetchone()
-    conn.close()
-
-    if user:
-        return dict(user)
-    return None

@@ -80,8 +80,9 @@
     <div class="buttons" role="navigation" aria-label="mode-buttons">
       <button id="diagnoseBtn" class="btn">诊断模式</button>
       <button id="eduBtn" class="btn secondary">教育模式</button>
-      <button id="tasksBtn" class="btn ghost">任务管理</button>
-      <button id="usersBtn" class="btn ghost">用户管理</button>
+      <!-- [改动] 默认隐藏管理员专用按钮 -->
+      <button id="tasksBtn" class="btn ghost" style="display: none;">任务管理</button>
+      <button id="usersBtn" class="btn ghost" style="display: none;">用户管理</button>
     </div>
 
     <div class="actions">
@@ -111,6 +112,10 @@
       }
 
       async function loadUser() {
+        let isAdmin = false; // [新增] 默认无管理员权限
+        let uname = getCookieValue('username') || getCookieValue('user') || 'unknown';
+        let org = '';
+
         // 优先通过后端的 /api/users/current 获取
         try {
           const resp = await fetch('/api/users/current');
@@ -118,26 +123,34 @@
             const body = await resp.json().catch(()=>null);
             if (body && body.data) {
               const u = body.data;
-              const uname = u.username || u.user || u.login || u.name || getCookieValue('username') || 'unknown';
-              const org = u.organization || u.org || u.organizationName || u.department || '';
-              applyUser(uname, org);
-              return;
+              uname = u.username || u.user || u.login || u.name || uname;
+              org = u.organization || u.org || u.organizationName || u.department || '';
+              // [新增] 提取管理员标识，严格判断是否为 true
+              isAdmin = u.is_admin === true; 
             }
           }
         } catch (e) {
           // 忽略，尝试 cookie 回退
         }
 
-        // 回退到 cookie 中读取 username（后端 login 已写入）
-        const cname = getCookieValue('username') || getCookieValue('user') || 'unknown';
-        applyUser(cname, '');
+        applyUser(uname, org, isAdmin);
       }
 
-      function applyUser(username, org) {
+      // [改动] 增加 isAdmin 参数，用于控制按钮显示
+      function applyUser(username, org, isAdmin) {
         const uname = username || 'unknown';
         welcomeText.textContent = `欢迎回来，${uname}`;
         orgText.textContent = org ? `机构：${org}` : '机构：未知机构';
         avatar.textContent = (uname && uname[0]) ? uname[0].toUpperCase() : 'U';
+
+        // [新增] 根据权限动态显示管理按钮
+        if (isAdmin) {
+          tasksBtn.style.display = 'inline-block';
+          usersBtn.style.display = 'inline-block';
+        } else {
+          tasksBtn.style.display = 'none';
+          usersBtn.style.display = 'none';
+        }
       }
 
       // 按钮导航
