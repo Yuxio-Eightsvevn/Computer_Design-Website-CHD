@@ -6,38 +6,111 @@
   <title>任务批次接收 - 儿童先心病诊断平台</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:#f5f7fa; color:#333; min-height:100vh; }
-    .container { max-width:1200px; margin: 30px auto; padding: 0 20px; display:flex; gap:16px; align-items:flex-start; }
-    .sidebar { width:220px; }
-    .main { flex:1; }
-    .navbar { background: linear-gradient(135deg,#667eea 0%,#764ba2 100%); color:white; padding:12px 20px; border-radius:8px; display:flex; justify-content:space-between; align-items:center; }
-    .card { background:white; border-radius:12px; padding:20px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); margin-top:20px; }
-    h1 { font-size:20px; margin-bottom:12px; }
-    .dropzone { border: 2px dashed #c9d7ff; border-radius:12px; padding:30px; text-align:center; cursor:pointer; background:linear-gradient(180deg, #ffffff, #fbfdff); transition: all .15s; }
-    .dropzone.dragover { border-color:#667eea; background: #eef4ff; transform: translateY(-2px); }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f5f7fa;
+      color: #333;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 30px auto;
+      padding: 0 20px;
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+    .sidebar { width: 220px; }
+    .main { flex: 1; }
+    .navbar {
+      background: linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+      margin-top: 20px;
+    }
+    h1 { font-size: 20px; margin-bottom: 12px; }
+    .dropzone {
+      border: 2px dashed #c9d7ff;
+      border-radius: 12px;
+      padding: 30px;
+      text-align: center;
+      cursor: pointer;
+      background: linear-gradient(180deg, #ffffff, #fbfdff);
+      transition: all .15s;
+    }
+    .dropzone.dragover { border-color: #667eea; background: #eef4ff; transform: translateY(-2px); }
     .controls { display:flex; gap:12px; align-items:center; margin-bottom:16px; flex-wrap:wrap; }
     .btn { padding:8px 14px; border-radius:8px; border:none; cursor:pointer; background:#667eea; color:white; }
-    .btn.secondary { background:#6c757d; }
+    .btn.secondary {
+      background: linear-gradient(90deg, #ff7b7b 0%, #ff5252 100%);
+      color: #ffffff;
+      border: none;
+     box-shadow: 0 2px 8px rgba(255, 82, 82, 0.14);
+    }
+    .btn.secondary:hover {
+      filter: brightness(0.95);
+    }
     .hint { color:#666; font-size:13px; }
     .rows { margin-top:16px; display:flex; flex-direction:column; gap:12px; }
-    .row-card { border:1px solid #e6eefc; border-radius:10px; padding:12px; background:white; display:flex; gap:12px; align-items:flex-start; justify-content:space-between; }
+    .row-card {
+      border:1px solid #e6eefc;
+      border-radius:10px;
+      padding:12px;
+      background:white;
+      display:flex;
+      gap:12px;
+      align-items:flex-start;
+      justify-content:space-between;
+    }
     .row-card.dragover { box-shadow: inset 0 0 0 3px rgba(102,126,234,0.08); border-color:#667eea; }
     .row-left { flex:1; display:flex; flex-direction:column; gap:8px; }
     .case-name { display:flex; gap:8px; align-items:center; }
     .case-name input { padding:8px 10px; border-radius:6px; border:1px solid #d7e2ff; }
     .thumbs { display:flex; gap:8px; flex-wrap:wrap; }
-    .thumb { width:160px; border-radius:6px; overflow:hidden; border:1px solid #eee; background:#000; color:white; position:relative; }
+    .thumb {
+      width:160px;
+      border-radius:6px;
+      overflow:hidden;
+      border:1px solid #eee;
+      background:#000;
+      color:white;
+      position:relative;
+    }
     .thumb img, .thumb canvas { display:block; width:100%; height:90px; object-fit:cover; background:#000; }
     .thumb .label { padding:6px; font-size:12px; background:white; color:#333; text-align:center; }
-    .thumb .del-single { position:absolute; top:6px; right:6px; background:rgba(0,0,0,0.6); color:white; border-radius:12px; width:24px; height:24px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-weight:bold; }
+    .thumb .del-single {
+      position:absolute; top:6px; right:6px;
+      background:rgba(0,0,0,0.6); color:white; border-radius:12px;
+      width:24px; height:24px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-weight:bold;
+    }
     .row-actions { display:flex; gap:8px; align-items:center; }
-    .remove-row { background:#ff4d4f; color:white; border-radius:8px; padding:6px 8px; border:none; cursor:pointer; }
-    .add-file-btn { background:#28a745; color:white; border-radius:8px; padding:6px 8px; border:none; cursor:pointer; }
+    .remove-row {
+      background:#ff4d4f; color:white; border-radius:8px; padding:6px 8px; border:none; cursor:pointer;
+    }
+    .add-file-btn {
+      background:#28a745; color:white; border-radius:8px; padding:6px 8px; border:none; cursor:pointer;
+    }
     .bottom-actions { display:flex; gap:12px; margin-top:16px; justify-content:flex-end; }
     .alert { padding:10px 12px; border-radius:8px; background:#fff3cd; color:#856404; margin-top:10px; }
     .hidden { display:none; }
-    .add-case-btn { background:#20c997; color:white; border-radius:8px; padding:6px 8px; border:none; cursor:pointer; }
-    @media (max-width:960px) { .container { flex-direction:column; } .sidebar { width:100%; } .thumb { width:120px; } }
+    .add-case-btn {
+      background:#20c997; color:white; border-radius:8px; padding:6px 8px; border:none; cursor:pointer;
+    }
+    @media (max-width:960px) {
+      .container { flex-direction:column; }
+      .sidebar { width:100%; }
+      .thumb { width:120px; }
+    }
   </style>
 </head>
 <body>
@@ -45,7 +118,7 @@
     <div class="sidebar">
       <div class="card" style="margin-top:0">
         <div style="display:flex;align-items:center;gap:10px;">
-          <div style="width:48px;height:48px;border-radius:24px;background:#e9eefc;display:flex;align-items:center;justify-content:center;color:#4b6; font-weight:700;">U</div>
+          <div id="avatarBox" style="width:48px;height:48px;border-radius:24px;background:#e9eefc;display:flex;align-items:center;justify-content:center;color:#4b6; font-weight:700;">U</div>
           <div>
             <div id="currentUserName" style="font-weight:700">loading...</div>
             <div id="currentUserOrg" style="font-size:13px;color:#666">...</div>
@@ -64,7 +137,7 @@
     <div class="main">
       <div class="navbar">
         <div>👩‍⚕️ 任务批次接收（独立上传）</div>
-        <div><a href="/admin" style="color:white;text-decoration:none">管理</a></div>
+        <div><button id="logoutBtn" class="btn secondary">退出登录</button></div>
       </div>
 
       <div class="card" style="margin-top:20px">
@@ -102,7 +175,7 @@
   </div>
 
   <script>
-    (function(){
+    (function () {
       const MAX_VIDEOS_PER_CASE = 5;
       const ALLOWED_EXT = ['.mp4', '.avi', '.mov', '.mkv'];
 
@@ -116,30 +189,115 @@
       const messages = document.getElementById('messages');
       const uploadBtn = document.getElementById('uploadBtn');
       const clearBtn = document.getElementById('clearBtn');
+      const logoutBtn = document.getElementById('logoutBtn');
 
       let currentUser = null;
-
       // staging: array of { caseName, files: [ { file, relativePath|null, thumbDataUrl } ], createdAt }
       let staging = [];
 
-      // load current user for display and upload use
-      async function loadCurrentUser(){
-        let usr = null;
-        const endpoints = ['/api/users/current', '/api/users/me', '/api/users?current=1', '/api/users'];
-        for (const ep of endpoints) {
+      // Try multiple localStorage keys to find stored user info (login front-end may have saved username/info)
+      function readLocalUser() {
+        const keys = ['username', 'user', 'currentUser', 'current_user', 'auth', 'account'];
+        for (const k of keys) {
           try {
-            const r = await fetch(ep);
-            if (!r.ok) continue;
-            const d = await r.json();
-            if (d.username) { usr = { username: d.username, org: d.org || d.department || '' }; break; }
-            if (d.data && Array.isArray(d.data) && d.data.length) { usr = { username: d.data[0].username, org: d.data[0].org || '' }; break; }
-            if (d.data && d.data.username) { usr = { username: d.data.username, org: d.data.org || '' }; break; }
-          } catch (e) { /* try next */ }
+            const v = localStorage.getItem(k);
+            if (!v) continue;
+            // Try parse JSON
+            try {
+              const parsed = JSON.parse(v);
+              if (parsed && (parsed.username || parsed.user)) {
+                return { username: parsed.username || parsed.user, raw: parsed };
+              }
+            } catch (e) {
+              // not JSON, treat as plain username
+              if (typeof v === 'string' && v.trim()) return { username: v.trim(), raw: v };
+            }
+          } catch (e) { continue; }
         }
-        if (!usr) usr = { username: 'unknown', org: '' };
-        currentUser = usr;
-        document.getElementById('currentUserName').textContent = currentUser.username;
-        document.getElementById('currentUserOrg').textContent = currentUser.org || '';
+        return null;
+      }
+
+      // helper: read cookie
+      function getCookieValue(name) {
+        const cookies = document.cookie ? document.cookie.split('; ') : [];
+        for (let c of cookies) {
+          const [k, ...v] = c.split('=');
+          if (k === name) return decodeURIComponent(v.join('='));
+        }
+        return null;
+      }
+
+      // load current user for display and upload use
+      async function loadCurrentUser() {
+        // 1) try localStorage first (most likely)
+        const local = readLocalUser();
+        if (local && local.username) {
+          const uname = local.username;
+          // Try fetch user detail from backend to get organization (database stores 'organization')
+          try {
+            const r = await fetch(`/api/users/${encodeURIComponent(uname)}`);
+            if (r.ok) {
+              const d = await r.json();
+              if (d && d.data) {
+                currentUser = { username: d.data.username || uname, org: d.data.organization || d.data.org || '' };
+              } else {
+                currentUser = { username: uname, org: '' };
+              }
+            } else {
+              // backend didn't return specific user (maybe different flow), fall back
+              currentUser = { username: uname, org: '' };
+            }
+          } catch (e) {
+            currentUser = { username: uname, org: '' };
+          }
+        } else {
+          // 2) fallback: try /api/users and if only one user exist pick it (useful for single-user dev setups)
+          try {
+            const r = await fetch('/api/users');
+            if (r.ok) {
+              const data = await r.json();
+              if (data && Array.isArray(data.data) && data.data.length === 1) {
+                const u = data.data[0];
+                currentUser = { username: u.username, org: u.organization || '' };
+              } else {
+                // no reliable user found
+                currentUser = { username: 'unknown', org: '' };
+              }
+            } else {
+              currentUser = { username: 'unknown', org: '' };
+            }
+          } catch (e) {
+            currentUser = { username: 'unknown', org: '' };
+          }
+        }
+
+        // 3) cookie fallback: if above didn't produce a real username, try cookie set by backend login
+        if ((!currentUser || !currentUser.username || currentUser.username === 'unknown')) {
+          const cookieU = getCookieValue('username');
+          if (cookieU) {
+            try {
+              const r2 = await fetch(`/api/users/${encodeURIComponent(cookieU)}`);
+              if (r2.ok) {
+                const d2 = await r2.json();
+                if (d2 && d2.data) {
+                  currentUser = { username: d2.data.username || cookieU, org: d2.data.organization || d2.data.org || '' };
+                } else {
+                  currentUser = { username: cookieU, org: '' };
+                }
+              } else {
+                currentUser = { username: cookieU, org: '' };
+              }
+            } catch (e) {
+              currentUser = { username: cookieU, org: '' };
+            }
+          }
+        }
+
+        // display (ensure there's always some text)
+        document.getElementById('currentUserName').textContent = (currentUser && currentUser.username) ? currentUser.username : 'unknown';
+        document.getElementById('currentUserOrg').textContent = (currentUser && currentUser.org) ? currentUser.org : '未知机构';
+        const av = document.getElementById('avatarBox');
+        av.textContent = (currentUser && currentUser.username && currentUser.username[0]) ? currentUser.username[0].toUpperCase() : 'U';
       }
 
       function showMessage(text, timeout = 4000) {
@@ -147,7 +305,7 @@
         div.className = 'alert';
         div.textContent = text;
         messages.appendChild(div);
-        if (timeout > 0) setTimeout(()=>div.remove(), timeout);
+        if (timeout > 0) setTimeout(() => div.remove(), timeout);
       }
 
       function extOf(name) {
@@ -186,7 +344,7 @@
           video.crossOrigin = 'anonymous';
 
           const cleanup = () => {
-            try { video.pause(); } catch(e){}
+            try { video.pause(); } catch (e) { }
             URL.revokeObjectURL(url);
           };
 
@@ -230,11 +388,12 @@
           setTimeout(() => {
             // create a black placeholder if nothing worked
             const canvas = document.createElement('canvas');
-            canvas.width = 320; canvas.height = 180;
+            canvas.width = 320;
+            canvas.height = 180;
             const ctx = canvas.getContext('2d');
             ctx.fillStyle = '#000';
-            ctx.fillRect(0,0,canvas.width,canvas.height);
-            try { cleanup(); } catch(e){}
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            try { cleanup(); } catch (e) { }
             resolve(canvas.toDataURL('image/jpeg'));
           }, 4000);
         });
@@ -250,7 +409,7 @@
           const left = document.createElement('div'); left.className = 'row-left';
           const caseDiv = document.createElement('div'); caseDiv.className = 'case-name';
           const input = document.createElement('input'); input.value = caseItem.caseName;
-          input.addEventListener('input', (e)=> caseItem.caseName = e.target.value.trim() || caseItem.caseName);
+          input.addEventListener('input', (e) => caseItem.caseName = e.target.value.trim() || caseItem.caseName);
           caseDiv.appendChild(document.createTextNode('病例名：'));
           caseDiv.appendChild(input);
           left.appendChild(caseDiv);
@@ -282,7 +441,7 @@
 
           const ra = document.createElement('div'); ra.className = 'row-actions';
           const addBtn = document.createElement('button'); addBtn.className = 'add-file-btn'; addBtn.textContent = '添加视频';
-          addBtn.addEventListener('click', ()=> {
+          addBtn.addEventListener('click', () => {
             const tmp = document.createElement('input');
             tmp.type = 'file'; tmp.accept = 'video/*'; tmp.multiple = true;
             tmp.onchange = async (ev) => {
@@ -304,7 +463,7 @@
 
           const remBtn = document.createElement('button'); remBtn.className = 'remove-row'; remBtn.textContent = '删除病例';
           remBtn.title = '取消该病例上传';
-          remBtn.addEventListener('click', ()=> {
+          remBtn.addEventListener('click', () => {
             if (!confirm('确认删除该病例及其所有待上传视频吗？')) return;
             staging.splice(idx, 1);
             renderRows();
@@ -332,7 +491,7 @@
               return;
             }
             for (const f of files) {
-              const thumb = await createVideoThumbnail(f).catch(()=> '');
+              const thumb = await createVideoThumbnail(f).catch(() => '');
               caseItem.files.push({ file: f, relativePath: null, thumbDataUrl: thumb });
             }
             renderRows();
@@ -395,7 +554,7 @@
               if (files.length > MAX_VIDEOS_PER_CASE) { showMessage(`病例 ${caseName} 包含 ${files.length} 个视频，超过上限 ${MAX_VIDEOS_PER_CASE}`); return; }
               const rowFiles = [];
               for (const it of files) {
-                const thumb = await createVideoThumbnail(it.file).catch(()=> '');
+                const thumb = await createVideoThumbnail(it.file).catch(() => '');
                 rowFiles.push({ file: it.file, relativePath: it.relativePath, thumbDataUrl: thumb });
               }
               const defaultName = caseName || genPatientName(baseIndex + idx);
@@ -419,7 +578,7 @@
               if (files.length > MAX_VIDEOS_PER_CASE) { showMessage(`病例 ${caseName} 包含 ${files.length} 个视频，超过上限 ${MAX_VIDEOS_PER_CASE}`); return; }
               const rowFiles = [];
               for (const it of files) {
-                const thumb = await createVideoThumbnail(it.file).catch(()=> '');
+                const thumb = await createVideoThumbnail(it.file).catch(() => '');
                 rowFiles.push({ file: it.file, relativePath: it.relativePath, thumbDataUrl: thumb });
               }
               const defaultName = caseName || genPatientName(baseIndex + idx);
@@ -441,7 +600,7 @@
           const rowFiles = [];
           for (const it of fileObjs) {
             if (!isAllowedFile(it.file.name)) { showMessage(`不支持的文件格式：${it.file.name}`); return; }
-            const thumb = await createVideoThumbnail(it.file).catch(()=> '');
+            const thumb = await createVideoThumbnail(it.file).catch(() => '');
             rowFiles.push({ file: it.file, relativePath: null, thumbDataUrl: thumb });
           }
           staging.push({ caseName: caseName, files: rowFiles, createdAt: Date.now() });
@@ -450,21 +609,21 @@
       }
 
       function setupDropzone() {
-        dropzone.addEventListener('dragover', (e)=> {
+        dropzone.addEventListener('dragover', (e) => {
           e.preventDefault();
           dropzone.classList.add('dragover');
         });
-        dropzone.addEventListener('dragleave', (e)=> {
+        dropzone.addEventListener('dragleave', (e) => {
           dropzone.classList.remove('dragover');
         });
 
-        dropzone.addEventListener('drop', async (e)=> {
+        dropzone.addEventListener('drop', async (e) => {
           e.preventDefault();
           dropzone.classList.remove('dragover');
           const items = e.dataTransfer.items;
           if (items && items.length > 0 && items[0].webkitGetAsEntry) {
             const entries = [];
-            for (let i=0;i<items.length;i++) entries.push(items[i].webkitGetAsEntry());
+            for (let i = 0; i < items.length; i++) entries.push(items[i].webkitGetAsEntry());
             const files = [];
             const traverse = (entry, pathPrefix) => {
               return new Promise((resolve) => {
@@ -500,7 +659,7 @@
         });
       }
 
-      chooseFolderBtn.addEventListener('click', ()=> folderInput.click());
+      chooseFolderBtn.addEventListener('click', () => folderInput.click());
       folderInput.addEventListener('change', async (e) => {
         const files = Array.from(e.target.files || []);
         if (!files.length) return;
@@ -508,7 +667,7 @@
         folderInput.value = '';
       });
 
-      chooseFilesBtn.addEventListener('click', ()=> fileInput.click());
+      chooseFilesBtn.addEventListener('click', () => fileInput.click());
       fileInput.addEventListener('change', async (e) => {
         const files = Array.from(e.target.files || []);
         if (!files.length) return;
@@ -550,7 +709,7 @@
             const f = fobj.file;
             if (fobj.relativePath) {
               const rel = f.webkitRelativePath || f.relativePath || f.name;
-              const parts = rel.split('/').filter(p=>p && p!=='.');
+              const parts = rel.split('/').filter(p => p && p !== '.');
               if (parts.length >= 3) {
                 form.append('files', f, rel);
               } else if (parts.length === 2) {
@@ -590,7 +749,7 @@
           const xhr = new XMLHttpRequest();
           xhr.open('POST', url, true);
           xhr.responseType = 'json';
-          xhr.onload = function() {
+          xhr.onload = function () {
             if (xhr.status >= 200 && xhr.status < 300) {
               resolve(xhr.response);
             } else {
@@ -598,13 +757,13 @@
               try {
                 if (xhr.response && xhr.response.detail) msg = xhr.response.detail;
                 else if (xhr.response && xhr.response.message) msg = xhr.response.message;
-              } catch(e){}
+              } catch (e) { }
               reject(new Error(msg));
             }
           };
-          xhr.onerror = function() { reject(new Error('网络错误')); };
+          xhr.onerror = function () { reject(new Error('网络错误')); };
           if (xhr.upload && onProgress) {
-            xhr.upload.onprogress = function(e) {
+            xhr.upload.onprogress = function (e) {
               if (e.lengthComputable) {
                 const pct = (e.loaded / e.total) * 100;
                 onProgress(pct);
@@ -616,6 +775,26 @@
       }
 
       clearBtn.addEventListener('click', clearAll);
+
+      // Logout handler: clear local state and attempt backend logout, then redirect to /login
+      logoutBtn.addEventListener('click', async () => {
+        if (!confirm('确认退出登录？')) return;
+        logoutBtn.disabled = true;
+        logoutBtn.textContent = '正在退出...';
+        // Clear common localStorage keys that might store auth/user info
+        const keysToClear = ['username', 'user', 'currentUser', 'current_user', 'auth', 'token', 'access_token'];
+        try {
+          keysToClear.forEach(k => localStorage.removeItem(k));
+        } catch (e) { /* ignore */ }
+
+        // Try to call backend logout endpoint (if exists) - best-effort
+        try {
+          await fetch('/api/logout', { method: 'POST' }).catch(() => null);
+        } catch (e) { /* ignore */ }
+
+        // Redirect to login page
+        window.location.href = '/login';
+      });
 
       loadCurrentUser();
       setupDropzone();

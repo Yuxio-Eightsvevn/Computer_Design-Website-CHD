@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, UploadFile, File, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,7 +13,7 @@ import json
 from datetime import datetime
 import shutil
 import zipfile
-
+from fastapi.responses import JSONResponse
 
 
 # 数据存储目录
@@ -84,9 +84,21 @@ async def login(request: LoginRequest):
     if not user:
         raise HTTPException(status_code=401, detail="用户名或密码错误")
     
-    return {
-        "data": user
-    }
+    resp = JSONResponse({"data": user})
+    resp.set_cookie(
+        key="username",
+        value=user["username"],
+        httponly=False,   # 最小改动，前端可读取 document.cookie
+        samesite="Lax",
+        path="/"
+    )
+    return resp
+
+@app.post("/api/logout")
+async def logout():
+    resp = JSONResponse({"message": "已登出"})
+    resp.delete_cookie(key="username", path="/")
+    return resp
 
 # 用户管理相关的请求模型
 class UserCreateRequest(BaseModel):
@@ -105,6 +117,64 @@ class UserUpdateRequest(BaseModel):
 async def get_users():
     users = database.get_all_users()
     return {"data": users}
+
+@app.get("/api/users/current")
+async def get_current_user(request: Request):
+    """
+    静态 endpoint，优先于 /api/users/{user_id} 被匹配。
+    优先查 cookie/header 中的 username，然后尝试通过 database.get_user_by_username 查找用户。
+    如果未提供 username，则返回第一个用户（如果存在）。
+    返回格式与 get_users 保持一致： {"data": user}
+    """
+    # 1) 从 cookie 或 header 尝试读取用户名
+    cookie_un = None
+    try:
+        cookie_un = request.cookies.get("username") or request.cookies.get("user")
+    except Exception:
+        cookie_un = None
+
+    header_un = request.headers.get("x-username") or request.headers.get("X-User")
+
+    lookup = cookie_un or header_un
+    if lookup:
+        # 优先使用 database 中现有的按用户名查找函数
+        try:
+            if hasattr(database, "get_user_by_username"):
+                user = database.get_user_by_username(lookup)
+                if user:
+                    return {"data": user}
+        except Exception:
+            # 忽略查找时的异常，继续降级查找
+            pass
+
+        # 降级实现：遍历所有用户按常见字段匹配
+        try:
+            all_users = database.get_all_users() or []
+        except Exception:
+            all_users = []
+
+        lower_lookup = str(lookup).lower()
+        for u in all_users:
+            # u 预期为 dict
+            for k in ("username", "user", "login", "name", "full_name", "email", "id"):
+                # 兼容 dict 或对象属性
+                val = u.get(k) if isinstance(u, dict) else getattr(u, k, None)
+                if val is None:
+                    continue
+                if str(val).lower() == lower_lookup:
+                    return {"data": u}
+
+    # 3) 未提供 username 或未匹配到：返回第一个用户（若有）
+    try:
+        users = database.get_all_users() or []
+    except Exception:
+        users = []
+    if users:
+        return {"data": users[0]}
+
+    # 4) 没有任何用户
+    raise HTTPException(status_code=404, detail="no users in database")
+
 
 # 获取单个用户信息
 @app.get("/api/users/{user_id}")
@@ -328,6 +398,14 @@ async def get_task_patients(username: str, task_folder: str):
 
 # 提供视频文件访问
 app.mount("/videos", StaticFiles(directory=DATA_BATCH_STORAGE), name="videos")
+
+try:
+    from routes_users import router as users_router
+    app.include_router(users_router, prefix="/api")
+except Exception as _e:
+    import logging
+    logging.exception("failed to include users router: %s", _e)
+
 
 # JSON格式提交诊断结果的请求模型
 class DiagnosisRecordSimple(BaseModel):
@@ -559,3 +637,4 @@ async def root():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+    
