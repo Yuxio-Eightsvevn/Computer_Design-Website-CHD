@@ -5,49 +5,22 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>任务批次接收 - 儿童先心病诊断平台</title>
   <style>
+    /* 样式部分完全保持不变，以维护您的 UI 外观 */
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: #f5f7fa; color: #333; min-height: 100vh;
-    }
-    .container {
-      max-width: 1200px; margin: 30px auto; padding: 0 20px;
-      display: flex; gap: 16px; align-items: flex-start;
-    }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f7fa; color: #333; min-height: 100vh; }
+    .container { max-width: 1200px; margin: 30px auto; padding: 0 20px; display: flex; gap: 16px; align-items: flex-start; }
     .sidebar { width: 220px; }
     .main { flex: 1; }
-    .navbar {
-      background: linear-gradient(135deg,#667eea 0%,#764ba2 100%);
-      color: white; padding: 12px 20px; border-radius: 8px;
-      display: flex; justify-content: space-between; align-items: center;
-    }
+    .navbar { background: linear-gradient(135deg,#667eea 0%,#764ba2 100%); color: white; padding: 12px 20px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
     .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); margin-top: 20px; }
     h1 { font-size: 20px; margin-bottom: 12px; }
-
-    /* --- [新增布局容器] --- */
-    .stats-container {
-      background: white; border-radius: 12px; padding: 16px 20px;
-      margin-top: 20px; display: flex; justify-content: space-between; align-items: center;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.04); border: 1px solid #eef2f7;
-    }
+    .stats-container { background: white; border-radius: 12px; padding: 16px 20px; margin-top: 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.04); border: 1px solid #eef2f7; }
     .task-count-box { font-size: 16px; font-weight: 700; color: #4b5563; }
     .task-count-number { color: #667eea; font-size: 20px; margin: 0 4px; }
-
-    .request-name-container {
-      background: #f8faff; border: 1px solid #d7e2ff; border-radius: 12px;
-      padding: 16px 20px; margin-top: 12px; display: flex; align-items: center; gap: 12px;
-    }
+    .request-name-container { background: #f8faff; border: 1px solid #d7e2ff; border-radius: 12px; padding: 16px 20px; margin-top: 12px; display: flex; align-items: center; gap: 12px; }
     .request-name-container label { font-weight: 700; color: #4b5563; white-space: nowrap; }
-    .request-name-container input {
-      flex: 1; padding: 10px 14px; border-radius: 8px; border: 1px solid #c9d7ff;
-      font-size: 15px; font-weight: 600; outline: none;
-    }
-    /* ---------------------- */
-
-    .dropzone {
-      border: 2px dashed #c9d7ff; border-radius: 12px; padding: 30px;
-      text-align: center; cursor: pointer; background: #fff; transition: all .15s;
-    }
+    .request-name-container input { flex: 1; padding: 10px 14px; border-radius: 8px; border: 1px solid #c9d7ff; font-size: 15px; font-weight: 600; outline: none; }
+    .dropzone { border: 2px dashed #c9d7ff; border-radius: 12px; padding: 30px; text-align: center; cursor: pointer; background: #fff; transition: all .15s; }
     .dropzone.dragover { border-color: #667eea; background: #eef4ff; }
     .controls { display:flex; gap:12px; align-items:center; margin-bottom:16px; flex-wrap:wrap; }
     .btn { padding:8px 14px; border-radius:8px; border:none; cursor:pointer; background:#667eea; color:white; font-weight: 600;}
@@ -55,25 +28,15 @@
     .btn.view-tasks { background: #10b981; }
     .hint { color:#666; font-size:13px; }
     .rows { margin-top:16px; display:flex; flex-direction:column; gap:12px; }
-    .row-card {
-      border:1px solid #e6eefc; border-radius:10px; padding:12px;
-      background:white; display:flex; gap:12px; align-items:flex-start; justify-content:space-between;
-    }
+    .row-card { border:1px solid #e6eefc; border-radius:10px; padding:12px; background:white; display:flex; gap:12px; align-items:flex-start; justify-content:space-between; }
     .row-left { flex:1; display:flex; flex-direction:column; gap:8px; }
     .case-name { display:flex; gap:8px; align-items:center; }
     .case-name input { padding:8px 10px; border-radius:6px; border:1px solid #d7e2ff; }
     .thumbs { display:flex; gap:8px; flex-wrap:wrap; }
-    .thumb {
-      width:160px; border-radius:6px; overflow:hidden; border:1px solid #eee;
-      background:#000; color:white; position:relative;
-    }
+    .thumb { width:160px; border-radius:6px; overflow:hidden; border:1px solid #eee; background:#000; color:white; position:relative; }
     .thumb img, .thumb canvas { display:block; width:100%; height:90px; object-fit:cover; }
     .thumb .label { padding:6px; font-size:12px; background:white; color:#333; text-align:center; }
-    .thumb .del-single {
-      position:absolute; top:6px; right:6px; background:rgba(0,0,0,0.6);
-      color:white; border-radius:12px; width:24px; height:24px; display:flex;
-      align-items:center; justify-content:center; cursor:pointer;
-    }
+    .thumb .del-single { position:absolute; top:6px; right:6px; background:rgba(0,0,0,0.6); color:white; border-radius:12px; width:24px; height:24px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
     .bottom-actions { display:flex; gap:12px; margin-top:16px; justify-content:flex-end; }
     .alert { padding:10px 12px; border-radius:8px; background:#fff3cd; color:#856404; margin-top:10px; }
     @media (max-width:960px) { .container { flex-direction:column; } .sidebar { width:100%; } }
@@ -84,9 +47,9 @@
     <div class="sidebar">
       <div class="card" style="margin-top:0">
         <div style="display:flex;align-items:center;gap:10px;">
-          <div id="avatarBox" style="width:48px;height:48px;border-radius:24px;background:#e9eefc;display:flex;align-items:center;justify-content:center;color:#4b6; font-weight:700;">U</div>
+          <div id="avatarBox" style="width:48px;height:48px;border-radius:24px;background:#e9eefc;display:flex;align-items:center;justify-content:center;color:#667eea; font-weight:700;">U</div>
           <div>
-            <div id="currentUserName" style="font-weight:700">loading...</div>
+            <div id="currentUserName" style="font-weight:700">加载中...</div>
             <div id="currentUserOrg" style="font-size:13px;color:#666">...</div>
           </div>
         </div>
@@ -104,15 +67,11 @@
         <div><button id="logoutBtn" class="btn secondary">返回</button></div>
       </div>
 
-      <!-- [布局微调：容器 1] -->
       <div class="stats-container">
-        <div class="task-count-box">
-          已上传任务数：<span id="uploadedTaskCount" class="task-count-number">-</span>
-        </div>
+        <div class="task-count-box">已上传任务数：<span id="uploadedTaskCount" class="task-count-number">-</span></div>
         <button id="viewTasksBtn" class="btn view-tasks">📋 查看已上传任务</button>
       </div>
 
-      <!-- [布局微调：容器 2] -->
       <div class="request-name-container">
         <label for="requestNameInput">当前任务名称：</label>
         <input id="requestNameInput" type="text" placeholder="Task_YYYYMMDD_HHMMSS" />
@@ -129,14 +88,9 @@
           <div style="flex:1"></div>
           <div id="statusHint" class="hint">可拖拽文件夹到下方区域</div>
         </div>
-
-        <div id="dropzone" class="dropzone">
-          将文件或文件夹拖放到此处
-        </div>
-
+        <div id="dropzone" class="dropzone">将文件或文件夹拖放到此处</div>
         <div id="messages"></div>
         <div id="rowsContainer" class="rows"></div>
-
         <div class="bottom-actions">
           <button id="clearBtn" class="btn secondary" style="background:#94a3b8">清空</button>
           <button id="uploadBtn" class="btn">确认上传</button>
@@ -147,7 +101,6 @@
 
   <script>
     (function () {
-      // --- 核心常量与逻辑原封不动搬回 ---
       const MAX_VIDEOS_PER_CASE = 5;
       const ALLOWED_EXT = ['.mp4', '.avi', '.mov', '.mkv'];
 
@@ -177,10 +130,9 @@
 
       viewTasksBtn.onclick = () => { window.location.href = '/task_status'; };
 
-      // [新增获取逻辑，预留给后端]
       async function fetchUploadCount(username) {
         try {
-          const res = await fetch(`/api/users/${encodeURIComponent(username)}/oridata-count`);
+          const res = await fetch(`/api/users/${encodeURIComponent(username)}/oridata-count?_t=${Date.now()}`);
           if (res.ok) {
             const data = await res.json();
             document.getElementById('uploadedTaskCount').textContent = data.count ?? '0';
@@ -188,121 +140,114 @@
         } catch (e) { document.getElementById('uploadedTaskCount').textContent = '0'; }
       }
 
-      // --- 完整保留您的 loadCurrentUser 逻辑 ---
+      // --- [同步自 task_status.html 的用户信息加载逻辑] ---
       async function loadCurrentUser() {
-        const nameEl = document.getElementById('currentUserName');
-        const orgEl = document.getElementById('currentUserOrg');
-        const avEl = document.getElementById('avatarBox');
-
         try {
-          // 1. 直接通过 /api/users/current 获取当前会话用户
           const r = await fetch('/api/users/current');
           if (r.ok) {
             const d = await r.json();
             if (d && d.data) {
               currentUser = d.data;
-              const uname = currentUser.username || 'Guest';
-              const org = currentUser.organization || '未知机构';
-
-              // 更新界面显示
-              nameEl.textContent = uname;
-              orgEl.textContent = org;
-              avEl.textContent = uname[0].toUpperCase();
-
-              // 2. 成功获取用户后，立即拉取任务数
-              fetchUploadCount(uname);
+              document.getElementById('currentUserName').textContent = currentUser.username;
+              document.getElementById('currentUserOrg').textContent = currentUser.organization || '未知机构';
+              document.getElementById('avatarBox').textContent = currentUser.username[0].toUpperCase();
+              fetchUploadCount(currentUser.username);
               return;
             }
           }
-        } catch (e) {
-          console.error("加载用户信息失败:", e);
-        }
-        
-        // 兜底显示
-        nameEl.textContent = "未登录";
+        } catch (e) { console.error("Session Error", e); }
+        document.getElementById('currentUserName').textContent = "未登录";
       }
 
-      // --- 完整保留您的 handleIncomingFiles 与 路径解析逻辑 (B1/B2) ---
-      async function handleIncomingFiles(fileList, fromEntries = false) {
+      // --- [核心：递归文件夹算法回归] ---
+      async function traverse(entry, path = '', files = []) {
+        if (entry.isFile) {
+          await new Promise(resolve => {
+            entry.file(file => {
+              file.relativePath = path + file.name;
+              files.push(file);
+              resolve();
+            });
+          });
+        } else if (entry.isDirectory) {
+          const reader = entry.createReader();
+          const entries = await new Promise(resolve => reader.readEntries(resolve));
+          for (const child of entries) {
+            await traverse(child, path + entry.name + '/', files);
+          }
+        }
+        return files;
+      }
+
+      // --- [核心：路径解析逻辑回归 (CASE A/B1/B2)] ---
+      async function handleIncomingFiles(fileList) {
         const fileObjs = fileList.map(f => ({
-          file: f, 
-          relativePath: (f.webkitRelativePath || f.relativePath || f.fullPath || f.name).replace(/^\/+/, '')
+          file: f,
+          rel: (f.webkitRelativePath || f.relativePath || f.name).replace(/^\/+/, '')
         }));
 
-        const someWith = fileObjs.some(o => o.relativePath.includes('/'));
-        const someWithout = fileObjs.some(o => !o.relativePath.includes('/'));
-        if (someWith && someWithout) { showMessage('不支持混合上传'); return; }
-
-        if (someWith) {
-          const partsList = fileObjs.map(o => o.relativePath.split('/').filter(p => p && p !== '.'));
-          if (partsList.every(p => p.length >= 3)) {
+        const anySlash = fileObjs.some(o => o.rel.includes('/'));
+        
+        if (anySlash) {
+          const partsList = fileObjs.map(o => o.rel.split('/').filter(p => p && p !== '.'));
+          
+          if (partsList.every(p => p.length >= 3)) { // CASE B1
             const groups = {};
             fileObjs.forEach((o, i) => {
-              const p = partsList[i]; const cName = p[1];
+              const cName = partsList[i][1];
               groups[cName] = groups[cName] || [];
-              groups[cName].push({ file: o.file, rel: p.slice(2).join('/') });
+              groups[cName].push({ file: o.file, rel: partsList[i].slice(2).join('/') });
             });
             for (const [cName, files] of Object.entries(groups)) {
               const row = { caseName: cName, files: [] };
               for (const it of files) {
-                const thumb = await createVideoThumbnail(it.file);
-                row.files.push({ file: it.file, relativePath: it.rel, thumbDataUrl: thumb });
+                row.files.push({ file: it.file, relativePath: it.rel, thumbDataUrl: await createVideoThumbnail(it.file) });
               }
               staging.push(row);
             }
-          } else if (partsList.every(p => p.length === 2)) {
+          } else if (partsList.every(p => p.length === 2)) { // CASE B2
             const groups = {};
             fileObjs.forEach((o, i) => {
-              const p = partsList[i];
-              groups[p[0]] = groups[p[0]] || [];
-              groups[p[0]].push({ file: o.file, rel: p[1] });
+              const cName = partsList[i][0];
+              groups[cName] = groups[cName] || [];
+              groups[cName].push({ file: o.file, rel: partsList[i][1] });
             });
             for (const [cName, files] of Object.entries(groups)) {
               const row = { caseName: cName, files: [] };
               for (const it of files) {
-                const thumb = await createVideoThumbnail(it.file);
-                row.files.push({ file: it.file, relativePath: it.rel, thumbDataUrl: thumb });
+                row.files.push({ file: it.file, relativePath: it.rel, thumbDataUrl: await createVideoThumbnail(it.file) });
               }
               staging.push(row);
             }
           }
-        } else {
+        } else { // CASE A
           const row = { caseName: `patient ${staging.length + 1}`, files: [] };
           for (const it of fileObjs) {
-            const thumb = await createVideoThumbnail(it.file);
-            row.files.push({ file: it.file, relativePath: null, thumbDataUrl: thumb });
+            row.files.push({ file: it.file, relativePath: null, thumbDataUrl: await createVideoThumbnail(it.file) });
           }
           staging.push(row);
         }
         renderRows();
       }
 
-      // --- 完整保留递归遍历 traverse 逻辑 ---
       function setupDropzone() {
         dropzone.ondragover = (e) => { e.preventDefault(); dropzone.classList.add('dragover'); };
         dropzone.ondragleave = () => dropzone.classList.remove('dragover');
         dropzone.ondrop = async (e) => {
           e.preventDefault(); dropzone.classList.remove('dragover');
           const items = e.dataTransfer.items;
-          if (items && items[0].webkitGetAsEntry) {
-            const files = [];
-            const traverse = async (entry, path = '') => {
-              if (entry.isFile) {
-                await new Promise(res => entry.file(f => { f.relativePath = path + f.name; files.push(f); res(); }));
-              } else if (entry.isDirectory) {
-                const reader = entry.createReader();
-                const entries = await new Promise(res => reader.readEntries(res));
-                for (const en of entries) await traverse(en, path + entry.name + '/');
-              }
-            };
-            for (const item of items) await traverse(item.webkitGetAsEntry());
-            handleIncomingFiles(files, true);
+          if (items && items.length > 0 && items[0].webkitGetAsEntry) {
+            let allFiles = [];
+            for (const item of items) {
+              const entry = item.webkitGetAsEntry();
+              if (entry) await traverse(entry, '', allFiles);
+            }
+            handleIncomingFiles(allFiles);
           }
         };
       }
 
-      // 缩略图生成保持您的逻辑
-      function createVideoThumbnail(file) {
+      async function createVideoThumbnail(file) {
         return new Promise((resolve) => {
           const url = URL.createObjectURL(file);
           const video = document.createElement('video');
@@ -317,7 +262,7 @@
             };
           };
           video.onerror = () => resolve('');
-          setTimeout(() => resolve(''), 3000);
+          setTimeout(() => resolve(''), 2000);
         });
       }
 
@@ -326,51 +271,76 @@
         staging.forEach((c, i) => {
           const row = document.createElement('div'); row.className = 'row-card';
           row.innerHTML = `<div class="row-left"><div class="case-name">病例名：<input value="${c.caseName}" oninput="staging[${i}].caseName=this.value"></div><div class="thumbs"></div></div><div class="row-actions"><button class="btn secondary" onclick="staging.splice(${i},1);renderRows()">删除</button></div>`;
-          const thumbCont = row.querySelector('.thumbs');
+          const tCont = row.querySelector('.thumbs');
           c.files.forEach(f => {
             const t = document.createElement('div'); t.className = 'thumb';
             t.innerHTML = `<img src="${f.thumbDataUrl || ''}"><div class="label">${f.file.name}</div>`;
-            thumbCont.appendChild(t);
+            tCont.appendChild(t);
           });
           rowsContainer.appendChild(row);
         });
       }
 
-      // --- 完整保留带有 XHR Progress 的上传逻辑 ---
+      // dashboard.html 修正后的上传逻辑
       uploadBtn.onclick = async () => {
-        if (!staging.length) return;
+        if (!staging.length || !currentUser) return;
+        
         const form = new FormData();
         form.append('request_name', requestNameInput.value);
+        
+        // [核心修改] 显式配对上传
         staging.forEach(c => {
           c.files.forEach(f => {
-            const path = f.relativePath || `${c.caseName}/${f.file.name}`;
-            form.append('files', f.file, path);
+            // 1. 发送原始文件对象
+            form.append('files', f.file); 
+            // 2. 同步发送该文件所属的病例名（确保后端收到的列表索引一致）
+            form.append('case_names', c.caseName); 
           });
         });
 
+        uploadBtn.disabled = true;
+        uploadBtn.textContent = "正在传输...";
+
         const xhr = new XMLHttpRequest();
         xhr.open('POST', `/api/users/${encodeURIComponent(currentUser.username)}/upload-oridata`);
+        
         xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable) uploadBtn.textContent = `上传中 ${Math.round((e.loaded/e.total)*100)}%`;
+          if (e.lengthComputable) {
+            uploadBtn.textContent = `上传中 ${Math.round((e.loaded/e.total)*100)}%`;
+          }
         };
+
         xhr.onload = () => {
-          if (xhr.status === 200) { showMessage('上传成功'); staging = []; renderRows(); fetchUploadCount(currentUser.username); }
-          uploadBtn.textContent = '确认上传';
+          uploadBtn.disabled = false;
+          uploadBtn.textContent = "确认上传";
+          if (xhr.status === 200) { 
+            const resp = xhr.response;
+            if (resp.warnings && resp.warnings.length > 0) {
+              alert("⚠️ 部分病例被截断：\n" + resp.warnings.join("\n"));
+            } else {
+              showMessage('✅ 上传成功'); 
+            }
+            staging = []; renderRows(); 
+            requestNameInput.value = generateDefaultRequestName();
+            setTimeout(() => fetchUploadCount(currentUser.username), 500);
+          } else {
+            alert("❌ 上传失败：" + (xhr.response?.detail || "服务器错误"));
+          }
         };
         xhr.send(form);
       };
 
       function showMessage(t) { const m = document.createElement('div'); m.className='alert'; m.textContent=t; messages.appendChild(m); setTimeout(()=>m.remove(), 3000); }
-      
       chooseFolderBtn.onclick = () => folderInput.click();
-      folderInput.onchange = (e) => handleIncomingFiles(Array.from(e.target.files), true);
+      folderInput.onchange = (e) => handleIncomingFiles(Array.from(e.target.files));
       chooseFilesBtn.onclick = () => fileInput.click();
-      fileInput.onchange = (e) => handleIncomingFiles(Array.from(e.target.files), false);
+      fileInput.onchange = (e) => handleIncomingFiles(Array.from(e.target.files));
       clearBtn.onclick = () => { staging = []; renderRows(); };
       logoutBtn.onclick = () => { window.location.href = '/flow'; };
 
       loadCurrentUser(); setupDropzone();
-      window.staging = staging; window.renderRows = renderRows; // 为了内联 onclick 正常工作
+      // 挂载到 window 确保内联 onclick 可用
+      window.staging = staging; window.renderRows = renderRows;
     })();
   </script>
 </body>

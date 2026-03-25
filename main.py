@@ -78,20 +78,26 @@ async def login(request: LoginRequest):
     username = request.username
     password = request.password
     
-    # 从数据库验证用户
     user = database.verify_user(username, password)
-    
     if not user:
         raise HTTPException(status_code=401, detail="用户名或密码错误")
     
+    # --- [新增：data.json 自动初始化钩子] ---
+    user_root = Path(DATA_BATCH_STORAGE) / username
+    user_root.mkdir(parents=True, exist_ok=True)
+    index_path = user_root / "data.json"
+    
+    if not index_path.exists():
+        try:
+            with open(index_path, "w", encoding="utf-8") as f:
+                json.dump({"tasks": []}, f, ensure_ascii=False, indent=2)
+            print(f"📄 已为用户 {username} 初始化任务索引文件")
+        except Exception as e:
+            print(f"⚠️ 初始化索引文件失败: {e}")
+    # ---------------------------------------
+
     resp = JSONResponse({"data": user})
-    resp.set_cookie(
-        key="username",
-        value=user["username"],
-        httponly=False,   # 最小改动，前端可读取 document.cookie
-        samesite="Lax",
-        path="/"
-    )
+    resp.set_cookie(key="username", value=user["username"], httponly=False, samesite="Lax", path="/")
     return resp
 
 @app.post("/api/logout")
@@ -632,6 +638,11 @@ async def serve_flow():
 @app.get("/")
 async def root():
     return FileResponse("login.html")
+
+@app.get("/task_status")
+async def serve_task_status():
+    """返回任务状态进度页面"""
+    return FileResponse("task_status.html")
 
 
 
