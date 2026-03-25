@@ -235,3 +235,14 @@ async def upload_oridata(
         except Exception:
             pass
         raise HTTPException(status_code=500, detail=f"服务器错误: {e}")
+
+
+@router.get("/api/users/{username}/oridata-count")
+async def get_oridata_count(username: str):
+    """统计用户 oridata 目录下的文件夹数量"""
+    user_oridata_path = BASE_DATA_DIR / username / ORIDATA_DIRNAME
+    if not user_oridata_path.exists():
+        return {"count": 0}
+    # 统计该目录下文件夹的数量
+    count = len([d for d in user_oridata_path.iterdir() if d.is_dir()])
+    return {"count": count}

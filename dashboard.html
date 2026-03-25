@@ -190,42 +190,36 @@
 
       // --- 完整保留您的 loadCurrentUser 逻辑 ---
       async function loadCurrentUser() {
-        const local = (function readLocalUser() {
-          const keys = ['username', 'user', 'currentUser', 'current_user', 'auth', 'account'];
-          for (const k of keys) {
-            try {
-              const v = localStorage.getItem(k); if (!v) continue;
-              try { const parsed = JSON.parse(v); if (parsed && (parsed.username || parsed.user)) return { username: parsed.username || parsed.user }; }
-              catch (e) { if (typeof v === 'string' && v.trim()) return { username: v.trim() }; }
-            } catch (e) {}
-          }
-          return null;
-        })();
+        const nameEl = document.getElementById('currentUserName');
+        const orgEl = document.getElementById('currentUserOrg');
+        const avEl = document.getElementById('avatarBox');
 
-        let uname = local ? local.username : (function getCookieValue(name) {
-          const cookies = document.cookie ? document.cookie.split('; ') : [];
-          for (let c of cookies) {
-            const [k, ...v] = c.split('='); if (k === name) return decodeURIComponent(v.join('='));
-          }
-          return null;
-        })('username');
+        try {
+          // 1. 直接通过 /api/users/current 获取当前会话用户
+          const r = await fetch('/api/users/current');
+          if (r.ok) {
+            const d = await r.json();
+            if (d && d.data) {
+              currentUser = d.data;
+              const uname = currentUser.username || 'Guest';
+              const org = currentUser.organization || '未知机构';
 
-        if (uname) {
-          try {
-            const r = await fetch(`/api/users/${encodeURIComponent(uname)}`);
-            if (r.ok) {
-              const d = await r.json();
-              if (d && d.data) {
-                currentUser = { username: d.data.username || uname, org: d.data.organization || '' };
-                document.getElementById('currentUserName').textContent = currentUser.username;
-                document.getElementById('currentUserOrg').textContent = currentUser.org || '未知机构';
-                const av = document.getElementById('avatarBox');
-                av.textContent = currentUser.username[0].toUpperCase();
-                fetchUploadCount(currentUser.username);
-              }
+              // 更新界面显示
+              nameEl.textContent = uname;
+              orgEl.textContent = org;
+              avEl.textContent = uname[0].toUpperCase();
+
+              // 2. 成功获取用户后，立即拉取任务数
+              fetchUploadCount(uname);
+              return;
             }
-          } catch (e) {}
+          }
+        } catch (e) {
+          console.error("加载用户信息失败:", e);
         }
+        
+        // 兜底显示
+        nameEl.textContent = "未登录";
       }
 
       // --- 完整保留您的 handleIncomingFiles 与 路径解析逻辑 (B1/B2) ---
