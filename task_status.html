@@ -170,7 +170,6 @@
       processing.forEach(t => box2.appendChild(createTaskRow(t, false)));
     }
 
-    // [新增] 弹窗控制逻辑
     function showTaskDetail(task) {
       const content = document.getElementById('modalContent');
       content.innerHTML = `
@@ -207,16 +206,23 @@
       const btnInfo = document.createElement('button');
       btnInfo.className = 'btn btn-info';
       btnInfo.textContent = '查看详情';
-      // [修改] 指向新弹窗函数
       btnInfo.onclick = () => showTaskDetail(task);
       btnGroup.appendChild(btnInfo);
       if (isFinished) {
         const btnDiag = document.createElement('button');
         btnDiag.className = 'btn btn-diag';
         btnDiag.textContent = '进入判读';
+        
+        // [核心对接修改] 对齐 diagnosis.html 的 URL 参数需求
         btnDiag.onclick = () => {
-            window.location.href = `/diagnosis?submission_id=${task.submission_id}&req_name=${task.request_name}`;
+            const userName = encodeURIComponent(currentUser.username);
+            const taskFolderName = encodeURIComponent(`${task.request_name}_${task.submission_id}`);
+            const taskDisplayName = encodeURIComponent(task.request_name);
+            
+            // 构建跳转 URL
+            window.location.href = `/diagnosis?username=${userName}&task=${taskFolderName}&taskName=${taskDisplayName}`;
         };
+        
         btnGroup.appendChild(btnDiag);
         const btnDel = document.createElement('button');
         btnDel.className = 'btn btn-del';

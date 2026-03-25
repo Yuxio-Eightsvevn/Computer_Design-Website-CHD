@@ -78,11 +78,13 @@ async def login(request: LoginRequest):
     username = request.username
     password = request.password
     
+    # 从数据库验证用户
     user = database.verify_user(username, password)
+    
     if not user:
         raise HTTPException(status_code=401, detail="用户名或密码错误")
     
-    # --- [新增：data.json 自动初始化钩子] ---
+    # --- [此处为您手动追加的 data.json 自动初始化钩子] ---
     user_root = Path(DATA_BATCH_STORAGE) / username
     user_root.mkdir(parents=True, exist_ok=True)
     index_path = user_root / "data.json"
@@ -94,10 +96,16 @@ async def login(request: LoginRequest):
             print(f"📄 已为用户 {username} 初始化任务索引文件")
         except Exception as e:
             print(f"⚠️ 初始化索引文件失败: {e}")
-    # ---------------------------------------
+    # ------------------------------------------------
 
     resp = JSONResponse({"data": user})
-    resp.set_cookie(key="username", value=user["username"], httponly=False, samesite="Lax", path="/")
+    resp.set_cookie(
+        key="username",
+        value=user["username"],
+        httponly=False,   # 最小改动，前端可读取 document.cookie
+        samesite="Lax",
+        path="/"
+    )
     return resp
 
 @app.post("/api/logout")
@@ -302,69 +310,61 @@ async def get_user_tasks(username: str):
 @app.get("/api/tasks/{username}/{task_folder}/patients")
 async def get_task_patients(username: str, task_folder: str):
     """
-    获取指定任务下的所有病人（数字命名的文件夹）
-    将视频按基础文件名分组，每组包含三个模态
+    [重构] 适配模型输出结构。
+    深入 processed/{task_folder}/{case_folder}/output_videos/ 和 output_data/
     """
-    task_path = Path(DATA_BATCH_STORAGE) / username / task_folder
+    # 路径解析：统一指向 processed 目录
+    task_path = Path(DATA_BATCH_STORAGE) / username / "processed" / task_folder
     
-    print(f"📂 正在查找任务路径: {task_path}")
+    print(f"📂 正在查找模型结果路径: {task_path}")
     
     # 检查任务文件夹是否存在
     if not task_path.exists():
-        print(f"❌ 任务文件夹不存在: {task_path}")
-        raise HTTPException(status_code=404, detail="任务文件夹不存在")
+        print(f"❌ 任务结果文件夹不存在: {task_path}")
+        raise HTTPException(status_code=404, detail="任务结果文件夹不存在")
     
     patients = []
     
-    # 遍历任务文件夹下的所有子文件夹
-    for patient_folder in task_path.iterdir():
-        print(f"  检查文件夹: {patient_folder.name}")
-        # 只处理病人文件夹（排除 tasks.json、.DS_Store 等文件，以及隐藏文件夹）
-        if patient_folder.is_dir() and not patient_folder.name.startswith('.'):
-            print(f"  ✅ 找到病人文件夹: {patient_folder.name}")
-            # 获取该病人文件夹下的所有MP4视频文件，并按基础文件名分组
+    # 遍历任务文件夹下的所有病例子文件夹 (case1, case2...)
+    for case_folder in task_path.iterdir():
+        print(f"  检查文件夹: {case_folder.name}")
+        if case_folder.is_dir() and not case_folder.name.startswith('.'):
+            print(f"  ✅ 找到病例文件夹: {case_folder.name}")
+            
             video_groups = {}  # {base_name: {modality: path}}
             
-            for video_file in patient_folder.iterdir():
-                if video_file.is_file() and video_file.suffix.lower() == '.mp4':
-                    filename = video_file.name
-                    print(f"    找到视频文件: {filename}")
-                    
-                    # 解析模态类型和基础文件名
-                    if filename.endswith('_heatmap.mp4'):
-                        base_name = filename[:-12]  # 去掉 _heatmap.mp4 (12个字符)
-                        modality = 'heatmap'
-                    elif filename.endswith('_bbox.mp4'):
-                        base_name = filename[:-9]  # 去掉 _bbox.mp4 (9个字符)
-                        modality = 'bbox'
-                    elif filename.endswith('_original.mp4'):
-                        base_name = filename[:-13]  # 去掉 _original.mp4 (13个字符)
-                        modality = 'original'
-                    else:
-                        # 其他视频，去掉 .mp4 后缀
-                        base_name = filename[:-4]  # 去掉 .mp4
-                        modality = 'original'
-                    
-                    print(f"      解析: base_name={base_name}, modality={modality}")
-                    
-                    # 初始化该基础文件名的组
-                    if base_name not in video_groups:
-                        video_groups[base_name] = {}
-                    
-                    # 添加该模态的视频
-                    video_groups[base_name][modality] = f"/videos/{username}/{task_folder}/{patient_folder.name}/{filename}"
+            # 深入 output_videos 寻找可视化 MP4
+            videos_dir = case_folder / "output_videos"
+            if videos_dir.exists():
+                for video_file in videos_dir.iterdir():
+                    if video_file.is_file() and video_file.suffix.lower() == '.mp4':
+                        filename = video_file.name
+                        print(f"    找到展示视频: {filename}")
+                        
+                        # 解析模态类型和基础文件名
+                        if filename.endswith('_heatmap.mp4'):
+                            base_name = filename[:-12]; modality = 'heatmap'
+                        elif filename.endswith('_bbox.mp4'):
+                            base_name = filename[:-9]; modality = 'bbox'
+                        elif filename.endswith('_original.mp4'):
+                            base_name = filename[:-13]; modality = 'original'
+                        else:
+                            base_name = filename[:-4]; modality = 'original'
+                        
+                        if base_name not in video_groups: video_groups[base_name] = {}
+                        
+                        # 生成供前端访问的 /data 路径
+                        video_groups[base_name][modality] = f"/data/{username}/processed/{task_folder}/{case_folder.name}/output_videos/{filename}"
             
-            print(f"    视频分组结果: {video_groups}")
-            
-            # 转换为列表格式
+            # 转换为列表格式并绑定 output_data 下的置信度文件
             videos = []
             for base_name in sorted(video_groups.keys()):
-                # 查找对应的metadata文件
+                # 寻找该病例的置信度文件 (output_data/confidence_scores.json)
                 metadata_path = None
-                json_file = patient_folder / f"{base_name}_metadata.json"
-                if json_file.exists():
-                    metadata_path = f"/videos/{username}/{task_folder}/{patient_folder.name}/{base_name}_metadata.json"
-                    print(f"      找到metadata文件: {json_file.name}")
+                conf_json = case_folder / "output_data" / "confidence_scores.json"
+                if conf_json.exists():
+                    metadata_path = f"/data/{username}/processed/{task_folder}/{case_folder.name}/output_data/confidence_scores.json"
+                    print(f"      找到置信度数据: {conf_json.name}")
                 
                 videos.append({
                     'baseName': base_name,
@@ -372,38 +372,35 @@ async def get_task_patients(username: str, task_folder: str):
                     'metadataPath': metadata_path
                 })
             
-            if videos:  # 只添加有视频的病人文件夹
+            if videos:
                 patients.append({
-                    'id': patient_folder.name,
+                    'id': case_folder.name,
                     'videos': videos
                 })
-                print(f"  ✅ 病人 {patient_folder.name} 添加成功，共 {len(videos)} 个视频组")
+                print(f"  ✅ 病例 {case_folder.name} 添加成功，共 {len(videos)} 个视频组")
             else:
-                print(f"  ⚠️ 病人文件夹 {patient_folder.name} 没有视频")
+                print(f"  ⚠️ 病例文件夹 {case_folder.name} 没有检测到输出视频")
     
-    # 按病人ID排序（智能排序：优先数字，然后字符串）
+    # 按病例ID智能排序 (保持原文逻辑)
     def sort_key(patient):
         patient_id = patient['id']
-        # 尝试提取ID中的数字部分进行排序
         import re
-        # 提取第一个数字序列
         match = re.search(r'\d+', patient_id)
         if match:
-            # 如果有数字，按数字排序，数字相同则按完整字符串排序
             return (0, int(match.group()), patient_id)
         else:
-            # 如果没有数字，按字符串排序，放在最后
             return (1, 0, patient_id)
     
     patients.sort(key=sort_key)
     
-    print(f"🎬 最终返回 {len(patients)} 个病人")
-    print(f"返回数据: {patients}")
-    
+    print(f"🎬 最终返回 {len(patients)} 个病例对象")
     return {"data": patients}
 
 # 提供视频文件访问
 app.mount("/videos", StaticFiles(directory=DATA_BATCH_STORAGE), name="videos")
+
+# [重点新增] 提供全局数据访问权，支持 3D PNG 序列帧的访问
+app.mount("/data", StaticFiles(directory=DATA_BATCH_STORAGE), name="data")
 
 
 # JSON格式提交诊断结果的请求模型
@@ -420,30 +417,30 @@ class DiagnosisSubmitJsonRequest(BaseModel):
     patientCount: int
     records: List[DiagnosisRecordSimple]
 
-# 提交诊断结果（JSON格式）
+# 提交诊断结果（重构保存路径）
 @app.post("/api/diagnosis/submit-json")
 async def submit_diagnosis_json(request: DiagnosisSubmitJsonRequest):
     """
-    提交诊断结果并保存为JSON文件
+    提交诊断结论并保存在对应的 processed 结果文件夹中。
     """
     try:
-        # 构建保存路径
-        task_path = Path(DATA_BATCH_STORAGE) / request.username / request.taskFolder
+        # 修改保存路径，使其归档在处理后的 processed 文件夹内
+        task_path = Path(DATA_BATCH_STORAGE) / request.username / "processed" / request.taskFolder
         
         if not task_path.exists():
-            raise HTTPException(status_code=404, detail="任务文件夹不存在")
+            task_path.mkdir(parents=True, exist_ok=True)
         
         # 生成时间戳
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         
-        # 保存JSON格式文件
-        json_filename = f"diagnosis_results_{timestamp}.json"
+        # 结果文件名
+        json_filename = f"final_diagnosis_report_{timestamp}.json"
         json_path = task_path / json_filename
         
         with open(json_path, 'w', encoding='utf-8') as jsonfile:
             json.dump(request.dict(), jsonfile, ensure_ascii=False, indent=2)
         
-        print(f"✅ JSON诊断结果已保存: {json_path}")
+        print(f"✅ 诊断结论已在结果区归档: {json_path}")
         
         return {
             "message": "诊断结果提交成功",
@@ -650,4 +647,3 @@ async def serve_task_status():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
-    
