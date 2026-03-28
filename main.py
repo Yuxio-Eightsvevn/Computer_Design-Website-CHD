@@ -20,6 +20,10 @@ from fastapi.responses import JSONResponse
 # 数据存储目录
 DATA_BATCH_STORAGE = "data_batch_storage"
 
+# [新增] 教育模式系统根目录
+SYSTEM_EDU_DIR = Path(DATA_BATCH_STORAGE) / "SYSTEM" / "edu_data"
+RESULT_STORAGE_DIR = SYSTEM_EDU_DIR / "Doctor_Diag_Result"
+
 # 系统初始化
 def init_system():
     """初始化系统"""
@@ -29,6 +33,14 @@ def init_system():
     # 创建主存储目录
     storage_path = Path(DATA_BATCH_STORAGE)
     storage_path.mkdir(exist_ok=True)
+
+    # 2. [重点新增] 初始化教育模式空间
+    RESULT_STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+    edu_index = SYSTEM_EDU_DIR / "data.json"
+    if not edu_index.exists():
+        with open(edu_index, "w", encoding="utf-8") as f:
+            json.dump({"tasks": []}, f, ensure_ascii=False, indent=2)
+    print(f"🏛️ 系统空间已就绪: {SYSTEM_EDU_DIR}")
     
     # 为所有用户创建文件夹
     users = database.get_all_users()

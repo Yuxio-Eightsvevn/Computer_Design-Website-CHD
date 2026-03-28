@@ -187,6 +187,10 @@ def get_user_by_username(username: str) -> Optional[Dict]:
 # [改动] 增加 is_admin 参数，默认为 False (即 0)
 def create_user(username: str, password: str, doctor: str, organization: str, is_admin: bool = False) -> bool:
     """创建新用户"""
+    # [核心加固] 禁止注册系统保留名
+    if username.upper() == "SYSTEM":
+        print(f"🚫 拦截：禁止创建保留用户名 {username}")
+        return False
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -264,6 +268,8 @@ def delete_user(user_id: int) -> bool:
 
 def check_username_exists(username: str, exclude_id: Optional[int] = None) -> bool:
     """检查用户名是否已存在"""
+    if username.upper() == "SYSTEM":
+        return True
     conn = get_db_connection()
     cursor = conn.cursor()
 
