@@ -84,7 +84,7 @@ async def login(request: LoginRequest):
     if not user:
         raise HTTPException(status_code=401, detail="用户名或密码错误")
     
-    # --- [此处为您手动追加的 data.json 自动初始化钩子] ---
+    # --- [新增：data.json 自动初始化钩子] ---
     user_root = Path(DATA_BATCH_STORAGE) / username
     user_root.mkdir(parents=True, exist_ok=True)
     index_path = user_root / "data.json"
@@ -96,7 +96,7 @@ async def login(request: LoginRequest):
             print(f"📄 已为用户 {username} 初始化任务索引文件")
         except Exception as e:
             print(f"⚠️ 初始化索引文件失败: {e}")
-    # ------------------------------------------------
+    # ---------------------------------------
 
     resp = JSONResponse({"data": user})
     resp.set_cookie(
@@ -306,100 +306,92 @@ async def get_user_tasks(username: str):
     
     return {"data": tasks}
 
-# 获取任务下的病人列表
+# --- [重写：通过智慧适配解决 404 问题] ---
+
 @app.get("/api/tasks/{username}/{task_folder}/patients")
 async def get_task_patients(username: str, task_folder: str):
     """
-    [重构] 适配模型输出结构。
-    深入 processed/{task_folder}/{case_folder}/output_videos/ 和 output_data/
+    [重构] 获取病例列表。
+    适配逻辑：解决前端传“长名”而磁盘只有“短ID”导致的 404。
     """
-    # 路径解析：统一指向 processed 目录
-    task_path = Path(DATA_BATCH_STORAGE) / username / "processed" / task_folder
+    proc_root = Path(DATA_BATCH_STORAGE) / username / "processed"
+    task_path = None
+    final_task_id = task_folder # 记录最终生效的文件夹名
+
+    # 1. 智慧寻址：尝试多种组合匹配物理文件夹
+    possible_paths = [
+        proc_root / task_folder, # processed/ID
+        Path(DATA_BATCH_STORAGE) / username / task_folder, # root/ID
+    ]
     
-    print(f"📂 正在查找模型结果路径: {task_path}")
-    
-    # 检查任务文件夹是否存在
-    if not task_path.exists():
-        print(f"❌ 任务结果文件夹不存在: {task_path}")
-        raise HTTPException(status_code=404, detail="任务结果文件夹不存在")
-    
+    # 尝试直接匹配
+    for p in possible_paths:
+        if p.exists():
+            task_path = p
+            break
+            
+    # [核心修复] 如果直接匹配不到，尝试扫描 processed 目录进行“长短名”模糊匹配
+    if not task_path and proc_root.exists():
+        print(f"🔍 正在执行长短名模糊匹配: 目标是 {task_folder}")
+        for sub_dir in proc_root.iterdir():
+            if sub_dir.is_dir() and (sub_dir.name in task_folder or task_folder in sub_dir.name):
+                task_path = sub_dir
+                final_task_id = sub_dir.name
+                print(f"🎯 模糊匹配成功：找到物理文件夹 {sub_dir.name}")
+                break
+
+    if not task_path:
+        print(f"❌ 404 彻底找不到：{task_folder}")
+        raise HTTPException(status_code=404, detail="找不到任务文件夹")
+
     patients = []
     
-    # 遍历任务文件夹下的所有病例子文件夹 (case1, case2...)
+    # 2. 扫描病例文件夹
     for case_folder in task_path.iterdir():
-        print(f"  检查文件夹: {case_folder.name}")
         if case_folder.is_dir() and not case_folder.name.startswith('.'):
-            print(f"  ✅ 找到病例文件夹: {case_folder.name}")
+            print(f"  ✅ 发现病例: {case_folder.name}")
+            video_groups = {}
             
-            video_groups = {}  # {base_name: {modality: path}}
-            
-            # 深入 output_videos 寻找可视化 MP4
+            # 进入 output_videos 扫描 MP4
             videos_dir = case_folder / "output_videos"
             if videos_dir.exists():
-                for video_file in videos_dir.iterdir():
-                    if video_file.is_file() and video_file.suffix.lower() == '.mp4':
-                        filename = video_file.name
-                        print(f"    找到展示视频: {filename}")
-                        
-                        # 解析模态类型和基础文件名
-                        if filename.endswith('_heatmap.mp4'):
-                            base_name = filename[:-12]; modality = 'heatmap'
-                        elif filename.endswith('_bbox.mp4'):
-                            base_name = filename[:-9]; modality = 'bbox'
-                        elif filename.endswith('_original.mp4'):
-                            base_name = filename[:-13]; modality = 'original'
-                        else:
-                            base_name = filename[:-4]; modality = 'original'
+                for v_file in videos_dir.iterdir():
+                    if v_file.suffix.lower() == '.mp4':
+                        fn = v_file.name
+                        if fn.endswith('_heatmap.mp4'): base_name = fn[:-12]; m = 'heatmap'
+                        elif fn.endswith('_bbox.mp4'): base_name = fn[:-9]; m = 'bbox'
+                        elif fn.endswith('_original.mp4'): base_name = fn[:-13]; m = 'original'
+                        else: base_name = fn[:-4]; m = 'original'
                         
                         if base_name not in video_groups: video_groups[base_name] = {}
                         
-                        # 生成供前端访问的 /data 路径
-                        video_groups[base_name][modality] = f"/data/{username}/processed/{task_folder}/{case_folder.name}/output_videos/{filename}"
+                        # 生成 URL 路径
+                        sub_route = "processed" if "processed" in str(task_path) else ""
+                        rel_url = f"/data/{username}/{sub_route}/{final_task_id}/{case_folder.name}/output_videos/{fn}".replace("//", "/")
+                        video_groups[base_name][m] = rel_url
+
+            # 关联置信度
+            videos_list = []
+            conf_rel = f"/data/{username}/{'processed' if 'processed' in str(task_path) else ''}/{final_task_id}/{case_folder.name}/output_data/confidence_scores.json".replace("//", "/")
+            metadata_url = conf_rel if (case_folder / "output_data" / "confidence_scores.json").exists() else None
+
+            for bn in sorted(video_groups.keys()):
+                videos_list.append({'baseName': bn, 'modalities': video_groups[bn], 'metadataPath': metadata_url})
             
-            # 转换为列表格式并绑定 output_data 下的置信度文件
-            videos = []
-            for base_name in sorted(video_groups.keys()):
-                # 寻找该病例的置信度文件 (output_data/confidence_scores.json)
-                metadata_path = None
-                conf_json = case_folder / "output_data" / "confidence_scores.json"
-                if conf_json.exists():
-                    metadata_path = f"/data/{username}/processed/{task_folder}/{case_folder.name}/output_data/confidence_scores.json"
-                    print(f"      找到置信度数据: {conf_json.name}")
-                
-                videos.append({
-                    'baseName': base_name,
-                    'modalities': video_groups[base_name],
-                    'metadataPath': metadata_path
-                })
-            
-            if videos:
-                patients.append({
-                    'id': case_folder.name,
-                    'videos': videos
-                })
-                print(f"  ✅ 病例 {case_folder.name} 添加成功，共 {len(videos)} 个视频组")
-            else:
-                print(f"  ⚠️ 病例文件夹 {case_folder.name} 没有检测到输出视频")
-    
-    # 按病例ID智能排序 (保持原文逻辑)
-    def sort_key(patient):
-        patient_id = patient['id']
+            if videos_list:
+                patients.append({'id': case_folder.name, 'videos': videos_list})
+
+    def sort_key(p):
         import re
-        match = re.search(r'\d+', patient_id)
-        if match:
-            return (0, int(match.group()), patient_id)
-        else:
-            return (1, 0, patient_id)
+        match = re.search(r'\d+', p['id'])
+        return (0, int(match.group()), p['id']) if match else (1, 0, p['id'])
     
     patients.sort(key=sort_key)
-    
-    print(f"🎬 最终返回 {len(patients)} 个病例对象")
     return {"data": patients}
 
-# 提供视频文件访问
-app.mount("/videos", StaticFiles(directory=DATA_BATCH_STORAGE), name="videos")
 
-# [重点新增] 提供全局数据访问权，支持 3D PNG 序列帧的访问
+# 提供资源访问
+app.mount("/videos", StaticFiles(directory=DATA_BATCH_STORAGE), name="videos")
 app.mount("/data", StaticFiles(directory=DATA_BATCH_STORAGE), name="data")
 
 
@@ -417,42 +409,36 @@ class DiagnosisSubmitJsonRequest(BaseModel):
     patientCount: int
     records: List[DiagnosisRecordSimple]
 
-# 提交诊断结果（重构保存路径）
+# 提交诊断结果（自适应路径）
 @app.post("/api/diagnosis/submit-json")
 async def submit_diagnosis_json(request: DiagnosisSubmitJsonRequest):
-    """
-    提交诊断结论并保存在对应的 processed 结果文件夹中。
-    """
     try:
-        # 修改保存路径，使其归档在处理后的 processed 文件夹内
-        task_path = Path(DATA_BATCH_STORAGE) / request.username / "processed" / request.taskFolder
+        proc_path = Path(DATA_BATCH_STORAGE) / request.username / "processed" / request.taskFolder
+        root_path = Path(DATA_BATCH_STORAGE) / request.username / request.taskFolder
         
-        if not task_path.exists():
-            task_path.mkdir(parents=True, exist_ok=True)
+        # 同样执行智慧寻址，确保存储位置正确
+        task_path = proc_path if proc_path.exists() else root_path
         
-        # 生成时间戳
+        # 如果还是找不到，尝试模糊寻找
+        if not task_path.exists() and (Path(DATA_BATCH_STORAGE) / request.username / "processed").exists():
+            for d in (Path(DATA_BATCH_STORAGE) / request.username / "processed").iterdir():
+                if d.is_dir() and (d.name in request.taskFolder or request.taskFolder in d.name):
+                    task_path = d
+                    break
+
+        if not task_path.exists(): task_path.mkdir(parents=True, exist_ok=True)
+        
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        
-        # 结果文件名
         json_filename = f"final_diagnosis_report_{timestamp}.json"
         json_path = task_path / json_filename
         
         with open(json_path, 'w', encoding='utf-8') as jsonfile:
             json.dump(request.dict(), jsonfile, ensure_ascii=False, indent=2)
         
-        print(f"✅ 诊断结论已在结果区归档: {json_path}")
-        
-        return {
-            "message": "诊断结果提交成功",
-            "filename": json_filename,
-            "path": str(json_path)
-        }
-        
+        print(f"✅ 诊断已保存: {json_path}")
+        return {"message": "成功", "filename": json_filename}
     except Exception as e:
-        print(f"❌ 保存诊断结果失败: {e}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"保存失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # 上传任务文件夹（接收zip压缩包）
 @app.post("/api/users/{username}/upload-task")
@@ -519,13 +505,16 @@ async def get_user_result_files(username: str):
                     'filename': json_file.name,
                     'taskFolder': task_folder.name,
                     'size': json_file.stat().st_size,
-                    'modifiedTime': datetime.fromtimestamp(json_file.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
+                    'modifiedTime': datetime.timestamp(json_file.stat().st_mtime), # 保持原始数值
                     'downloadUrl': f"/api/users/{username}/download-result/{task_folder.name}/{json_file.name}"
                 })
     
-    # 按修改时间倒序排列
+    # 排序
     result_files.sort(key=lambda x: x['modifiedTime'], reverse=True)
-    
+    # 格式化时间供显示
+    for r in result_files:
+        r['modifiedTime'] = datetime.fromtimestamp(r['modifiedTime']).strftime("%Y-%m-%d %H:%M:%S")
+        
     return {"data": result_files}
 
 # 下载JSON结果文件
@@ -624,7 +613,6 @@ async def serve_admin():
 
 @app.get("/diagnosis")
 async def serve_diagnosis():
-
     return FileResponse("diagnosis.html")
 
 
@@ -640,8 +628,6 @@ async def root():
 async def serve_task_status():
     """返回任务状态进度页面"""
     return FileResponse("task_status.html")
-
-
 
 
 if __name__ == "__main__":

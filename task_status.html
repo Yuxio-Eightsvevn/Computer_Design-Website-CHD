@@ -209,17 +209,17 @@
       btnInfo.onclick = () => showTaskDetail(task);
       btnGroup.appendChild(btnInfo);
       if (isFinished) {
+        // 按钮 2: 进入判读
         const btnDiag = document.createElement('button');
         btnDiag.className = 'btn btn-diag';
         btnDiag.textContent = '进入判读';
         
-        // [核心对接修改] 对齐 diagnosis.html 的 URL 参数需求
         btnDiag.onclick = () => {
             const userName = encodeURIComponent(currentUser.username);
-            const taskFolderName = encodeURIComponent(`${task.request_name}_${task.submission_id}`);
+            // [核心修复] 跳转时 task 参数必须严格等于 submission_id，这才是文件夹的真实名称
+            const taskFolderName = encodeURIComponent(task.submission_id);
             const taskDisplayName = encodeURIComponent(task.request_name);
             
-            // 构建跳转 URL
             window.location.href = `/diagnosis?username=${userName}&task=${taskFolderName}&taskName=${taskDisplayName}`;
         };
         
