@@ -13,6 +13,7 @@ import json
 from datetime import datetime
 import shutil
 import zipfile
+import re  # 确保正则模块可用
 from fastapi.responses import JSONResponse
 
 
@@ -306,31 +307,29 @@ async def get_user_tasks(username: str):
     
     return {"data": tasks}
 
-# --- [重写：通过智慧适配解决 404 问题] ---
+# --- [重点重构：智慧适配、归组逻辑与元数据对齐] ---
 
 @app.get("/api/tasks/{username}/{task_folder}/patients")
 async def get_task_patients(username: str, task_folder: str):
     """
-    [重构] 获取病例列表。
-    适配逻辑：解决前端传“长名”而磁盘只有“短ID”导致的 404。
+    [重构版] 获取病例列表。
+    适配逻辑：使用正则剥离后缀进行完美归组，并将 metadataPath 指向动态适配接口。
     """
     proc_root = Path(DATA_BATCH_STORAGE) / username / "processed"
     task_path = None
-    final_task_id = task_folder # 记录最终生效的文件夹名
+    final_task_id = task_folder 
 
-    # 1. 智慧寻址：尝试多种组合匹配物理文件夹
+    # 1. 智慧寻址 (支持长短名模糊匹配)
     possible_paths = [
-        proc_root / task_folder, # processed/ID
-        Path(DATA_BATCH_STORAGE) / username / task_folder, # root/ID
+        proc_root / task_folder, 
+        Path(DATA_BATCH_STORAGE) / username / task_folder, 
     ]
     
-    # 尝试直接匹配
     for p in possible_paths:
         if p.exists():
             task_path = p
             break
             
-    # [核心修复] 如果直接匹配不到，尝试扫描 processed 目录进行“长短名”模糊匹配
     if not task_path and proc_root.exists():
         print(f"🔍 正在执行长短名模糊匹配: 目标是 {task_folder}")
         for sub_dir in proc_root.iterdir():
@@ -350,33 +349,44 @@ async def get_task_patients(username: str, task_folder: str):
     for case_folder in task_path.iterdir():
         if case_folder.is_dir() and not case_folder.name.startswith('.'):
             print(f"  ✅ 发现病例: {case_folder.name}")
-            video_groups = {}
+            video_groups = {}  # {base_name: {modality: path}}
             
-            # 进入 output_videos 扫描 MP4
+            # 进入 output_videos 扫描 MP4 并使用正则归组
             videos_dir = case_folder / "output_videos"
             if videos_dir.exists():
                 for v_file in videos_dir.iterdir():
-                    if v_file.suffix.lower() == '.mp4':
+                    if v_file.is_file() and v_file.suffix.lower() == '.mp4':
                         fn = v_file.name
-                        if fn.endswith('_heatmap.mp4'): base_name = fn[:-12]; m = 'heatmap'
-                        elif fn.endswith('_bbox.mp4'): base_name = fn[:-9]; m = 'bbox'
-                        elif fn.endswith('_original.mp4'): base_name = fn[:-13]; m = 'original'
-                        else: base_name = fn[:-4]; m = 'original'
+                        # 使用正则精准识别后缀并剥离出共同的 baseName
+                        m_match = re.search(r'_(heatmap|bbox|original)\.mp4$', fn, re.IGNORECASE)
+                        if m_match:
+                            modality = m_match.group(1).lower()
+                            base_name = fn[:m_match.start()]
+                        else:
+                            modality = 'original'; base_name = v_file.stem
                         
                         if base_name not in video_groups: video_groups[base_name] = {}
                         
                         # 生成 URL 路径
                         sub_route = "processed" if "processed" in str(task_path) else ""
                         rel_url = f"/data/{username}/{sub_route}/{final_task_id}/{case_folder.name}/output_videos/{fn}".replace("//", "/")
-                        video_groups[base_name][m] = rel_url
+                        video_groups[base_name][modality] = rel_url
 
-            # 关联置信度
+            # 3. 关联置信度元数据 (指向动态适配接口)
             videos_list = []
-            conf_rel = f"/data/{username}/{'processed' if 'processed' in str(task_path) else ''}/{final_task_id}/{case_folder.name}/output_data/confidence_scores.json".replace("//", "/")
-            metadata_url = conf_rel if (case_folder / "output_data" / "confidence_scores.json").exists() else None
-
             for bn in sorted(video_groups.keys()):
-                videos_list.append({'baseName': bn, 'modalities': video_groups[bn], 'metadataPath': metadata_url})
+                abs_conf_path = case_folder / "output_data" / "confidence_scores.json"
+                metadata_url = None
+                if abs_conf_path.exists():
+                    # 指向中转接口以适配格式
+                    metadata_url = f"/api/get-metadata?path={username}/{'processed/' if 'processed' in str(task_path) else ''}{final_task_id}/{case_folder.name}/output_data/confidence_scores.json"
+                    metadata_url = metadata_url.replace("//", "/")
+
+                group = video_groups[bn]
+                # 质量守卫
+                if 'original' not in group and group: group['original'] = list(group.values())[0]
+                
+                videos_list.append({'baseName': bn, 'modalities': group, 'metadataPath': metadata_url})
             
             if videos_list:
                 patients.append({'id': case_folder.name, 'videos': videos_list})
@@ -389,6 +399,18 @@ async def get_task_patients(username: str, task_folder: str):
     patients.sort(key=sort_key)
     return {"data": patients}
 
+# --- [新增：元数据格式适配接口] ---
+@app.get("/api/get-metadata")
+async def get_metadata(path: str):
+    """读取原始 JSON 并在内存中包上一层 confidence_scores 外壳以适配前端"""
+    file_path = Path(DATA_BATCH_STORAGE) / path
+    if not file_path.exists(): raise HTTPException(status_code=404)
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            raw_data = json.load(f)
+        return raw_data if "confidence_scores" in raw_data else {"confidence_scores": raw_data}
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+
 
 # 提供资源访问
 app.mount("/videos", StaticFiles(directory=DATA_BATCH_STORAGE), name="videos")
@@ -399,7 +421,7 @@ app.mount("/data", StaticFiles(directory=DATA_BATCH_STORAGE), name="data")
 class DiagnosisRecordSimple(BaseModel):
     patientId: str
     diagnosis: str
-    severity: int
+    severity: Optional[int] = None
 
 class DiagnosisSubmitJsonRequest(BaseModel):
     username: str
@@ -409,22 +431,18 @@ class DiagnosisSubmitJsonRequest(BaseModel):
     patientCount: int
     records: List[DiagnosisRecordSimple]
 
-# 提交诊断结果（自适应路径）
+# 提交诊断结果（支持智慧寻址）
 @app.post("/api/diagnosis/submit-json")
 async def submit_diagnosis_json(request: DiagnosisSubmitJsonRequest):
     try:
         proc_path = Path(DATA_BATCH_STORAGE) / request.username / "processed" / request.taskFolder
         root_path = Path(DATA_BATCH_STORAGE) / request.username / request.taskFolder
-        
-        # 同样执行智慧寻址，确保存储位置正确
         task_path = proc_path if proc_path.exists() else root_path
         
-        # 如果还是找不到，尝试模糊寻找
         if not task_path.exists() and (Path(DATA_BATCH_STORAGE) / request.username / "processed").exists():
             for d in (Path(DATA_BATCH_STORAGE) / request.username / "processed").iterdir():
                 if d.is_dir() and (d.name in request.taskFolder or request.taskFolder in d.name):
-                    task_path = d
-                    break
+                    task_path = d; break
 
         if not task_path.exists(): task_path.mkdir(parents=True, exist_ok=True)
         
@@ -433,7 +451,9 @@ async def submit_diagnosis_json(request: DiagnosisSubmitJsonRequest):
         json_path = task_path / json_filename
         
         with open(json_path, 'w', encoding='utf-8') as jsonfile:
-            json.dump(request.dict(), jsonfile, ensure_ascii=False, indent=2)
+            # 兼容处理
+            data_to_save = request.model_dump() if hasattr(request, 'model_dump') else request.dict()
+            json.dump(data_to_save, jsonfile, ensure_ascii=False, indent=2)
         
         print(f"✅ 诊断已保存: {json_path}")
         return {"message": "成功", "filename": json_filename}
@@ -593,6 +613,38 @@ async def batch_download(request: BatchDownloadRequest):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"批量下载失败: {str(e)}")
 
+
+@app.get("/api/tasks/{username}/{submission_id}/download-info")
+async def get_task_download_info(username: str, submission_id: str):
+    # 路径锁定：data_batch_storage/{user}/processed/{id}
+    task_dir = Path(DATA_BATCH_STORAGE) / username / "processed" / submission_id
+    if not task_dir.exists():
+        raise HTTPException(status_code=404, detail="任务结果文件夹尚未生成")
+
+    # 1. 搜寻最新的医师判读报告 (支持模糊搜索)
+    reports = list(task_dir.glob("final_diagnosis_report_*.json"))
+    latest_report = None
+    if reports:
+        latest_file = max(reports, key=lambda p: p.stat().st_mtime)
+        latest_report = {
+            "name": latest_file.name,
+            "url": f"/data/{username}/processed/{submission_id}/{latest_file.name}",
+            "time": datetime.fromtimestamp(latest_file.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+        }
+
+    # 2. 搜寻模型结果压缩包 (case_name/output_data.zip)
+    model_zips = []
+    for case_folder in task_dir.iterdir():
+        if case_folder.is_dir() and not case_folder.name.startswith('.'):
+            # [核心修复] 检查 case_folder 根目录下的 output_data.zip
+            zip_path = case_folder / "output_data.zip"
+            if zip_path.exists():
+                model_zips.append({
+                    "case_id": case_folder.name,
+                    "url": f"/data/{username}/processed/{submission_id}/{case_folder.name}/output_data.zip"
+                })
+    
+    return {"doctor_report": latest_report, "model_results": model_zips}
 
 # 静态文件路由
 @app.get("/video_3d_modal.js")

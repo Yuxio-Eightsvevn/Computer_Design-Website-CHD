@@ -115,7 +115,7 @@
     </div>
   </div>
 
-  <!-- [新增] 弹窗 HTML -->
+  <!-- [通用详情弹窗] -->
   <div id="modalOverlay" class="modal-overlay" onclick="closeModal()">
     <div class="modal-card" onclick="event.stopPropagation()">
       <div class="modal-header">
@@ -124,6 +124,18 @@
       </div>
       <div id="modalContent"></div>
       <button onclick="closeModal()" class="btn btn-info" style="width:100%; margin-top:10px; background:#667eea; color:white">关闭</button>
+    </div>
+  </div>
+
+  <!-- [新增：结果下载弹窗] -->
+  <div id="downloadOverlay" class="modal-overlay" onclick="closeDownloadModal()">
+    <div class="modal-card" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h3 style="margin:0; color:#1e293b">📥 结果下载中心</h3>
+        <button onclick="closeDownloadModal()" style="border:none; background:none; cursor:pointer; font-size:24px; color:#94a3b8">&times;</button>
+      </div>
+      <div id="downloadContent"></div>
+      <button onclick="closeDownloadModal()" class="btn btn-info" style="width:100%; margin-top:10px; background:#94a3b8; color:white">关闭</button>
     </div>
   </div>
 
@@ -189,6 +201,52 @@
       document.getElementById('modalOverlay').style.display = 'none';
     }
 
+    // [新增：下载中心逻辑]
+    async function openDownloadModal(task) {
+        const container = document.getElementById('downloadContent');
+        container.innerHTML = '<p style="text-align:center; padding:20px; color:#64748b;">正在检索文件列表...</p>';
+        document.getElementById('downloadOverlay').style.display = 'flex';
+
+        try {
+            const r = await fetch(`/api/tasks/${encodeURIComponent(currentUser.username)}/${task.submission_id}/download-info`);
+            const data = await r.json();
+
+            let html = `<div style="margin-bottom:20px">
+                <p class="detail-label" style="margin-bottom:10px; border-left:4px solid #10b981; padding-left:8px;">👨‍⚕️ 医师判读结论报告</p>`;
+            
+            if (data.doctor_report) {
+                html += `<div class="row-card" style="padding:12px; margin-bottom:5px; background:#f0fdf4; border-color:#bbf7d0">
+                    <div style="flex:1; font-size:13px; color:#166534">
+                        <strong>结论 JSON 文件</strong><br/><span style="font-size:11px; color:#15803d">生成于: ${data.doctor_report.time}</span>
+                    </div>
+                    <a href="${data.doctor_report.url}" download class="btn btn-diag" style="text-decoration:none">下载</a>
+                </div>`;
+            } else {
+                html += `<p style="font-size:13px; color:#94a3b8; padding:10px; background:#f8fafc; border-radius:8px; text-align:center;">尚未提交医师判读结论</p>`;
+            }
+
+            html += `</div><div><p class="detail-label" style="margin-bottom:10px; border-left:4px solid #6366f1; padding-left:8px;">🤖 模型处理原始数据 (ZIP)</p>
+                     <div style="max-height:200px; overflow-y:auto; padding-right:5px">`;
+            
+            if (data.model_results && data.model_results.length > 0) {
+                data.model_results.forEach(z => {
+                    html += `<div class="row-card" style="padding:10px; margin-bottom:5px; background:#f8fafc">
+                        <span style="font-size:13px; color:#475569">病例: ${z.case_id}</span>
+                        <a href="${z.url}" download class="btn btn-info" style="text-decoration:none; background:#6366f1; color:white">下载包</a>
+                    </div>`;
+                });
+            } else {
+                html += `<p style="font-size:13px; color:#94a3b8; text-align:center; padding:10px;">未发现模型输出包</p>`;
+            }
+            html += `</div></div>`;
+            container.innerHTML = html;
+        } catch (e) { container.innerHTML = '<p style="color:#ef4444; text-align:center; padding:20px;">获取下载信息失败</p>'; }
+    }
+
+    function closeDownloadModal() {
+        document.getElementById('downloadOverlay').style.display = 'none';
+    }
+
     function createTaskRow(task, isFinished) {
       const row = document.createElement('div');
       row.className = 'row-card';
@@ -208,7 +266,16 @@
       btnInfo.textContent = '查看详情';
       btnInfo.onclick = () => showTaskDetail(task);
       btnGroup.appendChild(btnInfo);
+      
       if (isFinished) {
+        // [新增：结果下载按钮]
+        const btnDown = document.createElement('button');
+        btnDown.className = 'btn btn-info';
+        btnDown.style.background = '#6366f1'; btnDown.style.color = 'white';
+        btnDown.textContent = '结果下载';
+        btnDown.onclick = () => openDownloadModal(task);
+        btnGroup.appendChild(btnDown);
+
         // 按钮 2: 进入判读
         const btnDiag = document.createElement('button');
         btnDiag.className = 'btn btn-diag';
@@ -216,11 +283,10 @@
         
         btnDiag.onclick = () => {
             const userName = encodeURIComponent(currentUser.username);
-            // [核心修复] 跳转时 task 参数必须严格等于 submission_id，这才是文件夹的真实名称
             const taskFolderName = encodeURIComponent(task.submission_id);
             const taskDisplayName = encodeURIComponent(task.request_name);
-            
-            window.location.href = `/diagnosis?username=${userName}&task=${taskFolderName}&taskName=${taskDisplayName}`;
+            // 带上 mode=diag 以供适配
+            window.location.href = `/diagnosis?username=${userName}&task=${taskFolderName}&taskName=${taskDisplayName}&mode=diag`;
         };
         
         btnGroup.appendChild(btnDiag);

@@ -1184,6 +1184,7 @@
 
     <script>
         let userData = null;
+        let currentMode = 'diag'; // [核心修复] 将变量提升至全局，默认为判读模式
         let video3DViewer = null; // 3D查看器实例
         let currentSeverity = null;
         let timerInterval = null;
@@ -1335,6 +1336,7 @@
         window.addEventListener('DOMContentLoaded', async () => {
             // 获取URL参数
             const urlParams = new URLSearchParams(window.location.search);
+            currentMode = urlParams.get('mode') || 'diag'; // 默认为判读模式
             taskInfo.username = urlParams.get('username');
             taskInfo.taskFolder = urlParams.get('task');
             taskInfo.taskName = urlParams.get('taskName') || '诊断任务';
@@ -1353,6 +1355,22 @@
                 }
                 keysToRemove.forEach(k => sessionStorage.removeItem(k));
                 console.log('✅ 已清除所有草稿');
+            }
+            // [新增] 模式 UI 适配逻辑
+            if (currentMode === 'diag') {
+                // 隐藏计时器区块
+                const timerBox = document.querySelector('.timer-button-container');
+                if (timerBox) timerBox.style.display = 'none';
+                
+                // 隐藏诊断标准等级选择触发器
+                const standardTrigger = document.querySelector('.diagnosis-standard-trigger');
+                if (standardTrigger) standardTrigger.style.display = 'none';
+                
+                // 隐藏可能已经存在的选中显示
+                const currentSel = document.getElementById('currentSelection');
+                if (currentSel) currentSel.style.display = 'none';
+
+                console.log("🎨 当前处于：判读模式，已简化 UI");
             }
             
             // 检查必要参数
@@ -1916,11 +1934,16 @@
         }
 
         // 选择诊断选项
-        function selectOption(element, group) {
+function selectOption(element, group) {
             const buttons = element.parentElement.querySelectorAll('.option-btn');
             buttons.forEach(btn => btn.classList.remove('active'));
             element.classList.add('active');
             
+            // [新增] 如果是在判读模式下选择临床结论，立即触发静默保存以更新进度
+            if (group === 'diagnosis' && currentMode === 'diag') {
+                saveCurrentDiagnosisQuietly();
+            }
+
             // 如果是模态切换，重新加载视频
             if (group === 'modality') {
                 const modalityText = element.textContent.trim();
@@ -2006,9 +2029,10 @@
         }
 
         // 下一个病人
+        // 导航：切换至下一个病人
         function nextVideo() {
             if (currentPatientIndex < patients.length - 1) {
-                // 验证表单：必须填写临床判断和诊断意见
+                // 1. 验证基础表单：必须填写临床判断（Normal/VSD/ASD/PDA）
                 const diagnosisGroup = document.querySelectorAll('.diagnosis-group')[1];
                 const selectedDiagnosis = diagnosisGroup.querySelector('.option-btn.active');
                 
@@ -2017,23 +2041,33 @@
                     return;
                 }
                 
-                if (!currentSeverity) {
-                    alert('请选择诊断意见后再切换病人！');
+                // 2. [核心适配] 模式化校验：
+                // 仅在非判读模式（即教育模式）下，才强制要求填写诊断意见等级
+                if (currentMode !== 'diag' && !currentSeverity) {
+                    alert('请选择诊断意见等级后再切换病人！');
                     return;
                 }
                 
-                // 保存当前病人的诊断（使用带提示的版本，确保保存成功）
+                // 3. 保存当前病人的诊断记录
+                // 该函数内部现在已经适配了 currentMode，确保能正确处理 severity 字段
                 if (!saveCurrentDiagnosis()) {
                     return;
                 }
                 
-                // 重置模态为"普通"（只改UI和变量，不加载视频）
+                // 4. 执行界面切换与数据加载
+                // 重置视图模态为"普通"
                 resetModalityToOriginal(false);
                 
-                // 切换到下一个病人（会自动加载视频）
+                // 切换到下一个病人索引并加载视频
                 loadPatientVideos(currentPatientIndex + 1);
+                
+                // 更新顶部进度条统计
                 updateProgressText();
+                
+                // 自动保存草稿至 sessionStorage
                 saveDraft('nextVideo');
+                
+                console.log(`➡️ 已成功切换至病人: ${patients[currentPatientIndex].id}`);
             } else {
                 alert('已经是最后一个病人了');
             }
@@ -2131,7 +2165,8 @@
             const diagnosisGroup = document.querySelectorAll('.diagnosis-group')[1]; // 临床判断组
             const selectedDiagnosis = diagnosisGroup.querySelector('.option-btn.active');
             
-            if (!selectedDiagnosis || !currentSeverity) {
+            // [修改] 判读模式下仅校验结论选择，教育模式下校验结论和严重度
+            if (!selectedDiagnosis || (currentMode === 'edu' && !currentSeverity)) {
                 return false;
             }
 
@@ -2140,7 +2175,8 @@
             diagnosisRecords[patient.id] = {
                 patientId: patient.id,
                 diagnosis: selectedDiagnosis.textContent.trim(),
-                severity: currentSeverity
+                // [修改] 判读模式存 null，教育模式存实际选择
+                severity: currentMode === 'diag' ? null : currentSeverity
             };
             
             console.log('已自动保存诊断记录:', diagnosisRecords[patient.id]);
@@ -2150,33 +2186,35 @@
         }
 
         // 保存当前病人的诊断记录（带提示）
+        /* --- Patch: 全量替换原有函数 --- */
         function saveCurrentDiagnosis() {
-            // 查找临床判断组的按钮
-            const diagnosisGroup = document.querySelectorAll('.diagnosis-group')[1]; // 临床判断组
+            const diagnosisGroup = document.querySelectorAll('.diagnosis-group')[1];
             const selectedDiagnosis = diagnosisGroup.querySelector('.option-btn.active');
             
+            // 基础校验：临床判断必须选（无论什么模式）
             if (!selectedDiagnosis) {
                 alert('请选择临床判断');
                 return false;
             }
 
-            if (!currentSeverity) {
-                alert('请选择诊断意见');
+            // [逻辑纠正] 仅教育模式(edu)强制要求严重度，判读模式直接跳过
+            if (currentMode === 'edu' && !currentSeverity) {
+                alert('请选择诊断意见等级');
                 return false;
             }
 
             const patient = patients[currentPatientIndex];
-            
             diagnosisRecords[patient.id] = {
                 patientId: patient.id,
                 diagnosis: selectedDiagnosis.textContent.trim(),
-                severity: currentSeverity
+                // 判读模式传 null，教育模式传真实的严重度
+                severity: currentMode === 'diag' ? null : currentSeverity
             };
             
-            console.log('已保存诊断记录:', diagnosisRecords[patient.id]);
-            updateProgressText(); // 更新进度显示
+            console.log(`✅ [${currentMode}] 已记录诊断:`, diagnosisRecords[patient.id]);
+            updateProgressText();
             saveDraft('saveCurrentDiagnosis');
-            return true;
+            return true; // 只有返回 true，nextVideo 才会继续
         }
 
         // 提交所有诊断
@@ -2259,6 +2297,9 @@
 
         // 切换诊断标准显示
         function toggleDiagnosisStandard() {
+            // 诊断模式返回
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('mode') === 'diag') return; 
             // 检查是否已选择临床判断
             const diagnosisGroup = document.querySelectorAll('.diagnosis-group')[1];
             const selectedDiagnosis = diagnosisGroup.querySelector('.option-btn.active');
