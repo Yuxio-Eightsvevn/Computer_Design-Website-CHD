@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>教育模式管理 - 儿童先心病诊断平台</title>
+  <style>
+    /* CSS 部分完全保持您的原文不变，维护 UI 外观 */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f7fa; color: #333; min-height: 100vh; }
+    .container { max-width: 1400px; margin: 30px auto; padding: 0 20px; display: flex; gap: 16px; align-items: flex-start; }
+    .sidebar { width: 240px; flex-shrink: 0; }
+    .main { flex: 1; }
+    .navbar { background: linear-gradient(135deg,#764ba2 0%, #667eea 100%); color: white; padding: 15px 25px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 12px rgba(118, 75, 162, 0.2); }
+    .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); margin-top: 20px; }
+    .upload-section { border: 2px dashed #c9d7ff; border-radius: 12px; padding: 40px; text-align: center; cursor: pointer; background: #fff; transition: all 0.2s; position: relative; }
+    .upload-section:hover { border-color: #764ba2; background: #fdfaff; }
+    .upload-icon { font-size: 40px; margin-bottom: 10px; display: block; }
+    .kanban-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 25px; }
+    .kanban-col { background: #ebf0f7; border-radius: 12px; padding: 15px; min-height: 500px; }
+    .col-title { font-size: 15px; font-weight: 700; color: #475569; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
+    .task-card { background: white; border-radius: 10px; padding: 15px; margin-bottom: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.04); border-left: 4px solid #cbd5e1; cursor: pointer; transition: transform 0.1s; }
+    .task-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+    .task-card.processing { border-left-color: #3b82f6; opacity: 0.8; }
+    .task-card.unreleased { border-left-color: #f59e0b; }
+    .task-card.published { border-left-color: #10b981; }
+    .task-name { font-weight: 700; font-size: 14px; margin-bottom: 6px; color: #1e293b; }
+    .task-meta { font-size: 12px; color: #64748b; line-height: 1.5; }
+    .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; }
+    .modal-card { background: white; border-radius: 12px; padding: 25px; width: 90%; max-width: 500px; animation: slideUp 0.3s ease; }
+    .user-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; max-height: 300px; overflow-y: auto; margin: 15px 0; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; }
+    .user-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+    .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.2s; }
+    .btn-primary { background: #667eea; color: white; }
+    .btn-ghost { background: #f1f5f9; color: #475569; }
+    @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    @media (max-width: 1000px) { .kanban-container { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="container" id="mainApp">
+    <div class="sidebar">
+      <div class="card" style="margin-top:0">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:48px;height:48px;border-radius:24px;background:#f3e8ff;display:flex;align-items:center;justify-content:center;color:#764ba2; font-weight:700;">A</div>
+          <div>
+            <div style="font-weight:700">系统管理员</div>
+            <div style="font-size:12px;color:#666">教育模式控制台</div>
+          </div>
+        </div>
+        <hr style="margin:12px 0;border:none;border-top:1px solid #f1f5f9;">
+        <div style="font-size:12px;color:#64748b;line-height:1.6">
+          <strong>操作指引：</strong><br/>
+          1. 拖入带答案的 ZIP 压缩包。<br/>
+          2. 模型自动判读后进入“未发布”。<br/>
+          3. 选择医师点击发布。
+        </div>
+      </div>
+    </div>
+
+    <div class="main">
+      <div class="navbar">
+        <div style="font-weight:700; font-size:18px;">🎓 教育模式管理后台</div>
+        <button onclick="window.location.href='/flow'" class="btn btn-ghost" style="background:rgba(255,255,255,0.2); color:white; border:1px solid rgba(255,255,255,0.3)">返回主页</button>
+      </div>
+
+      <div class="card">
+        <div id="dropzone" class="upload-section">
+          <input type="file" id="zipInput" accept=".zip" style="display:none">
+          <span class="upload-icon">📦</span>
+          <strong>点击或拖拽教育资源压缩包至此</strong>
+          <p style="font-size:12px; color:#94a3b8; margin-top:8px;">( 必须包含 epoch_data.json 和 videos 文件夹 )</p>
+        </div>
+      </div>
+
+      <div class="kanban-container">
+        <div class="kanban-col">
+          <div class="col-title">🔄 模型判读中 <span id="cnt-processing" style="font-weight:400; color:#94a3b8">0</span></div>
+          <div id="col-processing"></div>
+        </div>
+        <div class="kanban-col">
+          <div class="col-title">📥 待发布任务 <span id="cnt-unreleased" style="font-weight:400; color:#94a3b8">0</span></div>
+          <div id="col-unreleased"></div>
+        </div>
+        <div class="kanban-col">
+          <div class="col-title">✅ 已发布教学 <span id="cnt-published" style="font-weight:400; color:#94a3b8">0</span></div>
+          <div id="col-published"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="confirmModal" class="modal-overlay">
+    <div class="modal-card">
+      <h3 style="margin-bottom:15px;">确认上传教育任务</h3>
+      <div style="background:#f8fafc; padding:15px; border-radius:8px; font-size:13px; margin-bottom:15px;">
+        <p>📊 解析统计：</p>
+        <p>病例总数：<strong id="m-case-cnt">-</strong></p>
+        <p>视频总数：<strong id="m-video-cnt">-</strong></p>
+      </div>
+      <div style="margin-bottom:20px;">
+        <label style="font-size:13px; font-weight:700; color:#475569;">自定义任务名称：</label>
+        <input type="text" id="m-task-name" style="width:100%; padding:10px; margin-top:5px; border:1px solid #cbd5e1; border-radius:6px;">
+      </div>
+      <div style="display:flex; gap:10px; justify-content:flex-end;">
+        <button class="btn btn-ghost" onclick="closeModal('confirmModal')">取消</button>
+        <button class="btn btn-primary" id="btn-final-upload">确认并开始判读</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="publishModal" class="modal-overlay">
+    <div class="modal-card">
+      <h3 id="p-task-title">发布任务</h3>
+      <p style="font-size:12px; color:#64748b; margin-top:5px;">请选择允许参与判读的医师：</p>
+      <div class="user-grid" id="userList"></div>
+      <div style="display:flex; gap:10px; justify-content:flex-end;">
+        <button class="btn btn-ghost" onclick="closeModal('publishModal')">取消</button>
+        <button class="btn btn-primary" id="btn-final-publish" style="background:#10b981">确认发布</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentZipFile = null;
+    let currentTempId = null;
+    let currentTargetTaskId = null;
+
+    async function init() {
+      fetchTasks();
+      setInterval(fetchTasks, 5000); 
+    }
+
+    async function fetchTasks() {
+      try {
+        const r = await fetch('/api/edu/admin/tasks');
+        const data = await r.json();
+        renderKanban('processing', data.processing);
+        renderKanban('unreleased', data.unreleased);
+        renderKanban('published', data.published);
+      } catch (e) { console.error("看板加载失败"); }
+    }
+
+    function renderKanban(type, tasks) {
+      const container = document.getElementById(`col-${type}`);
+      document.getElementById(`cnt-${type}`).textContent = tasks.length;
+      container.innerHTML = '';
+      tasks.forEach(t => {
+        const div = document.createElement('div');
+        div.className = `task-card ${type}`;
+        div.innerHTML = `
+          <div class="task-name">${t.request_name}</div>
+          <div class="task-meta">病例: ${t.request_case_cnt} | 视频: ${t.request_video_cnt}<br/>上传: ${t.upload_time}</div>
+        `;
+        if (type === 'unreleased') div.onclick = () => openPublishModal(t);
+        if (type === 'published') div.onclick = () => alert("已发布对象: " + (t.target_users ? t.target_users.join(', ') : '无'));
+        container.appendChild(div);
+      });
+    }
+
+    const dropzone = document.getElementById('dropzone');
+    const zipInput = document.getElementById('zipInput');
+
+    dropzone.onclick = () => zipInput.click();
+    zipInput.onchange = (e) => handleFile(e.target.files[0]);
+    
+    // 修正后的拖拽逻辑：增加 preventDefault 防止浏览器默认行为（如直接打开文件）
+    dropzone.ondrop = (e) => { 
+        e.preventDefault(); 
+        if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]); 
+    };
+    dropzone.ondragover = (e) => e.preventDefault();
+
+    async function handleFile(file) {
+      // [关键修复] JS 标准方法是 endsWith (大写 W)
+      if (!file || !file.name.endsWith('.zip')) return alert("请上传 ZIP 格式的压缩包");
+      
+      currentZipFile = file;
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const r = await fetch('/api/edu/parse-zip', { method: 'POST', body: formData });
+        if (!r.ok) throw new Error("解析失败");
+        const data = await r.json();
+        
+        document.getElementById('m-case-cnt').textContent = data.case_count;
+        document.getElementById('m-video-cnt').textContent = data.video_count;
+        document.getElementById('m-task-name').value = data.suggested_name;
+        currentTempId = data.submission_id;
+        
+        document.getElementById('confirmModal').style.display = 'flex';
+      } catch (e) { 
+          console.error(e);
+          alert("ZIP 内部结构非法：必须包含 epoch_data.json 且视频路径正确"); 
+      }
+    }
+
+    document.getElementById('btn-final-upload').onclick = async () => {
+      const btn = document.getElementById('btn-final-upload');
+      const taskName = document.getElementById('m-task-name').value.trim();
+      if (!taskName) return alert("请输入任务名称");
+
+      btn.disabled = true; btn.textContent = "上传中...";
+      
+      const formData = new FormData();
+      formData.append('file', currentZipFile);
+      formData.append('submission_id', currentTempId);
+      formData.append('request_name', taskName);
+
+      try {
+        const r = await fetch('/api/edu/confirm-upload', { method: 'POST', body: formData });
+        if (r.ok) {
+            closeModal('confirmModal');
+            fetchTasks();
+        } else {
+            alert("服务器保存失败，请检查 SYSTEM 文件夹写入权限");
+        }
+      } catch (e) { alert("网络错误，确认上传失败"); }
+      finally { btn.disabled = false; btn.textContent = "确认并开始判读"; }
+    };
+
+    async function openPublishModal(task) {
+      currentTargetTaskId = task.submission_id;
+      document.getElementById('p-task-title').textContent = "发布任务: " + task.request_name;
+      const listContainer = document.getElementById('userList');
+      listContainer.innerHTML = '<p style="text-align:center;width:100%;">正在加载医师列表...</p>';
+      document.getElementById('publishModal').style.display = 'flex';
+
+      try {
+        const r = await fetch('/api/users');
+        const { data } = await r.json();
+        // 过滤掉 system 账号，只显示真实医师
+        const filtered = data.filter(u => u.username.toLowerCase() !== 'system');
+        listContainer.innerHTML = filtered.map(u => `
+          <label class="user-item">
+            <input type="checkbox" name="targetUser" value="${u.username}" checked> ${u.username} (${u.doctor})
+          </label>
+        `).join('');
+      } catch (e) { listContainer.innerHTML = '加载用户失败'; }
+    }
+
+    document.getElementById('btn-final-publish').onclick = async () => {
+      const selected = Array.from(document.querySelectorAll('input[name="targetUser"]:checked')).map(cb => cb.value);
+      if (selected.length === 0) return alert("请选择至少一个医师进行发布");
+
+      const formData = new FormData();
+      formData.append('submission_id', currentTargetTaskId);
+      formData.append('target_users', JSON.stringify(selected));
+
+      try {
+        const r = await fetch('/api/edu/publish-task', { method: 'POST', body: formData });
+        if (r.ok) {
+            closeModal('publishModal');
+            fetchTasks();
+            alert("✅ 发布成功，医师现在可以在教育模式中看到该批次。");
+        }
+      } catch (e) { alert("发布失败，请检查网络"); }
+    };
+
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+    init();
+  </script>
+</body>
+</html>

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>教育练习 - 儿童先心病诊断平台</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f7fa; color: #333; min-height: 100vh; }
+    .container { max-width: 1200px; margin: 30px auto; padding: 0 20px; display: flex; gap: 16px; align-items: flex-start; }
+    .sidebar { width: 240px; flex-shrink: 0; }
+    .main { flex: 1; }
+    .navbar { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 15px 25px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; }
+    .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); margin-top: 20px; }
+    .task-card { background: white; border-radius: 10px; padding: 18px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #e2e8f0; transition: all 0.2s; }
+    .task-card:hover { border-color: #10b981; transform: translateX(5px); }
+    .task-card.completed { border-left: 5px solid #10b981; }
+    .task-card.pending { border-left: 5px solid #f59e0b; }
+    .btn { padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; font-size: 13px; }
+    .btn-start { background: #10b981; color: white; }
+    .btn-view { background: #f1f5f9; color: #475569; }
+    .score-badge { font-size: 20px; font-weight: 800; color: #10b981; }
+    /* 弹窗样式 */
+    .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; }
+    .modal-card { background: white; border-radius: 12px; padding: 30px; width: 90%; max-width: 450px; text-align: center; }
+    .metric-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin: 20px 0; }
+    .metric-item { background: #f8fafc; padding: 15px; border-radius: 10px; }
+    .metric-val { font-size: 22px; font-weight: 700; color: #1e293b; }
+    .metric-label { font-size: 12px; color: #64748b; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="sidebar">
+        <div class="card" style="margin-top:0">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div id="avatar" style="width:48px;height:48px;border-radius:24px;background:#ecfdf5;display:flex;align-items:center;justify-content:center;color:#10b981; font-weight:700;">U</div>
+              <div><div id="u-name" style="font-weight:700">加载中...</div><div style="font-size:12px;color:#666">教育模式</div></div>
+            </div>
+            <hr style="margin:12px 0;border:none;border-top:1px solid #f1f5f9;">
+            <p style="font-size:12px; color:#64748b; line-height:1.6">点击“开始判读”进行练习。完成后可查收详细评估报告，包含准确率、敏感度等指标。</p>
+        </div>
+    </div>
+    <div class="main">
+      <div class="navbar"><div>🎓 教育练习中心</div><button onclick="window.location.href='/flow'" class="btn" style="background:rgba(255,255,255,0.2); color:white">返回</button></div>
+      <div id="taskList" class="card">
+          <p style="text-align:center; color:#94a3b8">正在拉取分发给您的教学批次...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 成绩报告弹窗 -->
+  <div id="resultModal" class="modal-overlay">
+      <div class="modal-card">
+          <h2 style="color:#1e293b">🎯 教学评估报告</h2>
+          <div class="metric-grid">
+              <div class="metric-item"><div class="metric-val" id="r-acc">-</div><div class="metric-label">准确率</div></div>
+              <div class="metric-item"><div class="metric-val" id="r-sen">-</div><div class="metric-label">敏感度</div></div>
+              <div class="metric-item"><div class="metric-val" id="r-spe">-</div><div class="metric-label">特异性</div></div>
+              <div class="metric-item"><div class="metric-val" id="r-dur">-</div><div class="metric-label">总耗时</div></div>
+          </div>
+          <div style="display:flex; gap:10px;">
+              <button class="btn btn-view" style="flex:1" onclick="closeModal()">关闭</button>
+              <button class="btn btn-start" style="flex:1" id="btn-re-run">重新练习</button>
+          </div>
+      </div>
+  </div>
+
+  <script>
+    let currentUser = null;
+
+    async function loadUser() {
+        const r = await fetch('/api/users/current');
+        if (r.ok) {
+            const d = await r.json(); currentUser = d.data;
+            document.getElementById('u-name').textContent = currentUser.username;
+            document.getElementById('avatar').textContent = currentUser.username[0].toUpperCase();
+            fetchEduTasks();
+        }
+    }
+
+    async function fetchEduTasks() {
+        const r = await fetch(`/api/edu/user/tasks/${encodeURIComponent(currentUser.username)}`);
+        const { tasks } = await r.json();
+        const container = document.getElementById('taskList');
+        container.innerHTML = tasks.length ? '' : '<p style="text-align:center;color:#94a3b8">暂无已发布的教学任务</p>';
+        
+        tasks.forEach(t => {
+            const div = document.createElement('div');
+            div.className = `task-card ${t.is_completed ? 'completed' : 'pending'}`;
+            div.innerHTML = `
+                <div><div style="font-weight:700">${t.request_name}</div>
+                <div style="font-size:12px; color:#64748b; margin-top:4px">
+                    病例: ${t.request_case_cnt} | 视频: ${t.request_video_cnt} | ${t.is_completed ? '✅ 已评估' : '⏳ 待判读'}
+                </div></div>
+                <div style="display:flex; align-items:center; gap:15px">
+                    ${t.is_completed ? `<div class="score-badge">${(t.last_score*100).toFixed(0)}%</div>` : ''}
+                    <button class="btn ${t.is_completed ? 'btn-view' : 'btn-start'}" onclick="handleTask('${t.submission_id}', '${t.request_name}', ${t.is_completed})">
+                        ${t.is_completed ? '查看报告' : '开始判读'}
+                    </button>
+                </div>`;
+            container.appendChild(div);
+        });
+    }
+
+    function handleTask(id, name, isComp) {
+        if (isComp) {
+            openResultModal(id, name);
+        } else {
+            window.location.href = `/diagnosis?username=${encodeURIComponent(currentUser.username)}&task=${encodeURIComponent(id)}&taskName=${encodeURIComponent(name)}&mode=edu`;
+        }
+    }
+
+    async function openResultModal(id, name) {
+        const r = await fetch(`/api/edu/user/result/${encodeURIComponent(currentUser.username)}/${id}`);
+        const data = await r.json();
+        document.getElementById('r-acc').textContent = (data.accuracy * 100).toFixed(1) + '%';
+        document.getElementById('r-sen').textContent = (data.sensitivity * 100).toFixed(1) + '%';
+        document.getElementById('r-spe').textContent = (data.specificity * 100).toFixed(1) + '%';
+        document.getElementById('r-dur').textContent = data.formatted_duration || '-';
+        
+        document.getElementById('btn-re-run').onclick = () => {
+            window.location.href = `/diagnosis?username=${encodeURIComponent(currentUser.username)}&task=${encodeURIComponent(id)}&taskName=${encodeURIComponent(name)}&mode=edu&clearCache=true`;
+        };
+        document.getElementById('resultModal').style.display = 'flex';
+    }
+
+    function closeModal() { document.getElementById('resultModal').style.display = 'none'; }
+    loadUser();
+  </script>
+</body>
+</html>

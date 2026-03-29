@@ -2248,6 +2248,7 @@ function selectOption(element, group) {
                     const diagnosisData = {
                         username: taskInfo.username,
                         taskFolder: taskInfo.taskFolder,
+                        mode: currentMode, // [重点新增] 告知后端当前模式
                         submittedAt: new Date().toLocaleString('zh-CN', {
                             year: 'numeric',
                             month: '2-digit',

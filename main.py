@@ -438,6 +438,7 @@ class DiagnosisRecordSimple(BaseModel):
 class DiagnosisSubmitJsonRequest(BaseModel):
     username: str
     taskFolder: str
+    mode: Optional[str] = "diag"  # [新增] 默认为判读模式
     submittedAt: str
     totalTime: Dict[str, Any]
     patientCount: int
@@ -446,30 +447,91 @@ class DiagnosisSubmitJsonRequest(BaseModel):
 # 提交诊断结果（支持智慧寻址）
 @app.post("/api/diagnosis/submit-json")
 async def submit_diagnosis_json(request: DiagnosisSubmitJsonRequest):
+    """
+    提交诊断结论：
+    1. 判读模式：存入任务目录。
+    2. 教育模式：计算准确率、敏感度、特异性，并存入 SYSTEM 成绩单。
+    """
     try:
-        proc_path = Path(DATA_BATCH_STORAGE) / request.username / "processed" / request.taskFolder
-        root_path = Path(DATA_BATCH_STORAGE) / request.username / request.taskFolder
-        task_path = proc_path if proc_path.exists() else root_path
+        # 定义诊断名与 Label 的映射
+        LABEL_MAP = {"Normal": 0, "VSD": 1, "ASD": 2, "PDA": 3}
         
-        if not task_path.exists() and (Path(DATA_BATCH_STORAGE) / request.username / "processed").exists():
-            for d in (Path(DATA_BATCH_STORAGE) / request.username / "processed").iterdir():
-                if d.is_dir() and (d.name in request.taskFolder or request.taskFolder in d.name):
-                    task_path = d; break
+        # --- 情况 A：教育模式 (Assessment) ---
+        if request.mode == "edu":
+            # 1. 定位标准答案
+            gt_path = Path(DATA_BATCH_STORAGE) / "SYSTEM" / "edu_data" / request.taskFolder / "epoch_data.json"
+            if not gt_path.exists():
+                raise HTTPException(status_code=404, detail="教育批次答案文件丢失")
+            
+            with open(gt_path, "r", encoding="utf-8") as f:
+                ground_truth = json.load(f)
 
-        if not task_path.exists(): task_path.mkdir(parents=True, exist_ok=True)
-        
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        json_filename = f"final_diagnosis_report_{timestamp}.json"
-        json_path = task_path / json_filename
-        
-        with open(json_path, 'w', encoding='utf-8') as jsonfile:
-            # 兼容处理
-            data_to_save = request.model_dump() if hasattr(request, 'model_dump') else request.dict()
-            json.dump(data_to_save, jsonfile, ensure_ascii=False, indent=2)
-        
-        print(f"✅ 诊断已保存: {json_path}")
-        return {"message": "成功", "filename": json_filename}
+            # 2. 初始化统计变量
+            tp, tn, fp, fn = 0, 0, 0, 0
+            correct_count = 0
+            total = len(request.records)
+
+            for rec in request.records:
+                user_diag = rec.diagnosis
+                user_label = LABEL_MAP.get(user_diag, -1)
+                gt_label = ground_truth.get(rec.patientId, {}).get("label")
+
+                # 计算准确率
+                if user_label == gt_label:
+                    correct_count += 1
+                
+                # 计算敏感度/特异性 (Positive = 非0, Negative = 0)
+                is_user_pos = user_label > 0
+                is_gt_pos = gt_label > 0
+
+                if is_user_pos and is_gt_pos: tp += 1
+                elif not is_user_pos and not is_gt_pos: tn += 1
+                elif is_user_pos and not is_gt_pos: fp += 1
+                elif not is_user_pos and is_gt_pos: fn += 1
+
+            # 3. 计算评估指标
+            stats = {
+                "accuracy": correct_count / total if total > 0 else 0,
+                "sensitivity": tp / (tp + fn) if (tp + fn) > 0 else 1.0,
+                "specificity": tn / (tn + fp) if (tn + fp) > 0 else 1.0,
+                "formatted_duration": request.totalTime.get("formatted", "0:00"),
+                "submitted_at": request.submittedAt
+            }
+
+            # 4. 存入 SYSTEM 个人成绩单 (Doctor_Diag_Result/{user}.json)
+            user_res_path = Path(DATA_BATCH_STORAGE) / "SYSTEM" / "edu_data" / "Doctor_Diag_Result" / f"{request.username}.json"
+            user_data = {}
+            if user_res_path.exists():
+                with open(user_res_path, "r", encoding="utf-8") as f:
+                    user_data = json.load(f)
+            
+            user_data[request.taskFolder] = stats # 以 submission_id 为键保存
+            
+            with open(user_res_path, "w", encoding="utf-8") as f:
+                json.dump(user_data, f, ensure_ascii=False, indent=2)
+
+            print(f"📊 教育模式评分完成: {request.username} - 得分: {stats['accuracy']*100}%")
+            return {"message": "评估完成", "stats": stats}
+
+        # --- 情况 B：普通判读模式 (保持原有逻辑) ---
+        else:
+            # 执行智慧寻址找到任务路径
+            proc_path = Path(DATA_BATCH_STORAGE) / request.username / "processed" / request.taskFolder
+            root_path = Path(DATA_BATCH_STORAGE) / request.username / request.taskFolder
+            task_path = proc_path if proc_path.exists() else root_path
+            
+            if not task_path.exists(): task_path.mkdir(parents=True, exist_ok=True)
+            
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            json_filename = f"final_diagnosis_report_{timestamp}.json"
+            with open(task_path / json_filename, 'w', encoding='utf-8') as f:
+                data_to_save = request.model_dump() if hasattr(request, 'model_dump') else request.dict()
+                json.dump(data_to_save, f, ensure_ascii=False, indent=2)
+            
+            return {"message": "结论已归档", "filename": json_filename}
+
     except Exception as e:
+        print(f"❌ 提交逻辑崩溃: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # 上传任务文件夹（接收zip压缩包）
@@ -693,6 +755,18 @@ async def serve_task_status():
     """返回任务状态进度页面"""
     return FileResponse("task_status.html")
 
+@app.get("/edu_status")
+async def serve_edu_status(): return FileResponse("edu_status.html")
+
+@app.get("/edu_admin")
+async def serve_edu_admin():
+    """返回教育模式管理页面"""
+    return FileResponse("edu_admin.html")
+
+@app.get("/edu_admin")
+async def serve_edu_admin():
+    """返回教育模式管理端页面"""
+    return FileResponse("edu_admin.html")
 
 if __name__ == "__main__":
     import uvicorn
