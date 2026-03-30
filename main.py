@@ -325,29 +325,37 @@ async def get_user_tasks(username: str):
 async def get_task_patients(username: str, task_folder: str):
     """
     [重构版] 获取病例列表。
-    适配逻辑：使用正则剥离后缀进行完美归组，并将 metadataPath 指向动态适配接口。
+    适配逻辑：支持模糊匹配，并增加 SYSTEM 空间搜索以支持教育模式。
     """
-    proc_root = Path(DATA_BATCH_STORAGE) / username / "processed"
+    # 1. 定义所有可能的物理搜索根路径
+    user_proc_root = Path(DATA_BATCH_STORAGE) / username / "processed"
+    user_root_root = Path(DATA_BATCH_STORAGE) / username
+    system_edu_root = Path(DATA_BATCH_STORAGE) / "SYSTEM" / "edu_data" / "processed"
+
     task_path = None
     final_task_id = task_folder 
+    # 用于动态构造 URL 的路径前缀
+    base_prefix = "" 
 
-    # 1. 智慧寻址 (支持长短名模糊匹配)
-    possible_paths = [
-        proc_root / task_folder, 
-        Path(DATA_BATCH_STORAGE) / username / task_folder, 
-    ]
-    
-    for p in possible_paths:
-        if p.exists():
-            task_path = p
-            break
-            
-    if not task_path and proc_root.exists():
+    # 智慧寻址优先级：私有结果 > 私有根目录 > 系统教育目录
+    if (user_proc_root / task_folder).exists():
+        task_path = user_proc_root / task_folder
+        base_prefix = f"{username}/processed"
+    elif (user_root_root / task_folder).exists():
+        task_path = user_root_root / task_folder
+        base_prefix = f"{username}"
+    elif (system_edu_root / task_folder).exists():
+        task_path = system_edu_root / task_folder
+        base_prefix = "SYSTEM/edu_data/processed"
+        print(f"🎓 教育模式：已定位到系统公共资源库 {task_folder}")
+    # 模糊匹配逻辑 (仅针对私有目录，保持原文)
+    elif user_proc_root.exists():
         print(f"🔍 正在执行长短名模糊匹配: 目标是 {task_folder}")
-        for sub_dir in proc_root.iterdir():
+        for sub_dir in user_proc_root.iterdir():
             if sub_dir.is_dir() and (sub_dir.name in task_folder or task_folder in sub_dir.name):
                 task_path = sub_dir
                 final_task_id = sub_dir.name
+                base_prefix = f"{username}/processed"
                 print(f"🎯 模糊匹配成功：找到物理文件夹 {sub_dir.name}")
                 break
 
@@ -369,7 +377,7 @@ async def get_task_patients(username: str, task_folder: str):
                 for v_file in videos_dir.iterdir():
                     if v_file.is_file() and v_file.suffix.lower() == '.mp4':
                         fn = v_file.name
-                        # 使用正则精准识别后缀并剥离出共同的 baseName
+                        import re
                         m_match = re.search(r'_(heatmap|bbox|original)\.mp4$', fn, re.IGNORECASE)
                         if m_match:
                             modality = m_match.group(1).lower()
@@ -379,9 +387,8 @@ async def get_task_patients(username: str, task_folder: str):
                         
                         if base_name not in video_groups: video_groups[base_name] = {}
                         
-                        # 生成 URL 路径
-                        sub_route = "processed" if "processed" in str(task_path) else ""
-                        rel_url = f"/data/{username}/{sub_route}/{final_task_id}/{case_folder.name}/output_videos/{fn}".replace("//", "/")
+                        # [修改] 使用动态 base_prefix 生成 URL 路径，支持跨空间访问
+                        rel_url = f"/data/{base_prefix}/{final_task_id}/{case_folder.name}/output_videos/{fn}".replace("//", "/")
                         video_groups[base_name][modality] = rel_url
 
             # 3. 关联置信度元数据 (指向动态适配接口)
@@ -390,8 +397,8 @@ async def get_task_patients(username: str, task_folder: str):
                 abs_conf_path = case_folder / "output_data" / "confidence_scores.json"
                 metadata_url = None
                 if abs_conf_path.exists():
-                    # 指向中转接口以适配格式
-                    metadata_url = f"/api/get-metadata?path={username}/{'processed/' if 'processed' in str(task_path) else ''}{final_task_id}/{case_folder.name}/output_data/confidence_scores.json"
+                    # [修改] path 参数同步使用动态前缀
+                    metadata_url = f"/api/get-metadata?path={base_prefix}/{final_task_id}/{case_folder.name}/output_data/confidence_scores.json"
                     metadata_url = metadata_url.replace("//", "/")
 
                 group = video_groups[bn]

@@ -28,6 +28,7 @@ if str(CURRENT_ROOT) not in sys.path:
 # 教育模式专用路径
 SYSTEM_EDU_DIR = Path("data_batch_storage") / "SYSTEM" / "edu_data"
 EDU_RESULTS_DIR = SYSTEM_EDU_DIR / "Doctor_Diag_Result"
+BASE_DATA_DIR = Path("data_batch_storage")
 
 # --- [核心修复] 环境自愈：确保代码能看到 Conda 环境中的 ffmpeg ---
 def patch_ffmpeg_env():
@@ -57,7 +58,7 @@ except ImportError as e:
 
 router = APIRouter()
 
-BASE_DATA_DIR = Path("data_batch_storage")
+
 ORIDATA_DIRNAME = "oridata"
 MAX_VIDEOS_PER_CASE = 5
 ALLOWED_EXTENSIONS = {".mp4", ".avi", ".mov", ".mkv"}
@@ -101,13 +102,13 @@ async def transcode_to_h264(video_path: Path):
     input_str = f'"{video_path.absolute()}"'
     output_str = f'"{temp_output.absolute()}"'
     
-    # 构造标准 H.264 转码命令
+    # [已修正] 移除括号，确保 -crf 23 参数正确
     cmd = (
         f'ffmpeg -y -i {input_str} '
         f'-vcodec libx264 -pix_fmt yuv420p '
         f'-preset fast -crf 23 '
         f'-acodec aac {output_str}'
-    ).replace("(23)", " 23") # 确保空格正确
+    )
     
     try:
         print(f"🎬 正在修复视频编码: {video_path.name}...")
@@ -244,10 +245,6 @@ def update_edu_task_index(task_update: dict):
     finally:
         if lock_path.exists(): lock_path.unlink()
 
-
-
-
-
 # --- [重构] 后台模型调用包装器：支持教育模式 ---
 
 async def run_model_inference_wrapper(request_path: Path, output_root: Path, request_name: str, username: str, submission_id: str, is_system: bool = False):
@@ -373,7 +370,7 @@ async def upload_oridata(
         if submission_base.exists(): shutil.rmtree(submission_base)
         raise HTTPException(status_code=500, detail=str(e))
 
-# --- 附加接口 (完全保留) ---
+# --- 附加接口 ---
 
 @router.get("/api/users/{username}/oridata-count")
 async def get_oridata_count(username: str):
@@ -415,22 +412,30 @@ async def re_sync_tasks(username: str):
     return {"message": "同步完成"}
 
 
-# --- [教育模式核心接口] ---
+# --- [教育模式核心接口：修正自适应路径版] ---
 
 @router.post("/api/edu/parse-zip")
 async def parse_edu_zip(file: UploadFile = File(...)):
-    """解析教育压缩包统计信息"""
-    if not file.filename.endswith('.zip'):
+    """解析教育压缩包统计信息 [自适应层级版]"""
+    if not file.filename.lower().endswith('.zip'):
         raise HTTPException(status_code=400, detail="仅支持 ZIP 格式")
     try:
         content = await file.read()
         z = zipfile.ZipFile(io.BytesIO(content))
-        if 'epoch_data.json' not in z.namelist():
+        
+        # [重点修复]：在 ZIP 全路径列表中寻找 epoch_data.json
+        full_namelist = z.namelist()
+        json_inner_path = next((x for x in full_namelist if x.endswith('epoch_data.json')), None)
+        
+        if not json_inner_path:
             raise HTTPException(status_code=400, detail="压缩包内缺失 epoch_data.json")
-        with z.open('epoch_data.json') as f:
+            
+        with z.open(json_inner_path) as f:
             epoch_data = json.load(f)
+            
         case_cnt = len(epoch_data)
         video_cnt = sum(len(c.get("videos", [])) for c in epoch_data.values())
+            
         return {
             "suggested_name": Path(file.filename).stem,
             "case_count": case_cnt,
@@ -447,55 +452,81 @@ async def confirm_edu_upload(
     request_name: str = Form(...),
     file: UploadFile = File(...)
 ):
-    """管理员确认后，正式保存教育任务并启动模型"""
+    """
+    管理员确认后：
+    1. 解压原始文件。
+    2. [核心] 根据 epoch_data.json 将视频重组为 case 子目录结构，以适配 AI 模型。
+    3. 触发推理。
+    """
     submission_base = SYSTEM_EDU_DIR / submission_id
     processed_root = SYSTEM_EDU_DIR / "processed"
+    
     try:
+        # 1. 物理接收
         submission_base.mkdir(parents=True, exist_ok=True)
         content = await file.read()
         with zipfile.ZipFile(io.BytesIO(content)) as z:
             z.extractall(submission_base)
         
-        # 解析数据统计
-        with open(submission_base / "epoch_data.json", "r", encoding="utf-8") as f:
+        # [智慧平铺] 如果包了一层父目录，先把它提上来
+        for sub in list(submission_base.iterdir()):
+            if sub.is_dir() and (sub / "epoch_data.json").exists():
+                for item in sub.iterdir(): shutil.move(str(item), str(submission_base))
+                sub.rmdir()
+
+        # 2. 结构重组 (Structure Restoration)
+        json_path = submission_base / "epoch_data.json"
+        with open(json_path, "r", encoding="utf-8") as f:
             epoch_data = json.load(f)
+
+        print(f"🛠️ 正在为 AI 模型重组目录结构...")
+        for case_id, info in epoch_data.items():
+            # 创建病例文件夹 (如 submission_id/case1/)
+            case_dir = submission_base / case_id
+            case_dir.mkdir(exist_ok=True)
+            
+            for rel_v_path in info.get("videos", []):
+                # 原始位置 (通常在 videos/ 目录下)
+                src_path = submission_base / rel_v_path
+                # 目标位置 (病例文件夹下)
+                dst_path = case_dir / src_path.name
+                
+                if src_path.exists():
+                    shutil.move(str(src_path), str(dst_path))
         
-        # 登记到 SYSTEM/edu_data/data.json
+        # 清理掉现在已经没用的原始视频目录 (如果存在)
+        orig_v_dir = submission_base / "videos"
+        if orig_v_dir.exists() and not any(orig_v_dir.iterdir()):
+            orig_v_dir.rmdir()
+
+        # 3. 记录索引与分发任务
         update_edu_task_index({
-            "submission_id": submission_id, 
-            "request_name": request_name,
-            "request_pos": f"SYSTEM/edu_data/processed/{submission_id}",
+            "submission_id": submission_id, "request_name": request_name,
+            "request_pos": f"processed/{submission_id}", 
             "request_case_cnt": len(epoch_data), 
             "request_video_cnt": sum(len(c.get("videos", [])) for c in epoch_data.values()),
-            "status": "processing", 
-            "is_cmp": False
+            "status": "processing", "is_cmp": False
         })
         
-        # 触发 AI 模型处理 (is_system=True)
-        background_tasks.add_task(
-            run_model_inference_wrapper, 
-            submission_base, 
-            processed_root, 
-            request_name, 
-            "SYSTEM", 
-            submission_id,
-            True 
-        )
-        return {"message": "任务已进入系统处理队列", "submission_id": submission_id}
+        # 触发模型处理，SYSTEM 空间的输出路径也要对齐
+        background_tasks.add_task(run_model_inference_wrapper, submission_base, processed_root, request_name, "SYSTEM", submission_id, True)
+        
+        return {"message": "结构重组成功，任务已开始判读"}
+        
     except Exception as e:
         if submission_base.exists(): shutil.rmtree(submission_base)
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"🚨 教育任务创建失败: {e}")
+        raise HTTPException(status_code=500, detail=f"结构重组失败: {str(e)}")
+
 
 @router.get("/api/edu/admin/tasks")
 async def get_edu_admin_tasks():
-    """获取管理端三栏列表数据"""
     index_path = SYSTEM_EDU_DIR / "data.json"
     if not index_path.exists(): 
         return {"processing": [], "unreleased": [], "published": []}
     with open(index_path, "r", encoding="utf-8") as f:
         data = json.load(f)
     tasks = data.get("tasks", [])
-    # 按状态分组并按时间倒序
     tasks.sort(key=lambda x: x.get('upload_time', ''), reverse=True)
     return {
         "processing": [t for t in tasks if t.get("status") == "processing"],
@@ -505,57 +536,99 @@ async def get_edu_admin_tasks():
 
 @router.post("/api/edu/publish-task")
 async def publish_edu_task(submission_id: str = Form(...), target_users: str = Form(...)):
-    """发布教育任务给指定用户列表"""
     try:
         users = json.loads(target_users)
         if not users: raise HTTPException(status_code=400, detail="发布对象不能为空")
-        update_edu_task_index({
-            "submission_id": submission_id, 
-            "status": "published", 
-            "target_users": users
-        })
+        update_edu_task_index({"submission_id": submission_id, "status": "published", "target_users": users})
         return {"message": "任务已成功发布"}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"发布失败: {e}")
+    except Exception as e: raise HTTPException(status_code=400, detail=f"发布失败: {e}")
+
+@router.get("/api/edu/admin/task-status/{submission_id}")
+async def get_edu_task_detail_status(submission_id: str):
+    """获取特定教育任务下所有发布对象的实时判读进度"""
+    index_path = SYSTEM_EDU_DIR / "data.json"
+    if not index_path.exists(): raise HTTPException(status_code=404)
+    
+    with open(index_path, "r", encoding="utf-8") as f:
+        tasks = json.load(f).get("tasks", [])
+    
+    task = next((t for t in tasks if t["submission_id"] == submission_id), None)
+    if not task: raise HTTPException(status_code=404, detail="任务不存在")
+
+    target_users = task.get("target_users", [])
+    user_status_list = []
+
+    # 扫描每个用户的成绩单
+    for username in target_users:
+        result_file = EDU_RESULTS_DIR / f"{username}.json"
+        user_info = {"username": username, "completed": False, "score": None, "details": None}
+        
+        if result_file.exists():
+            with open(result_file, "r", encoding="utf-8") as f:
+                res_data = json.load(f)
+                if submission_id in res_data:
+                    user_info["completed"] = True
+                    user_info["score"] = res_data[submission_id].get("accuracy")
+                    user_info["details"] = res_data[submission_id] # 包含敏感度等详细数据
+        
+        user_status_list.append(user_info)
+    
+    return {"task_name": task["request_name"], "user_statuses": user_status_list}
+
 
 @router.get("/api/edu/user/tasks/{username}")
 async def get_user_edu_tasks(username: str):
-    """获取分配给特定用户的教育任务列表及其完成状态"""
     index_path = SYSTEM_EDU_DIR / "data.json"
     if not index_path.exists(): return {"tasks": []}
-    
     with open(index_path, "r", encoding="utf-8") as f:
         all_tasks = json.load(f).get("tasks", [])
-    
-    # 1. 过滤出已发布给该用户的任务
     user_tasks = [t for t in all_tasks if t.get("status") == "published" and username in t.get("target_users", [])]
-    
-    # 2. 检查用户成绩单，确定完成状态
     result_file = EDU_RESULTS_DIR / f"{username}.json"
     user_results = {}
     if result_file.exists():
-        with open(result_file, "r", encoding="utf-8") as f:
-            user_results = json.load(f)
-            
-    # 3. 合并状态
+        with open(result_file, "r", encoding="utf-8") as f: user_results = json.load(f)
     for t in user_tasks:
         sub_id = t["submission_id"]
         t["is_completed"] = sub_id in user_results
         t["last_score"] = user_results.get(sub_id, {}).get("accuracy") if t["is_completed"] else None
-        
     return {"tasks": user_tasks}
 
 @router.get("/api/edu/user/result/{username}/{submission_id}")
 async def get_user_edu_result(username: str, submission_id: str):
-    """获取用户在特定教育批次下的详细成绩"""
     result_file = EDU_RESULTS_DIR / f"{username}.json"
-    if not result_file.exists():
-        raise HTTPException(status_code=404, detail="未找到成绩记录")
+    if not result_file.exists(): raise HTTPException(status_code=404)
+    with open(result_file, "r", encoding="utf-8") as f: data = json.load(f)
+    if submission_id not in data: raise HTTPException(status_code=404)
+    return data[submission_id]
+
+
+
+@router.delete("/api/edu/admin/tasks/{submission_id}")
+async def delete_edu_task(submission_id: str):
+    """
+    [管理员特权] 物理删除 SYSTEM 空间下的教育任务及所有关联数据
+    """
+    index_path = SYSTEM_EDU_DIR / "data.json"
+    if not index_path.exists(): raise HTTPException(status_code=404)
+
+    try:
+        with open(index_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
         
-    with open(result_file, "r", encoding="utf-8") as f:
-        data = json.load(f)
-        
-    if submission_id not in data:
-        raise HTTPException(status_code=404, detail="该任务尚未完成判读")
-        
-    return data[submission_id]       
+        # 1. 查找任务
+        task = next((t for t in data["tasks"] if t["submission_id"] == submission_id), None)
+        if not task: raise HTTPException(status_code=404, detail="任务不存在")
+
+        # 2. 物理删除 (原始包 + 处理结果)
+        shutil.rmtree(SYSTEM_EDU_DIR / submission_id, ignore_errors=True)
+        shutil.rmtree(SYSTEM_EDU_DIR / "processed" / submission_id, ignore_errors=True)
+
+        # 3. 更新索引
+        data["tasks"] = [t for t in data["tasks"] if t["submission_id"] != submission_id]
+        with open(index_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+
+        print(f"🗑️ 系统教育任务已物理删除: {submission_id}")
+        return {"message": "任务已彻底从系统空间删除"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

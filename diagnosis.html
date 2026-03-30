@@ -1397,6 +1397,7 @@
                 applyDraft(draft);
             } else {
                 console.log('📄 无草稿,从头开始');
+                loadPatientVideos(0); // 仅在无草稿时手动触发一次
                 updateTimerDisplay();
                 updateProgressText();
             }
@@ -1453,7 +1454,7 @@
                 }
                 
                 // 加载第一个病人的视频
-                loadPatientVideos(0);
+                // loadPatientVideos(0);
                 updateProgressText();
                 
             } catch (error) {
@@ -1557,9 +1558,21 @@
                             video.onloadedmetadata = function() {
                                 console.log('✅ 视频元数据加载成功:', videoPath);
                                 // 尝试自动播放
-                                video.play().catch(err => {
-                                    console.warn('自动播放失败:', err);
-                                });
+                                // [教科书级修复] 增加一个微小的延迟或检查 playsinline 状态
+                                // 处理 play() 被中断的 AbortError
+                                const playPromise = video.play();
+                                if (playPromise !== undefined) {
+                                    playPromise.then(_ => {
+                                        // 播放成功
+                                    }).catch(err => {
+                                        // 仅记录非人为中断的错误
+                                        if (err.name !== 'AbortError') {
+                                            console.warn('视频播放遇到异常:', err);
+                                        } else {
+                                            console.log('ℹ️ 视频播放请求被后续动作正常覆盖(AbortError)');
+                                        }
+                                    });
+                                }
                             };
                             
                             video.onloadeddata = function() {

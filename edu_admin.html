@@ -5,6 +5,22 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>教育模式管理 - 儿童先心病诊断平台</title>
   <style>
+    /* [新增] 全屏加载遮罩 */
+    .global-loading {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(255,255,255,0.8); backdrop-filter: blur(4px);
+        display: none; flex-direction: column; align-items: center; justify-content: center;
+        z-index: 9999; /* 确保覆盖所有元素 */
+    }
+    /* [新增] 详情列表样式 */
+    .user-status-row {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 10px 15px; border-bottom: 1px solid #f1f5f9; cursor: pointer; border-radius: 6px;
+    }
+    .user-status-row:hover { background: #f8fafc; }
+    .status-tag { font-size: 11px; padding: 2px 6px; border-radius: 4px; }
+    .tag-done { background: #dcfce7; color: #166534; }
+    .tag-wait { background: #fef3c7; color: #92400e; }
     /* CSS 部分完全保持您的原文不变，维护 UI 外观 */
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f7fa; color: #333; min-height: 100vh; }
@@ -125,6 +141,7 @@
     let currentZipFile = null;
     let currentTempId = null;
     let currentTargetTaskId = null;
+    let taskPendingDeletion = null; // 记录当前弹窗选中的 ID
 
     async function init() {
       fetchTasks();
@@ -141,10 +158,13 @@
       } catch (e) { console.error("看板加载失败"); }
     }
 
+    /* --- Patch 2: 找到 renderKanban 并整体替换 --- */
     function renderKanban(type, tasks) {
       const container = document.getElementById(`col-${type}`);
-      document.getElementById(`cnt-${type}`).textContent = tasks.length;
+      const counter = document.getElementById(`cnt-${type}`);
+      if (counter) counter.textContent = tasks.length;
       container.innerHTML = '';
+
       tasks.forEach(t => {
         const div = document.createElement('div');
         div.className = `task-card ${type}`;
@@ -152,8 +172,14 @@
           <div class="task-name">${t.request_name}</div>
           <div class="task-meta">病例: ${t.request_case_cnt} | 视频: ${t.request_video_cnt}<br/>上传: ${t.upload_time}</div>
         `;
-        if (type === 'unreleased') div.onclick = () => openPublishModal(t);
-        if (type === 'published') div.onclick = () => alert("已发布对象: " + (t.target_users ? t.target_users.join(', ') : '无'));
+
+        // [核心修复] 根据任务状态直接在循环内绑定正确的点击事件
+        if (type === 'unreleased') {
+            div.onclick = () => openPublishModal(t);
+        } else if (type === 'published') {
+            // 点击已发布任务，调用升级版进度明细弹窗
+            div.onclick = () => openStatusDetail(t.submission_id);
+        }
         container.appendChild(div);
       });
     }
@@ -172,9 +198,14 @@
     dropzone.ondragover = (e) => e.preventDefault();
 
     async function handleFile(file) {
-      // [关键修复] JS 标准方法是 endsWith (大写 W)
       if (!file || !file.name.endsWith('.zip')) return alert("请上传 ZIP 格式的压缩包");
       
+      // 2. [核心修复] 启动全屏遮罩，防止解析期间操作
+      const overlay = document.getElementById('globalLoading');
+      const overlayText = overlay.querySelector('div:nth-child(2)');
+      overlayText.textContent = "正在深度解析教育资源包，请稍候...";
+      overlay.style.display = 'flex';
+
       currentZipFile = file;
       const formData = new FormData();
       formData.append('file', file);
@@ -191,34 +222,47 @@
         
         document.getElementById('confirmModal').style.display = 'flex';
       } catch (e) { 
-          console.error(e);
-          alert("ZIP 内部结构非法：必须包含 epoch_data.json 且视频路径正确"); 
+          alert("ZIP 结构解析失败：请确保 epoch_data.json 存在于压缩包内且格式正确"); 
+      } finally {
+          // 恢复 UI 状态
+          dropzone.style.pointerEvents = 'auto';
+          dropzone.innerHTML = originalHtml;
       }
     }
 
     document.getElementById('btn-final-upload').onclick = async () => {
-      const btn = document.getElementById('btn-final-upload');
-      const taskName = document.getElementById('m-task-name').value.trim();
-      if (!taskName) return alert("请输入任务名称");
+          const btn = document.getElementById('btn-final-upload');
+          const taskName = document.getElementById('m-task-name').value.trim();
+          if (!taskName) return alert("请输入任务名称");
 
-      btn.disabled = true; btn.textContent = "上传中...";
-      
-      const formData = new FormData();
-      formData.append('file', currentZipFile);
-      formData.append('submission_id', currentTempId);
-      formData.append('request_name', taskName);
+          // [新增] 开启全局全屏遮罩，彻底锁定交互
+          document.getElementById('globalLoading').style.display = 'flex';
+          // [新增] 立即关闭当前的确认弹窗
+          closeModal('confirmModal');
 
-      try {
-        const r = await fetch('/api/edu/confirm-upload', { method: 'POST', body: formData });
-        if (r.ok) {
-            closeModal('confirmModal');
-            fetchTasks();
-        } else {
-            alert("服务器保存失败，请检查 SYSTEM 文件夹写入权限");
-        }
-      } catch (e) { alert("网络错误，确认上传失败"); }
-      finally { btn.disabled = false; btn.textContent = "确认并开始判读"; }
-    };
+          btn.disabled = true; btn.textContent = "上传中...";
+          
+          const formData = new FormData();
+          formData.append('file', currentZipFile);
+          formData.append('submission_id', currentTempId);
+          formData.append('request_name', taskName);
+
+          try {
+            const r = await fetch('/api/edu/confirm-upload', { method: 'POST', body: formData });
+            if (r.ok) {
+                // closeModal('confirmModal'); // [已移至上方提前执行]
+                fetchTasks();
+            } else {
+                alert("服务器保存失败，请检查 SYSTEM 文件夹写入权限");
+            }
+          } catch (e) { alert("网络错误，确认上传失败"); }
+          finally { 
+              btn.disabled = false; 
+              btn.textContent = "确认并开始判读"; 
+              // [新增] 任务处理结束（无论成功或失败），解除全屏锁定
+              document.getElementById('globalLoading').style.display = 'none';
+          }
+        };
 
     async function openPublishModal(task) {
       currentTargetTaskId = task.submission_id;
@@ -260,6 +304,73 @@
 
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
     init();
+    async function openStatusDetail(taskId) {
+        const container = document.getElementById('sd-content');
+        container.innerHTML = '<p style="text-align:center; padding:20px;">正在拉取医师判读进度...</p>';
+        document.getElementById('statusDetailModal').style.display = 'flex';
+
+        try {
+            const r = await fetch(`/api/edu/admin/task-status/${taskId}`);
+            const data = await r.json();
+            document.getElementById('sd-title').textContent = `📊 进度追踪: ${data.task_name}`;
+            
+            if (!data.user_statuses || data.user_statuses.length === 0) {
+                container.innerHTML = '<p style="text-align:center; color:#94a3b8; padding:20px;">暂无发布对象</p>';
+                return;
+            }
+
+            container.innerHTML = data.user_statuses.map(u => `
+                <div class="user-status-row" onclick="${u.completed ? `alert('展示 ${u.username} 的详细指标 JSON: ' + JSON.stringify(u.details))` : 'alert(\'该医师尚未完成判读\')'}">
+                    <span><strong>👤 ${u.username}</strong></span>
+                    <span class="status-tag ${u.completed ? 'tag-done' : 'tag-wait'}">
+                        ${u.completed ? `已完成 (得分: ${(u.score*100).toFixed(1)}%)` : '⌛ 待判读'}
+                    </span>
+                </div>
+            `).join('');
+        } catch (e) { 
+            container.innerHTML = '<p style="color:#ef4444; text-align:center;">数据获取失败，请确保后端已实现 task-status 接口</p>'; 
+        }
+    }
+
+    async function deleteEduTask() {
+        if (!taskPendingDeletion) return;
+        if (!confirm("🚨 警告：此操作将物理删除系统空间内的原始视频、处理结果及所有成绩！\n\n确定要继续吗？")) return;
+
+        try {
+            const r = await fetch(`/api/edu/admin/tasks/${taskPendingDeletion}`, { method: 'DELETE' });
+            if (r.ok) {
+                alert("✅ 任务已从系统空间物理清除");
+                closeModal('statusDetailModal');
+                fetchTasks(); // 刷新看板
+            } else {
+                alert("删除失败，请检查后端权限");
+            }
+        } catch (e) { alert("网络连接异常"); }
+    }
+
+// 修改 renderKanban 中的点击事件
+if (type === 'published') div.onclick = () => openStatusDetail(t.submission_id);
+
+
   </script>
+  <!-- 全屏拦截遮罩 -->
+  <div id="globalLoading" class="global-loading">
+      <div style="font-size: 50px; animation: bounce 1s infinite;">📦</div>
+      <div style="font-weight: 700; color: #764ba2; margin-top: 15px;">正在处理压缩包并重组目录结构...</div>
+      <p style="color: #94a3b8; font-size: 12px; margin-top: 5px;">此过程涉及大量文件操作，请勿关闭或刷新页面</p>
+  </div>
+
+  <!-- 任务完成度详情弹窗 -->
+  <div id="statusDetailModal" class="modal-overlay">
+      <div class="modal-card" style="max-width: 600px;">
+          <h3 id="sd-title">判读进度明细</h3>
+          <div id="sd-content" style="margin: 20px 0; max-height: 400px; overflow-y: auto;"></div>
+          <div style="display:flex; gap:12px; margin-top:15px;">
+            <button class="btn btn-secondary" style="flex:1" onclick="deleteEduTask()">🗑️ 物理删除此任务</button>
+            <button class="btn btn-primary" style="flex:1" onclick="closeModal('statusDetailModal')">返回列表</button>
+      </div>
+  </div>
+
+
 </body>
 </html>
