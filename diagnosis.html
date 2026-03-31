@@ -2301,7 +2301,12 @@ function selectOption(element, group) {
                     // 提交成功后清除草稿
                     clearDraft();
                     
-                    window.location.href = '/flow';
+                    // [核心修改] 根据模式返回对应的状态界面
+                    if (currentMode === 'edu') {
+                        window.location.href = '/edu_status';
+                    } else {
+                        window.location.href = '/task_status';
+                    }
                 } catch (error) {
                     console.error('提交失败:', error);
                     alert('提交失败，请重试');
@@ -2394,8 +2399,14 @@ function selectOption(element, group) {
             
             // 延迟一下，确保清除操作完成
             setTimeout(() => {
-                console.log('🏠 跳转到主页');
-                window.location.href = '/flow';
+                // [修复] 根据当前模式决定返回路径
+                if (currentMode === 'edu') {
+                    console.log('🏠 返回教育练习列表');
+                    window.location.href = '/edu_status';
+                } else {
+                    console.log('🏠 返回任务进度列表');
+                    window.location.href = '/task_status';
+                }
             }, 100);
         }
 
