@@ -248,10 +248,34 @@ def update_edu_task_index(task_update: dict):
 # --- [重构] 后台模型调用包装器：支持教育模式 ---
 
 async def run_model_inference_wrapper(request_path: Path, output_root: Path, request_name: str, username: str, submission_id: str, is_system: bool = False):
+    """
+    后台AI推理任务包装器
+    状态追踪：使用 .processing 和 .failed 文件标记任务状态
+    """
     print(f"🤖 [AI任务] 启动推理流程: {request_name} (ID: {submission_id}, 系统任务: {is_system})")
+    
     if run_diagnosis is None:
         print("❌ [AI任务] 错误：模型函数未导入")
         return
+    
+    # 确定状态文件路径（用户空间或系统空间）
+    if is_system:
+        task_root = SYSTEM_EDU_DIR
+    else:
+        task_root = BASE_DATA_DIR / username
+    
+    processing_flag = task_root / "oridata" / submission_id / ".processing"
+    failed_flag = task_root / "oridata" / submission_id / ".failed"
+    
+    # 创建处理中标记
+    try:
+        processing_flag.parent.mkdir(parents=True, exist_ok=True)
+        with open(processing_flag, "w", encoding="utf-8") as f:
+            f.write(f"started_at: {datetime.datetime.now().isoformat()}\n")
+        print(f"📍 [AI任务] 状态标记已创建: {processing_flag}")
+    except Exception as e:
+        print(f"⚠️ [AI任务] 无法创建状态标记: {e}")
+    
     try:
         # 1. 运行 AI 诊断模型
         await asyncio.to_thread(run_diagnosis, target_dir=str(request_path), output_dir=str(output_root))
@@ -276,12 +300,27 @@ async def run_model_inference_wrapper(request_path: Path, output_root: Path, req
                 "is_cmp": True, 
                 "cmp_time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             })
-        print(f"✅ [AI任务] {request_name} 任务处理与编码修复全部完成。")
+        
+        # 4. 成功完成：删除处理中标记
+        if processing_flag.exists():
+            processing_flag.unlink()
+            print(f"✅ [AI任务] {request_name} 任务处理与编码修复全部完成。")
         
     except Exception as e:
         print(f"🚨 [AI任务] 流程崩溃: {e}")
         import traceback
         traceback.print_exc()
+        
+        # 失败：将 .processing 重命名为 .failed
+        if processing_flag.exists():
+            try:
+                processing_flag.rename(failed_flag)
+                with open(failed_flag, "a", encoding="utf-8") as f:
+                    f.write(f"failed_at: {datetime.datetime.now().isoformat()}\n")
+                    f.write(f"error: {str(e)}\n")
+                print(f"❌ [AI任务] 状态已标记为失败: {failed_flag}")
+            except Exception as rename_err:
+                print(f"⚠️ [AI任务] 无法更新失败标记: {rename_err}")
 
 # --- 核心 API 路由 (保持 100% 原文逻辑) ---
 
@@ -410,6 +449,93 @@ async def re_sync_tasks(username: str):
     for sub_id in physical_folders:
         update_user_task_index(username, {"submission_id": sub_id, "request_name": "同步任务", "is_cmp": True})
     return {"message": "同步完成"}
+
+
+# --- [新增] 清空未完成且未在运行的任务 ---
+
+@router.delete("/api/users/{username}/clear-stuck-tasks")
+async def clear_stuck_tasks(username: str):
+    """
+    清空当前用户下所有未完成且未在运行的任务（安全删除）
+    
+    删除条件：
+    1. is_cmp = False（未完成）
+    2. 不存在 .processing 文件（没有后台任务在运行）
+    
+    安全机制：
+    - 已完成的任务（is_cmp = True）不受影响
+    - 正在运行的任务（存在 .processing 文件）不受影响
+    - 失败的任务（存在 .failed 文件）会被清理
+    """
+    user_root = BASE_DATA_DIR / username
+    index_path = user_root / "data.json"
+    
+    if not index_path.exists():
+        raise HTTPException(status_code=404, detail="用户任务索引不存在")
+    
+    # 读取当前任务列表
+    with open(index_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    
+    tasks = data.get("tasks", [])
+    deleted_tasks = []
+    kept_tasks = []
+    
+    for task in tasks:
+        submission_id = task.get("submission_id")
+        is_cmp = task.get("is_cmp", False)
+        
+        # 只处理未完成的任务
+        if is_cmp:
+            kept_tasks.append(task)
+            continue
+        
+        # 检查是否有 .processing 文件（正在运行）
+        ori_path = user_root / ORIDATA_DIRNAME / submission_id
+        processing_flag = ori_path / ".processing"
+        
+        if processing_flag.exists():
+            # 正在运行，保留
+            kept_tasks.append(task)
+            print(f"⏭️ 任务 {submission_id} 正在运行，跳过")
+            continue
+        
+        # 满足删除条件
+        try:
+            # 删除原始数据
+            if ori_path.exists():
+                shutil.rmtree(ori_path)
+                print(f"🗑️ 已删除原始数据: {ori_path}")
+            
+            # 删除处理结果（如果存在）
+            request_pos = task.get("request_pos")
+            if request_pos:
+                proc_path = user_root / request_pos
+                if proc_path.exists():
+                    shutil.rmtree(proc_path)
+                    print(f"🗑️ 已删除处理结果: {proc_path}")
+            
+            deleted_tasks.append({
+                "submission_id": submission_id,
+                "request_name": task.get("request_name", "未命名")
+            })
+            
+        except Exception as e:
+            print(f"⚠️ 删除任务 {submission_id} 失败: {e}")
+            # 删除失败的任务保留在列表中
+            kept_tasks.append(task)
+    
+    # 更新索引文件
+    data["tasks"] = kept_tasks
+    with open(index_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    
+    return {
+        "message": f"已清理 {len(deleted_tasks)} 个卡住的任务",
+        "deleted_count": len(deleted_tasks),
+        "deleted_tasks": deleted_tasks,
+        "kept_count": len(kept_tasks)
+    }
 
 
 # --- [教育模式核心接口：修正自适应路径版] ---

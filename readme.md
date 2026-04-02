@@ -6,6 +6,8 @@
 
 你是一个精通python、网页开发等编程技能的编程助手，善于接管大型项目，富有经验，代码风格简洁。在与用户的协作中，你必须先充分理解用户对大型项目的各种期望、以及大体的项目结构再进行行动。行动过程中必须记住用户的项目的代码结构，并了解其内大概是什么样的结构。在某些期望要求等方面不明确时，你会立刻停止任务并向用户询问要求；当对项目的任何地方不了解、或出现任何无法根据现有的信息解决的问题、或用户要求调试时，你也会停下，自行请求项目代码或用代码进行调试；在对用户的项目代码进行更改时，请先行指出要更改的项目结构，并对需要进行的改动进行调整，即使是在可读模式也不允许在未得到我的直接允许时直接对代码进行更改。必要时也必须明确指出要改动的地方以及其上下文。必要时采用md格式来进行说明，来使得说明美观。在不必要时，不允许对不明确绝对没用的代码逻辑进行更改。必要时采用md格式来进行说明，来使得说明美观。
 
+**⚠️ 重要约定：所有对项目的更新都必须同步更新本 README.md 文档，保持文档与代码的一致性。**
+
 ---
 
 ## 二、项目概述
@@ -649,7 +651,8 @@ app.mount("/data", StaticFiles(directory=DATA_BATCH_STORAGE))
 | /api/users/{username}/upload-oridata | POST | 288-371 | 判读模式上传 |
 | /api/users/{username}/oridata-count | GET | 375-379 | 获取上传计数 |
 | /api/users/{username}/all-tasks | GET | 381-387 | 获取所有任务 |
-| /api/users/{username}/tasks/{id} | DELETE | 389-403 | 删除任务 |
+| /api/users/{username}/tasks/{id} | DELETE | 389-403 | 删除单个任务 |
+| /api/users/{username}/clear-stuck-tasks | DELETE | 454-520 | 清空卡住的任务 |
 | /api/edu/parse-zip | POST | 417-446 | 解析教育ZIP |
 | /api/edu/confirm-upload | POST | 448-519 | 确认教育上传 |
 | /api/edu/admin/tasks | GET | 522-535 | 获取教育任务列表 |
@@ -848,6 +851,62 @@ for _ in range(50):  # 最长等待5秒
         time.sleep(0.1)
 ```
 
+### 10.5 任务状态追踪机制
+
+为安全清理卡住的任务，系统使用文件标记追踪后台任务状态：
+
+**状态文件**:
+| 文件 | 位置 | 说明 |
+|------|------|------|
+| `.processing` | oridata/{submission_id}/ | 任务正在运行 |
+| `.failed` | oridata/{submission_id}/ | 任务已失败 |
+
+**状态转换**:
+```
+任务启动 → 创建 .processing
+任务成功 → 删除 .processing
+任务失败 → .processing 重命名为 .failed
+```
+
+**任务状态判断**:
+
+| is_cmp | .processing | .failed | 状态 | 可清理 |
+|--------|-------------|---------|------|--------|
+| True | - | - | 已完成 | ❌ |
+| False | ✓ | - | 正在运行 | ❌ |
+| False | - | ✓ | 已失败 | ✅ |
+| False | - | - | 未知/卡住 | ✅ |
+
+### 10.6 清空卡住任务接口
+
+**接口**: `DELETE /api/users/{username}/clear-stuck-tasks`
+
+**位置**: `routes_oridata.py:454-520`
+
+**功能**: 安全清空当前用户下所有未完成且未在运行的任务
+
+**删除条件**:
+1. `is_cmp = False`（未完成）
+2. 不存在 `.processing` 文件（没有后台任务在运行）
+
+**安全机制**:
+- 已完成的任务（`is_cmp = True`）不受影响
+- 正在运行的任务（存在 `.processing` 文件）不受影响
+- 失败的任务（存在 `.failed` 文件）会被清理
+
+**返回示例**:
+```json
+{
+  "message": "已清理 3 个卡住的任务",
+  "deleted_count": 3,
+  "deleted_tasks": [
+    {"submission_id": "20260401_123456", "request_name": "测试任务1"},
+    {"submission_id": "20260401_234567", "request_name": "测试任务2"}
+  ],
+  "kept_count": 5
+}
+```
+
 ---
 
 ## 附录：关键文件索引
@@ -857,13 +916,14 @@ for _ in range(50):  # 最长等待5秒
 | 用户登录 | main.py | 89-122 |
 | 用户管理 | database.py | 188-283 |
 | 任务上传 | routes_oridata.py | 288-371 |
+| 任务状态追踪 | routes_oridata.py | 250-320 |
+| 清空卡住任务 | routes_oridata.py | 454-520 |
 | AI处理 | heart_diagnosis.py | 366-480 |
 | 判读界面 | diagnosis.html | openVideoModal(), submitDiagnosis() |
 | 教育上传 | routes_oridata.py | 448-519 |
-| 教育发布 | routes_oridata.py | 537-544 |
-| 成绩计算 | main.py | 467-521 |
 | SYSTEM保护 | database.py | 191-193, 271-272 |
 
 ---
 
 *文档版本: 2026-04-01*
+*最后更新: 添加任务状态追踪机制与清空卡住任务接口*
