@@ -20,7 +20,7 @@
     .request-name-container { background: #f8faff; border: 1px solid #d7e2ff; border-radius: 12px; padding: 16px 20px; margin-top: 12px; display: flex; align-items: center; gap: 12px; }
     .request-name-container label { font-weight: 700; color: #4b5563; white-space: nowrap; }
     .request-name-container input { flex: 1; padding: 10px 14px; border-radius: 8px; border: 1px solid #c9d7ff; font-size: 15px; font-weight: 600; outline: none; }
-    .dropzone { border: 2px dashed #c9d7ff; border-radius: 12px; padding: 50px; text-align: center; cursor: pointer; background: #fff; transition: all .15s; min-height: 150px; }
+    .dropzone { border: 2px dashed #c9d7ff; border-radius: 12px; padding: 75px; text-align: center; cursor: pointer; background: #fff; transition: all .15s; min-height: 225px; }
     .dropzone.dragover { border-color: #667eea; background: #eef4ff; }
     .controls { display:flex; gap:12px; align-items:center; margin-bottom:16px; flex-wrap:wrap; }
     .btn { padding:8px 14px; border-radius:8px; border:none; cursor:pointer; background:#667eea; color:white; font-weight: 600;}
@@ -309,9 +309,9 @@
               <div class="case-dropzone" style="border: 2px dashed #c9d7ff; border-radius: 12px; padding: 15px; text-align: center; margin-top: 8px; cursor: pointer;">
                 拖拽视频到此处
               </div>
-              <button class="btn" onclick="addVideoToCase(${i})" style="margin-top: 8px;">添加视频</button>
             </div>
             <div class="row-actions">
+              <button class="btn" onclick="addVideoToCase(${i})" style="margin-bottom: 8px;">添加视频</button>
               <button class="btn secondary" onclick="staging.splice(${i},1);renderRows()">删除病例</button>
             </div>
           `;
