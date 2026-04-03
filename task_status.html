@@ -100,7 +100,10 @@
       </div>
 
       <div class="card">
-        <h2><span class="status-dot dot-processing"></span>处理中任务 <span id="countBox2" class="badge">0</span></h2>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h2><span class="status-dot dot-processing"></span>处理中任务 <span id="countBox2" class="badge">0</span></h2>
+            <button class="btn btn-danger btn-sm" onclick="clearAllFailedTasks()" style="padding: 6px 12px; font-size: 13px;">删除所有失败任务</button>
+        </div>
         <div id="box2" class="task-list">
             <div class="empty-hint">暂无正在处理的任务</div>
         </div>
@@ -148,25 +151,36 @@
         const r = await fetch('/api/users/current');
         if (r.ok) {
           const d = await r.json();
-          currentUser = d.data;
-          document.getElementById('currentUserName').textContent = currentUser.username;
-          document.getElementById('currentUserOrg').textContent = currentUser.organization || '未知机构';
-          document.getElementById('avatarBox').textContent = currentUser.username[0].toUpperCase();
-          fetchTasks();
-          pollInterval = setInterval(fetchTasks, 5000);
-        } else {
-          window.location.href = '/login';
+          if (d && d.data) {
+            currentUser = d.data;
+            document.getElementById('currentUserName').textContent = currentUser.username;
+            document.getElementById('currentUserOrg').textContent = currentUser.organization || '未知机构';
+            document.getElementById('avatarBox').textContent = currentUser.username[0].toUpperCase();
+            fetchTasks();
+            pollInterval = setInterval(fetchTasks, 5000);
+            return;
+          }
         }
       } catch (e) { console.error("Session Error", e); }
+      document.getElementById('currentUserName').textContent = "未登录";
     }
 
     async function fetchTasks() {
-      if (!currentUser) return;
+      if (!currentUser || !currentUser.username) {
+        console.error("currentUser为空或username不存在，无法获取任务列表");
+        return;
+      }
       try {
         const r = await fetch(`/api/users/${encodeURIComponent(currentUser.username)}/all-tasks`);
+        if (!r.ok) {
+          console.error("获取任务列表失败，状态码:", r.status);
+          return;
+        }
         const data = await r.json();
         renderTaskLists(data.tasks || []);
-      } catch (e) { console.error("Fetch Tasks Error", e); }
+      } catch (e) {
+        console.error("Fetch Tasks Error", e);
+      }
     }
 
     function renderTaskLists(tasks) {
@@ -250,12 +264,51 @@
     function createTaskRow(task, isFinished) {
       const row = document.createElement('div');
       row.className = 'row-card';
+      
+      // 检查任务状态（处理中/失败/卡住）
+      let statusHtml = '';
+      let statusColor = '#3b82f6'; // 默认蓝色（处理中）
+      let statusText = '⏳ 处理中';
+      
+      if (!isFinished) {
+        // 根据task_status字段显示不同的状态
+        if (task && task.task_status) {
+          switch(task.task_status) {
+            case 'processing':
+              statusColor = '#3b82f6'; // 蓝色 - 处理中
+              statusText = '⏳ 处理中';
+              break;
+            case 'failed':
+              statusColor = '#ef4444'; // 红色 - 失败
+              statusText = '❌ 失败';
+              break;
+            case 'stuck':
+              statusColor = '#f59e0b'; // 橙色 - 卡住
+              statusText = '⚠️ 卡住';
+              break;
+            default:
+              statusColor = '#3b82f6'; // 默认蓝色
+              statusText = '⏳ 处理中';
+          }
+        } else {
+          // 向后兼容：使用旧的has_failed逻辑
+          const hasFailed = task && task.has_failed !== undefined ? task.has_failed : false;
+          statusColor = hasFailed ? '#ef4444' : '#3b82f6';
+          statusText = hasFailed ? '❌ 失败' : '⏳ 处理中';
+        }
+        
+        statusHtml = `<div style="font-size: 12px; color: ${statusColor}; font-weight: 600; margin-top: 4px;">
+          ${statusText}
+        </div>`;
+      }
+      
       const infoHtml = `
         <div class="task-info">
-          <div class="task-name">${task.request_name}</div>
+          <div class="task-name">${task ? task.request_name : '未知任务'}</div>
           <div class="task-meta">
-            上传时间：${task.upload_time} | 病例数：${task.request_case_cnt} | 视频数：${task.request_video_cnt}
-            ${isFinished ? `<br/>完成时间：${task.cmp_time}` : ''}
+            上传时间：${task ? task.upload_time : '未知'} | 病例数：${task ? task.request_case_cnt : '0'} | 视频数：${task ? task.request_video_cnt : '0'}
+            ${isFinished ? `<br/>完成时间：${task ? task.cmp_time : '未知'}` : ''}
+            ${statusHtml}
           </div>
         </div>
       `;
@@ -282,6 +335,10 @@
         btnDiag.textContent = '进入判读';
         
         btnDiag.onclick = () => {
+            if (!currentUser || !currentUser.username) {
+                alert('请先登录');
+                return;
+            }
             const userName = encodeURIComponent(currentUser.username);
             const taskFolderName = encodeURIComponent(task.submission_id);
             const taskDisplayName = encodeURIComponent(task.request_name);
@@ -299,6 +356,25 @@
       row.innerHTML = infoHtml;
       row.appendChild(btnGroup);
       return row;
+    }
+
+    async function clearAllFailedTasks() {
+      if (!confirm("确定要删除所有失败任务吗？此操作将永久删除所有标记为失败的任务。")) return;
+      try {
+        const r = await fetch(`/api/users/${encodeURIComponent(currentUser.username)}/clear-stuck-tasks`, {
+          method: 'DELETE'
+        });
+        if (r.ok) {
+          const result = await r.json();
+          alert(`成功清理 ${result.deleted_count} 个失败任务`);
+          fetchTasks();
+        } else {
+          const error = await r.json();
+          alert(`清理失败: ${error.detail}`);
+        }
+      } catch (e) {
+        alert("网络错误，请重试");
+      }
     }
 
     async function deleteTask(subId) {

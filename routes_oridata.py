@@ -422,6 +422,35 @@ async def get_all_tasks(username: str):
     index_path = BASE_DATA_DIR / username / "data.json"
     if not index_path.exists(): return {"tasks": []}
     with open(index_path, "r", encoding="utf-8") as f: data = json.load(f)
+    
+    # 为每个任务添加状态检查
+    tasks_with_status = []
+    for task in data["tasks"]:
+        submission_id = task.get("submission_id")
+        ori_path = BASE_DATA_DIR / username / ORIDATA_DIRNAME / submission_id
+        
+        # 检查失败状态
+        failed_flag = ori_path / ".failed"
+        has_failed = failed_flag.exists()
+        
+        # 检查处理状态
+        processing_flag = ori_path / ".processing"
+        is_processing = processing_flag.exists()
+        
+        # 检查是否已完成
+        is_completed = task.get("is_cmp", False)
+        
+        # 判断任务状态
+        task_status = "completed" if is_completed else "processing" if is_processing else "failed" if has_failed else "stuck"
+        
+        tasks_with_status.append({
+            **task,
+            "has_failed": has_failed,
+            "is_processing": is_processing,
+            "task_status": task_status
+        })
+    
+    data["tasks"] = tasks_with_status
     data["tasks"].sort(key=lambda x: x['upload_time'], reverse=True)
     return data
 
