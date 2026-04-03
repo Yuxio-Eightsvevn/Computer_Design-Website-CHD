@@ -12,7 +12,7 @@
     .sidebar { width: 220px; }
     .main { flex: 1; }
     .navbar { background: linear-gradient(135deg,#667eea 0%,#764ba2 100%); color: white; padding: 12px 20px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
-    .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); margin-top: 20px; }
+    .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); margin-top: 20px; min-height: 500px; }
     h1 { font-size: 20px; margin-bottom: 12px; }
     .stats-container { background: white; border-radius: 12px; padding: 16px 20px; margin-top: 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.04); border: 1px solid #eef2f7; }
     .task-count-box { font-size: 16px; font-weight: 700; color: #4b5563; }
@@ -20,7 +20,7 @@
     .request-name-container { background: #f8faff; border: 1px solid #d7e2ff; border-radius: 12px; padding: 16px 20px; margin-top: 12px; display: flex; align-items: center; gap: 12px; }
     .request-name-container label { font-weight: 700; color: #4b5563; white-space: nowrap; }
     .request-name-container input { flex: 1; padding: 10px 14px; border-radius: 8px; border: 1px solid #c9d7ff; font-size: 15px; font-weight: 600; outline: none; }
-    .dropzone { border: 2px dashed #c9d7ff; border-radius: 12px; padding: 30px; text-align: center; cursor: pointer; background: #fff; transition: all .15s; }
+    .dropzone { border: 2px dashed #c9d7ff; border-radius: 12px; padding: 50px; text-align: center; cursor: pointer; background: #fff; transition: all .15s; min-height: 150px; }
     .dropzone.dragover { border-color: #667eea; background: #eef4ff; }
     .controls { display:flex; gap:12px; align-items:center; margin-bottom:16px; flex-wrap:wrap; }
     .btn { padding:8px 14px; border-radius:8px; border:none; cursor:pointer; background:#667eea; color:white; font-weight: 600;}
@@ -111,6 +111,11 @@
       const chooseFolderBtn = document.getElementById('chooseFolderBtn');
       const chooseFilesBtn = document.getElementById('chooseFilesBtn');
       const addCaseBtn = document.getElementById('addCaseBtn');
+      addCaseBtn.onclick = () => {
+        const newCase = { caseName: `patient ${staging.length + 1}`, files: [] };
+        staging.push(newCase);
+        renderRows();
+      };
       const dropzone = document.getElementById('dropzone');
       const rowsContainer = document.getElementById('rowsContainer');
       const messages = document.getElementById('messages');
@@ -252,17 +257,44 @@
           const url = URL.createObjectURL(file);
           const video = document.createElement('video');
           video.preload = 'metadata'; video.muted = true; video.src = url;
+          
           video.onloadedmetadata = () => {
-            video.currentTime = 0.05;
+            // 更全面的视频长度检查
+            if (!video.duration || video.duration <= 0 || isNaN(video.duration)) {
+              URL.revokeObjectURL(url);
+              resolve('');
+              return;
+            }
+            
+            const seekTime = Math.min(0.05, video.duration * 0.5);
+            video.currentTime = seekTime;
+            
             video.onseeked = () => {
               const canvas = document.createElement('canvas');
               canvas.width = 320; canvas.height = 180;
               canvas.getContext('2d').drawImage(video, 0, 0, 320, 180);
-              URL.revokeObjectURL(url); resolve(canvas.toDataURL('image/jpeg'));
+              URL.revokeObjectURL(url);
+              resolve(canvas.toDataURL('image/jpeg'));
+            };
+            
+            video.onerror = () => {
+              URL.revokeObjectURL(url);
+              resolve('');
             };
           };
-          video.onerror = () => resolve('');
-          setTimeout(() => resolve(''), 2000);
+          
+          video.onerror = () => {
+            URL.revokeObjectURL(url);
+            resolve('');
+          };
+          
+          // 设置更合理的超时
+          setTimeout(() => {
+            if (!video.seeked) {
+              URL.revokeObjectURL(url);
+              resolve('');
+            }
+          }, 3000); // 3秒超时
         });
       }
 
@@ -270,14 +302,74 @@
         rowsContainer.innerHTML = '';
         staging.forEach((c, i) => {
           const row = document.createElement('div'); row.className = 'row-card';
-          row.innerHTML = `<div class="row-left"><div class="case-name">病例名：<input value="${c.caseName}" oninput="staging[${i}].caseName=this.value"></div><div class="thumbs"></div></div><div class="row-actions"><button class="btn secondary" onclick="staging.splice(${i},1);renderRows()">删除</button></div>`;
+          row.innerHTML = `
+            <div class="row-left">
+              <div class="case-name">病例名：<input value="${c.caseName}" oninput="staging[${i}].caseName=this.value"></div>
+              <div class="thumbs"></div>
+              <div class="case-dropzone" style="border: 2px dashed #c9d7ff; border-radius: 12px; padding: 15px; text-align: center; margin-top: 8px; cursor: pointer;">
+                拖拽视频到此处
+              </div>
+              <button class="btn" onclick="addVideoToCase(${i})" style="margin-top: 8px;">添加视频</button>
+            </div>
+            <div class="row-actions">
+              <button class="btn secondary" onclick="staging.splice(${i},1);renderRows()">删除病例</button>
+            </div>
+          `;
+          
+          // 为每个病例的拖拽区域添加事件
+          const caseDropzone = row.querySelector('.case-dropzone');
+          caseDropzone.ondragover = (e) => { e.preventDefault(); caseDropzone.style.borderColor = '#667eea'; };
+          caseDropzone.ondragleave = () => { caseDropzone.style.borderColor = '#c9d7ff'; };
+          caseDropzone.ondrop = async (e) => {
+            e.preventDefault();
+            caseDropzone.style.borderColor = '#c9d7ff';
+            const items = e.dataTransfer.items;
+            if (items && items.length > 0) {
+              let files = [];
+              for (const item of items) {
+                if (item.kind === 'file') {
+                  const file = item.getAsFile();
+                  if (file && ALLOWED_EXT.includes('.' + file.name.split('.').pop().toLowerCase())) {
+                    files.push(file);
+                  }
+                }
+              }
+              files.forEach(file => {
+                staging[i].files.push({ file: file, relativePath: null, thumbDataUrl: '' });
+              });
+              renderRows();
+              // 重新生成缩略图
+              staging[i].files.forEach((f, idx) => {
+                if (!f.thumbDataUrl) {
+                  createVideoThumbnail(f.file).then(thumb => {
+                    staging[i].files[idx].thumbDataUrl = thumb;
+                    renderRows();
+                  });
+                }
+              });
+            }
+          };
+          
           const tCont = row.querySelector('.thumbs');
-          c.files.forEach(f => {
+          c.files.forEach((f, fileIndex) => {
             const t = document.createElement('div'); t.className = 'thumb';
-            t.innerHTML = `<img src="${f.thumbDataUrl || ''}"><div class="label">${f.file.name}</div>`;
+            t.innerHTML = `
+              <img src="${f.thumbDataUrl || ''}">
+              <div class="label">${f.file.name}</div>
+              <div class="del-single" data-case="${i}" data-file="${fileIndex}">✕</div>
+            `;
             tCont.appendChild(t);
           });
           rowsContainer.appendChild(row);
+        });
+        
+        // 为所有删除按钮添加事件监听器（解决作用域问题）
+        document.querySelectorAll('.del-single').forEach(button => {
+          button.addEventListener('click', function() {
+            const caseIndex = parseInt(this.dataset.case);
+            const fileIndex = parseInt(this.dataset.file);
+            deleteVideoFromCase(caseIndex, fileIndex);
+          });
         });
       }
 
@@ -331,6 +423,38 @@
       };
 
       function showMessage(t) { const m = document.createElement('div'); m.className='alert'; m.textContent=t; messages.appendChild(m); setTimeout(()=>m.remove(), 3000); }
+      
+      // 删除视频的函数
+      function deleteVideoFromCase(caseIndex, fileIndex) {
+        staging[caseIndex].files.splice(fileIndex, 1);
+        renderRows();
+      }
+      
+      // 添加视频到病例的函数
+      function addVideoToCase(caseIndex) {
+        fileInput.click();
+        fileInput.onchange = (e) => {
+          const files = Array.from(e.target.files);
+          files.forEach(file => {
+            staging[caseIndex].files.push({
+              file: file,
+              relativePath: null,
+              thumbDataUrl: '' // 将在后续处理中生成
+            });
+          });
+          renderRows();
+          // 重新生成缩略图
+          staging[caseIndex].files.forEach((f, idx) => {
+            if (!f.thumbDataUrl) {
+              createVideoThumbnail(f.file).then(thumb => {
+                staging[caseIndex].files[idx].thumbDataUrl = thumb;
+                renderRows();
+              });
+            }
+          });
+        };
+      }
+      
       chooseFolderBtn.onclick = () => folderInput.click();
       folderInput.onchange = (e) => handleIncomingFiles(Array.from(e.target.files));
       chooseFilesBtn.onclick = () => fileInput.click();
