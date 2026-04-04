@@ -49,6 +49,76 @@
     .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.2s; }
     .btn-primary { background: #667eea; color: white; }
     .btn-ghost { background: #f1f5f9; color: #475569; }
+    
+    /* [新增] 自定义下拉框样式 */
+    .custom-select-container {
+        position: relative;
+        width: 100%;
+    }
+    .custom-select-display {
+        padding: 10px;
+        border: 1px solid #d7e2ff;
+        border-radius: 6px;
+        background: white;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 14px;
+    }
+    .custom-select-display:hover {
+        border-color: #667eea;
+    }
+    .custom-select-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        max-height: 300px;
+        overflow-y: auto;
+        z-index: 100;
+        display: none;
+    }
+    .custom-select-dropdown.show {
+        display: block;
+    }
+    .custom-select-option {
+        padding: 10px 15px;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid #f1f5f9;
+    }
+    .custom-select-option:hover {
+        background: #f8fafc;
+    }
+    .custom-select-option:last-child {
+        border-bottom: none;
+    }
+    .custom-select-option.selected {
+        background: #eef2ff;
+        color: #667eea;
+    }
+    .custom-select-option .delete-btn {
+        background: #ef4444;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        padding: 4px 8px;
+        font-size: 11px;
+        cursor: pointer;
+        opacity: 0.8;
+    }
+    .custom-select-option .delete-btn:hover {
+        opacity: 1;
+        background: #dc2626;
+    }
+    
     @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     @media (max-width: 1000px) { .kanban-container { grid-template-columns: 1fr; } }
   </style>
@@ -103,6 +173,125 @@
           <div id="col-published"></div>
         </div>
       </div>
+      
+      <!-- 大模型配置卡片 -->
+      <div class="card" style="margin-top: 20px;">
+        <h3 style="margin-bottom: 15px;">🤖 大模型配置</h3>
+        
+        <!-- 模型选择下拉框 -->
+        <div style="margin: 15px 0;">
+          <label style="font-weight: 600; margin-bottom: 8px; display: block;">
+            选择模型：
+          </label>
+          <div class="custom-select-container" id="modelSelectContainer">
+            <div class="custom-select-header" onclick="toggleModelSelect()">
+              <span id="selectedModelName">-- 请选择模型 --</span>
+              <span class="custom-select-arrow">▼</span>
+            </div>
+            <div class="custom-select-dropdown" id="modelDropdown">
+              <!-- 模型选项将通过JavaScript动态添加 -->
+            </div>
+          </div>
+        </div>
+        
+        <!-- 当前模型信息显示（只读） -->
+        <div id="currentModelInfo" style="display:none; padding:15px; background:#f8fafc; border-radius:8px; margin-top:15px;">
+          <div style="margin-bottom:8px;"><strong>模型名称：</strong><span id="infoDisplayName"></span></div>
+          <div style="margin-bottom:8px;"><strong>Base URL：</strong><span id="infoBaseUrl"></span></div>
+          <div style="margin-bottom:8px;"><strong>API Key：</strong><span id="infoApiKey"></span></div>
+          <div style="margin-bottom:8px;"><strong>模型ID：</strong><span id="infoModelId"></span></div>
+          <div><strong>描述：</strong><span id="infoDescription"></span></div>
+        </div>
+        
+        <!-- 操作按钮 -->
+        <div style="margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
+          <button onclick="showAddModelModal()" class="btn btn-primary">
+            ➕ 增加模型
+          </button>
+          <button onclick="editCurrentModel()" id="editModelBtn" class="btn btn-ghost" style="display:none;">
+            ✏️ 编辑
+          </button>
+          <button onclick="testCurrentModel()" id="testModelBtn" class="btn" style="display:none; background:#10b981; color:white;">
+            🔌 测试连接
+          </button>
+        </div>
+        
+        <!-- 配置指南链接 -->
+        <div style="margin-top: 15px; padding: 12px; background: #f0f9ff; border-radius: 8px; border-left: 3px solid #667eea;">
+          <p style="font-size: 12px; color: #64748b; line-height: 1.6;">
+            💡 <strong>配置帮助</strong>：查看<a href="/config/LLM_MODELS_GUIDE.md" target="_blank" style="color: #667eea;">配置指南</a>了解如何获取API Key和配置参数
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 添加/编辑模型弹窗 -->
+  <div id="modelModal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 600px;">
+      <h3 id="modalTitle">增加模型</h3>
+      
+      <div style="margin: 15px 0;">
+        <label style="font-weight:600; display:block; margin-bottom:5px;">
+          显示名称 <span style="color:#ef4444;">*</span>
+        </label>
+        <input id="modelDisplayName" type="text" 
+               placeholder="例如：智谱AI GLM-4"
+               style="width:100%; padding:10px; border:1px solid #d7e2ff; border-radius:6px;">
+        <small style="color:#64748b; font-size:12px;">
+          在界面上显示的名称
+        </small>
+      </div>
+      
+      <div style="margin: 15px 0;">
+        <label style="font-weight:600; display:block; margin-bottom:5px;">
+          Base URL <span style="color:#ef4444;">*</span>
+        </label>
+        <input id="modelBaseUrl" type="text"
+               placeholder="例如：https://open.bigmodel.cn/api"
+               style="width:100%; padding:10px; border:1px solid #d7e2ff; border-radius:6px;">
+        <small style="color:#64748b; font-size:12px;">
+          API服务地址，详见<a href="/config/LLM_MODELS_GUIDE.md" target="_blank" style="color:#667eea;">配置指南</a>
+        </small>
+      </div>
+      
+      <div style="margin: 15px 0;">
+        <label style="font-weight:600; display:block; margin-bottom:5px;">
+          API Key <span style="color:#ef4444;">*</span>
+        </label>
+        <input id="modelApiKey" type="password"
+               placeholder="输入API密钥"
+               style="width:100%; padding:10px; border:1px solid #d7e2ff; border-radius:6px;">
+        <small style="color:#64748b; font-size:12px;">
+          从服务商获取的访问密钥
+        </small>
+      </div>
+      
+      <div style="margin: 15px 0;">
+        <label style="font-weight:600; display:block; margin-bottom:5px;">
+          模型名称 <span style="color:#ef4444;">*</span>
+        </label>
+        <input id="modelName" type="text"
+               placeholder="例如：glm-4"
+               style="width:100%; padding:10px; border:1px solid #d7e2ff; border-radius:6px;">
+        <small style="color:#64748b; font-size:12px;">
+          API调用时使用的模型标识符
+        </small>
+      </div>
+      
+      <div style="margin: 15px 0;">
+        <label style="font-weight:600; display:block; margin-bottom:5px;">
+          描述（可选）
+        </label>
+        <textarea id="modelDescription" rows="2"
+                  placeholder="例如：智谱AI最新GLM-4模型，支持128K上下文"
+                  style="width:100%; padding:10px; border:1px solid #d7e2ff; border-radius:6px; resize:vertical;"></textarea>
+      </div>
+      
+      <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:20px;">
+        <button onclick="closeModelModal()" class="btn btn-ghost">取消</button>
+        <button onclick="saveModel()" class="btn btn-primary">保存</button>
+      </div>
     </div>
   </div>
 
@@ -145,7 +334,272 @@
 
     async function init() {
       fetchTasks();
+      loadModels();
       setInterval(fetchTasks, 5000); 
+    }
+    
+    // ==================== 新的大模型配置管理函数 ====================
+    
+    let currentModels = [];
+    let selectedModelId = null;
+    let isDropdownOpen = false;
+    
+    async function loadModels() {
+      try {
+        const r = await fetch('/api/admin/llm-models');
+        if (r.ok) {
+          const data = await r.json();
+          currentModels = data.models || [];
+          selectedModelId = data.selected_model_id;
+          
+          renderModelDropdown();
+          
+          if (selectedModelId) {
+            showModelInfo(selectedModelId);
+          }
+        }
+      } catch (e) {
+        console.error('加载模型列表失败:', e);
+      }
+    }
+    
+    function renderModelDropdown() {
+      const dropdown = document.getElementById('modelDropdown');
+      const header = document.getElementById('selectedModelName');
+      
+      dropdown.innerHTML = '';
+      
+      if (currentModels.length === 0) {
+        header.textContent = '-- 无可用模型 --';
+        return;
+      }
+      
+      // 渲染模型选项
+      currentModels.forEach(model => {
+        const option = document.createElement('div');
+        option.className = 'custom-select-option';
+        option.innerHTML = `
+          <span class="model-name">${model.display_name}</span>
+          <button class="delete-btn" onclick="event.stopPropagation(); deleteModel('${model.id}')">删除</button>
+        `;
+        
+        option.onclick = (e) => {
+          if (!e.target.classList.contains('delete-btn')) {
+            selectModel(model.id);
+            toggleModelSelect();
+          }
+        };
+        
+        dropdown.appendChild(option);
+      });
+      
+      // 更新header显示
+      if (selectedModelId) {
+        const selectedModel = currentModels.find(m => m.id === selectedModelId);
+        if (selectedModel) {
+          header.textContent = selectedModel.display_name;
+        }
+      } else {
+        header.textContent = '-- 请选择模型 --';
+      }
+    }
+    
+    function toggleModelSelect() {
+      const dropdown = document.getElementById('modelDropdown');
+      isDropdownOpen = !isDropdownOpen;
+      dropdown.style.display = isDropdownOpen ? 'block' : 'none';
+      
+      // 点击外部关闭下拉框
+      if (isDropdownOpen) {
+        setTimeout(() => {
+          document.addEventListener('click', closeDropdownOnClickOutside);
+        }, 0);
+      }
+    }
+    
+    function closeDropdownOnClickOutside(e) {
+      const container = document.getElementById('modelSelectContainer');
+      if (!container.contains(e.target)) {
+        toggleModelSelect();
+        document.removeEventListener('click', closeDropdownOnClickOutside);
+      }
+    }
+    
+    async function selectModel(modelId) {
+      try {
+        const r = await fetch('/api/admin/llm-models/select', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+          body: `model_id=${modelId}`
+        });
+        
+        if (r.ok) {
+          selectedModelId = modelId;
+          showModelInfo(modelId);
+          renderModelDropdown();
+        }
+      } catch (e) {
+        console.error('选择模型失败:', e);
+      }
+    }
+    
+    function showModelInfo(modelId) {
+      const model = currentModels.find(m => m.id === modelId);
+      if (!model) return;
+      
+      document.getElementById('infoDisplayName').textContent = model.display_name;
+      document.getElementById('infoBaseUrl').textContent = model.base_url;
+      document.getElementById('infoApiKey').textContent = model.masked_api_key;
+      document.getElementById('infoModelId').textContent = model.model;
+      document.getElementById('infoDescription').textContent = model.description || '无';
+      
+      document.getElementById('currentModelInfo').style.display = 'block';
+      document.getElementById('editModelBtn').style.display = 'inline-block';
+      document.getElementById('testModelBtn').style.display = 'inline-block';
+    }
+    
+    function hideModelInfo() {
+      document.getElementById('currentModelInfo').style.display = 'none';
+      document.getElementById('editModelBtn').style.display = 'none';
+      document.getElementById('testModelBtn').style.display = 'none';
+    }
+    
+    function showAddModelModal() {
+      document.getElementById('modalTitle').textContent = '增加模型';
+      document.getElementById('modelDisplayName').value = '';
+      document.getElementById('modelBaseUrl').value = '';
+      document.getElementById('modelApiKey').value = '';
+      document.getElementById('modelName').value = '';
+      document.getElementById('modelDescription').value = '';
+      document.getElementById('modelModal').dataset.editModelId = '';
+      
+      document.getElementById('modelModal').style.display = 'flex';
+    }
+    
+    function editCurrentModel() {
+      const model = currentModels.find(m => m.id === selectedModelId);
+      if (!model) return;
+      
+      document.getElementById('modalTitle').textContent = '编辑模型';
+      document.getElementById('modelDisplayName').value = model.display_name;
+      document.getElementById('modelBaseUrl').value = model.base_url;
+      document.getElementById('modelApiKey').value = ''; // 不显示原API Key
+      document.getElementById('modelName').value = model.model;
+      document.getElementById('modelDescription').value = model.description || '';
+      document.getElementById('modelModal').dataset.editModelId = model.id;
+      
+      document.getElementById('modelModal').style.display = 'flex';
+    }
+    
+    async function saveModel() {
+      const displayName = document.getElementById('modelDisplayName').value.trim();
+      const baseUrl = document.getElementById('modelBaseUrl').value.trim();
+      const apiKey = document.getElementById('modelApiKey').value.trim();
+      const modelName = document.getElementById('modelName').value.trim();
+      const description = document.getElementById('modelDescription').value.trim();
+      
+      if (!displayName || !baseUrl || !modelName) {
+        alert('请填写必需参数（显示名称、Base URL、模型名称）');
+        return;
+      }
+      
+      const editModelId = document.getElementById('modelModal').dataset.editModelId;
+      const isEdit = !!editModelId;
+      const url = isEdit ? 
+        `/api/admin/llm-models/${editModelId}` : 
+        '/api/admin/llm-models';
+      const method = isEdit ? 'PUT' : 'POST';
+      
+      const body = {
+        display_name: displayName,
+        base_url: baseUrl,
+        model: modelName,
+        description: description
+      };
+      
+      // 编辑时，如果API Key为空，则不更新
+      if (!isEdit || apiKey) {
+        body.api_key = apiKey;
+      }
+      
+      try {
+        const r = await fetch(url, {
+          method: method,
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(body)
+        });
+        
+        if (r.ok) {
+          alert('✅ 模型保存成功！');
+          closeModelModal();
+          loadModels();
+        } else {
+          const error = await r.json();
+          alert('❌ 保存失败: ' + (error.detail || '未知错误'));
+        }
+      } catch (e) {
+        alert('❌ 网络错误: ' + e.message);
+      }
+    }
+    
+    async function deleteModel(modelId) {
+      const model = currentModels.find(m => m.id === modelId);
+      if (!model) return;
+      
+      if (!confirm(`确定要删除模型"${model.display_name}"吗？`)) return;
+      
+      try {
+        const r = await fetch(`/api/admin/llm-models/${modelId}`, {
+          method: 'DELETE'
+        });
+        
+        if (r.ok) {
+          alert('✅ 模型已删除');
+          if (selectedModelId === modelId) {
+            selectedModelId = null;
+            hideModelInfo();
+          }
+          loadModels();
+        } else {
+          const error = await r.json();
+          alert('❌ 删除失败: ' + (error.detail || '未知错误'));
+        }
+      } catch (e) {
+        alert('❌ 网络错误: ' + e.message);
+      }
+    }
+    
+    async function testCurrentModel() {
+      const btn = document.getElementById('testModelBtn');
+      btn.textContent = '🔄 测试中...';
+      btn.disabled = true;
+      
+      try {
+        const r = await fetch(`/api/admin/llm-models/${selectedModelId}/test`, {
+          method: 'POST'
+        });
+        
+        const result = await r.json();
+        
+        if (result.success) {
+          alert('✅ 连接测试成功！\n\n模型响应: ' + result.message);
+        } else {
+          alert('❌ 连接失败: ' + (result.error || '未知错误'));
+        }
+      } catch (e) {
+        alert('❌ 测试失败: ' + e.message);
+      } finally {
+        btn.textContent = '🔌 测试连接';
+        btn.disabled = false;
+      }
+    }
+    
+    function closeModelModal() {
+      document.getElementById('modelModal').style.display = 'none';
+    }
+    
+    function showGuide() {
+      window.open('/config/LLM_MODELS_GUIDE.md', '_blank');
     }
 
     async function fetchTasks() {

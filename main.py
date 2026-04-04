@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File, Request
+from fastapi import FastAPI, HTTPException, UploadFile, File, Request, Form
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,6 +15,8 @@ import shutil
 import zipfile
 import re  # 确保正则模块可用
 from fastapi.responses import JSONResponse
+from llm_analyzer import LLMAnalyzer, test_connection
+import asyncio
 
 
 # 数据存储目录
@@ -23,6 +25,79 @@ DATA_BATCH_STORAGE = "data_batch_storage"
 # [新增] 教育模式系统根目录
 SYSTEM_EDU_DIR = Path(DATA_BATCH_STORAGE) / "SYSTEM" / "edu_data"
 RESULT_STORAGE_DIR = SYSTEM_EDU_DIR / "Doctor_Diag_Result"
+
+# [新增] 大模型配置文件路径
+LLM_CONFIG_FILE = Path("config/llm_config.json")  # 旧配置文件（保留用于迁移）
+LLM_MODELS_FILE = Path("config/llm_models.json")  # 新配置文件
+
+
+# [新增] 大模型配置请求模型
+class LLMConfigRequest(BaseModel):
+    base_url: str
+    api_key: str
+    model: str = "glm-4"
+
+# [新增] 单个模型配置模型
+class LLMModelConfig(BaseModel):
+    display_name: str
+    base_url: str
+    api_key: str
+    model: str
+    description: Optional[str] = ""
+
+
+# [新增] 配置迁移函数
+def migrate_llm_config():
+    """迁移旧的LLM配置到新格式"""
+    try:
+        if not LLM_CONFIG_FILE.exists():
+            return
+        
+        with open(LLM_CONFIG_FILE, "r", encoding="utf-8") as f:
+            old_config = json.load(f)
+        
+        # 只在有有效配置时才迁移
+        if old_config.get("base_url") and old_config.get("api_key"):
+            new_config = {
+                "models": [{
+                    "id": "migrated_model",
+                    "display_name": f"迁移的模型 ({old_config.get('model', 'unknown')})",
+                    "base_url": old_config.get("base_url", ""),
+                    "api_key": old_config.get("api_key", ""),
+                    "model": old_config.get("model", ""),
+                    "description": "从旧配置自动迁移",
+                    "created_at": datetime.now().isoformat()
+                }],
+                "selected_model_id": "migrated_model"
+            }
+            
+            with open(LLM_MODELS_FILE, "w", encoding="utf-8") as f:
+                json.dump(new_config, f, ensure_ascii=False, indent=2)
+            
+            # 备份旧配置
+            import shutil
+            backup_path = LLM_CONFIG_FILE.with_suffix(".json.bak")
+            shutil.move(str(LLM_CONFIG_FILE), str(backup_path))
+            print(f"✅ LLM配置已迁移到新格式，旧配置已备份到: {backup_path}")
+        else:
+            # 旧配置无效，创建空配置
+            default_config = {
+                "models": [],
+                "selected_model_id": None
+            }
+            with open(LLM_MODELS_FILE, "w", encoding="utf-8") as f:
+                json.dump(default_config, f, ensure_ascii=False, indent=2)
+            print(f"🤖 LLM模型配置文件已创建: {LLM_MODELS_FILE}")
+            
+    except Exception as e:
+        print(f"⚠️ LLM配置迁移失败: {e}")
+        # 创建空配置
+        default_config = {
+            "models": [],
+            "selected_model_id": None
+        }
+        with open(LLM_MODELS_FILE, "w", encoding="utf-8") as f:
+            json.dump(default_config, f, ensure_ascii=False, indent=2)
 
 # 系统初始化
 def init_system():
@@ -41,6 +116,25 @@ def init_system():
         with open(edu_index, "w", encoding="utf-8") as f:
             json.dump({"tasks": []}, f, ensure_ascii=False, indent=2)
     print(f"🏛️ 系统空间已就绪: {SYSTEM_EDU_DIR}")
+    
+    # 3. [新增] 初始化LLM配置
+    config_dir = Path("config")
+    config_dir.mkdir(exist_ok=True)
+    
+    # 检查新配置文件是否存在
+    if not LLM_MODELS_FILE.exists():
+        # 检查是否有旧配置需要迁移
+        if LLM_CONFIG_FILE.exists():
+            migrate_llm_config()
+        else:
+            # 创建空配置
+            default_config = {
+                "models": [],
+                "selected_model_id": None
+            }
+            with open(LLM_MODELS_FILE, "w", encoding="utf-8") as f:
+                json.dump(default_config, f, ensure_ascii=False, indent=2)
+            print(f"🤖 LLM模型配置文件已创建: {LLM_MODELS_FILE}")
     
     # 为所有用户创建文件夹
     users = database.get_all_users()
@@ -441,6 +535,7 @@ class DiagnosisRecordSimple(BaseModel):
     patientId: str
     diagnosis: str
     severity: Optional[int] = None
+    viewTime: Optional[int] = 0  # 新增：查看时间（秒）
 
 class DiagnosisSubmitJsonRequest(BaseModel):
     username: str
@@ -451,17 +546,283 @@ class DiagnosisSubmitJsonRequest(BaseModel):
     patientCount: int
     records: List[DiagnosisRecordSimple]
 
+# ==================== 大模型配置管理 API（新版） ====================
+
+@app.get("/api/admin/llm-models")
+async def get_llm_models(request: Request):
+    """获取所有模型列表（API Key脱敏）"""
+    # 验证权限
+    username = request.cookies.get("username")
+    if not username:
+        raise HTTPException(status_code=401, detail="未登录")
+    
+    user = database.get_user_by_username(username)
+    if not user or not user.get('is_admin'):
+        raise HTTPException(status_code=403, detail="仅管理员可访问")
+    
+    try:
+        if not LLM_MODELS_FILE.exists():
+            return {"models": [], "selected_model_id": None}
+        
+        with open(LLM_MODELS_FILE, "r", encoding="utf-8") as f:
+            config = json.load(f)
+        
+        # 脱敏处理API Key
+        models = []
+        for model in config.get("models", []):
+            api_key = model.get("api_key", "")
+            masked_key = ""
+            if len(api_key) > 8:
+                masked_key = api_key[:4] + "*" * (len(api_key) - 8) + api_key[-4:]
+            elif api_key:
+                masked_key = "***"
+            
+            models.append({
+                **model,
+                "masked_api_key": masked_key
+            })
+        
+        return {
+            "models": models,
+            "selected_model_id": config.get("selected_model_id")
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"读取失败: {str(e)}")
+
+
+@app.post("/api/admin/llm-models")
+async def add_llm_model(model: LLMModelConfig, request: Request):
+    """添加新模型"""
+    # 验证权限
+    username = request.cookies.get("username")
+    if not username:
+        raise HTTPException(status_code=401, detail="未登录")
+    
+    user = database.get_user_by_username(username)
+    if not user or not user.get('is_admin'):
+        raise HTTPException(status_code=403, detail="仅管理员可配置")
+    
+    try:
+        # 读取现有配置
+        if LLM_MODELS_FILE.exists():
+            with open(LLM_MODELS_FILE, "r", encoding="utf-8") as f:
+                config = json.load(f)
+        else:
+            config = {"models": [], "selected_model_id": None}
+        
+        # 生成唯一ID
+        import uuid
+        model_id = str(uuid.uuid4())[:8]
+        
+        # 创建新模型
+        new_model = {
+            "id": model_id,
+            "display_name": model.display_name,
+            "base_url": model.base_url,
+            "api_key": model.api_key,
+            "model": model.model,
+            "description": model.description or "",
+            "created_at": datetime.now().isoformat()
+        }
+        
+        config["models"].append(new_model)
+        
+        # 如果是第一个模型，自动选中
+        if len(config["models"]) == 1:
+            config["selected_model_id"] = model_id
+        
+        # 保存配置
+        with open(LLM_MODELS_FILE, "w", encoding="utf-8") as f:
+            json.dump(config, f, ensure_ascii=False, indent=2)
+        
+        print(f"✅ 新模型已添加: {model.display_name} by {username}")
+        return {"message": "模型添加成功", "model_id": model_id}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"添加失败: {str(e)}")
+
+
+@app.put("/api/admin/llm-models/{model_id}")
+async def update_llm_model(model_id: str, model: LLMModelConfig, request: Request):
+    """更新模型配置"""
+    # 验证权限
+    username = request.cookies.get("username")
+    if not username:
+        raise HTTPException(status_code=401, detail="未登录")
+    
+    user = database.get_user_by_username(username)
+    if not user or not user.get('is_admin'):
+        raise HTTPException(status_code=403, detail="仅管理员可配置")
+    
+    try:
+        with open(LLM_MODELS_FILE, "r", encoding="utf-8") as f:
+            config = json.load(f)
+        
+        # 查找并更新模型
+        for i, m in enumerate(config["models"]):
+            if m["id"] == model_id:
+                config["models"][i].update({
+                    "display_name": model.display_name,
+                    "base_url": model.base_url,
+                    "model": model.model,
+                    "description": model.description or "",
+                    "updated_at": datetime.now().isoformat()
+                })
+                
+                # 只在提供了新API Key时才更新
+                if model.api_key:
+                    config["models"][i]["api_key"] = model.api_key
+                
+                break
+        else:
+            raise HTTPException(status_code=404, detail="模型不存在")
+        
+        # 保存配置
+        with open(LLM_MODELS_FILE, "w", encoding="utf-8") as f:
+            json.dump(config, f, ensure_ascii=False, indent=2)
+        
+        print(f"✅ 模型已更新: {model.display_name} by {username}")
+        return {"message": "模型更新成功"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"更新失败: {str(e)}")
+
+
+@app.delete("/api/admin/llm-models/{model_id}")
+async def delete_llm_model(model_id: str, request: Request):
+    """删除模型"""
+    # 验证权限
+    username = request.cookies.get("username")
+    if not username:
+        raise HTTPException(status_code=401, detail="未登录")
+    
+    user = database.get_user_by_username(username)
+    if not user or not user.get('is_admin'):
+        raise HTTPException(status_code=403, detail="仅管理员可配置")
+    
+    try:
+        with open(LLM_MODELS_FILE, "r", encoding="utf-8") as f:
+            config = json.load(f)
+        
+        # 查找并删除模型
+        original_count = len(config["models"])
+        config["models"] = [m for m in config["models"] if m["id"] != model_id]
+        
+        if len(config["models"]) == original_count:
+            raise HTTPException(status_code=404, detail="模型不存在")
+        
+        # 如果删除的是当前选中的模型，清除选择
+        if config.get("selected_model_id") == model_id:
+            config["selected_model_id"] = config["models"][0]["id"] if config["models"] else None
+        
+        # 保存配置
+        with open(LLM_MODELS_FILE, "w", encoding="utf-8") as f:
+            json.dump(config, f, ensure_ascii=False, indent=2)
+        
+        print(f"✅ 模型已删除: {model_id} by {username}")
+        return {"message": "模型删除成功"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"删除失败: {str(e)}")
+
+
+@app.post("/api/admin/llm-models/select")
+async def select_llm_model(request: Request, model_id: str = Form(...)):
+    """选择模型"""
+    # 验证权限
+    username = request.cookies.get("username")
+    if not username:
+        raise HTTPException(status_code=401, detail="未登录")
+    
+    user = database.get_user_by_username(username)
+    if not user or not user.get('is_admin'):
+        raise HTTPException(status_code=403, detail="仅管理员可配置")
+    
+    try:
+        with open(LLM_MODELS_FILE, "r", encoding="utf-8") as f:
+            config = json.load(f)
+        
+        # 验证模型是否存在
+        model_ids = [m["id"] for m in config.get("models", [])]
+        if model_id not in model_ids:
+            raise HTTPException(status_code=404, detail="模型不存在")
+        
+        # 更新选中的模型
+        config["selected_model_id"] = model_id
+        
+        # 保存配置
+        with open(LLM_MODELS_FILE, "w", encoding="utf-8") as f:
+            json.dump(config, f, ensure_ascii=False, indent=2)
+        
+        print(f"✅ 已选择模型: {model_id} by {username}")
+        return {"message": "模型选择成功"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"选择失败: {str(e)}")
+
+
+@app.post("/api/admin/llm-models/{model_id}/test")
+async def test_llm_model(model_id: str, request: Request):
+    """测试模型连接"""
+    # 验证权限
+    username = request.cookies.get("username")
+    if not username:
+        raise HTTPException(status_code=401, detail="未登录")
+    
+    user = database.get_user_by_username(username)
+    if not user or not user.get('is_admin'):
+        raise HTTPException(status_code=403, detail="仅管理员可测试")
+    
+    try:
+        with open(LLM_MODELS_FILE, "r", encoding="utf-8") as f:
+            config = json.load(f)
+        
+        # 查找模型
+        model = None
+        for m in config.get("models", []):
+            if m["id"] == model_id:
+                model = m
+                break
+        
+        if not model:
+            raise HTTPException(status_code=404, detail="模型不存在")
+        
+        # 测试连接
+        result = await test_connection(
+            model["base_url"],
+            model["api_key"],
+            model["model"]
+        )
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
 # 提交诊断结果（支持智慧寻址）
 @app.post("/api/diagnosis/submit-json")
 async def submit_diagnosis_json(request: DiagnosisSubmitJsonRequest):
     """
     提交诊断结论：
     1. 判读模式：存入任务目录。
-    2. 教育模式：计算准确率、敏感度、特异性，并存入 SYSTEM 成绩单。
+    2. 教育模式：计算增强统计数据，调用大模型分析，并存入 SYSTEM 成绩单。
     """
     try:
         # 定义诊断名与 Label 的映射
         LABEL_MAP = {"Normal": 0, "VSD": 1, "ASD": 2, "PDA": 3}
+        LABEL_REVERSE_MAP = {0: "Normal", 1: "VSD", 2: "ASD", 3: "PDA"}
         
         # --- 情况 A：教育模式 (Assessment) ---
         if request.mode == "edu":
@@ -477,15 +838,72 @@ async def submit_diagnosis_json(request: DiagnosisSubmitJsonRequest):
             tp, tn, fp, fn = 0, 0, 0, 0
             correct_count = 0
             total = len(request.records)
-
+            
+            # [新增] 病种统计
+            category_stats = {
+                "Normal": {"total": 0, "correct": 0, "error": 0},
+                "VSD": {"total": 0, "correct": 0, "error": 0},
+                "ASD": {"total": 0, "correct": 0, "error": 0},
+                "PDA": {"total": 0, "correct": 0, "error": 0}
+            }
+            
+            # [新增] 时间分析数据
+            case_time_data = []
+            
+            # [新增] AI依赖性统计
+            ai_dependency = {
+                "correct_reliance": 0,      # AI正确且判读正确
+                "insufficient_reliance": 0,  # AI正确且判读错误
+                "correct_independence": 0,    # AI错误且判读正确
+                "over_reliance": 0            # AI错误且判读错误
+            }
+            
+            # [新增] 详细数据列表
+            ground_truth_labels = []
+            ai_labels = []
+            user_labels = []
+            view_times = []
+            
+            # 3. 遍历所有记录，计算统计数据
             for rec in request.records:
                 user_diag = rec.diagnosis
                 user_label = LABEL_MAP.get(user_diag, -1)
                 gt_label = ground_truth.get(rec.patientId, {}).get("label")
-
-                # 计算准确率
-                if user_label == gt_label:
-                    correct_count += 1
+                
+                # 获取AI预测
+                ai_label = None
+                ai_confidence_path = Path(DATA_BATCH_STORAGE) / "SYSTEM" / "edu_data" / "processed" / request.taskFolder / rec.patientId / "output_data" / "confidence_scores.json"
+                if ai_confidence_path.exists():
+                    with open(ai_confidence_path, "r", encoding="utf-8") as f:
+                        ai_data = json.load(f)
+                        scores = ai_data.get("confidence_scores", {})
+                        if scores:
+                            ai_label = max(scores, key=scores.get)
+                            ai_label = LABEL_MAP.get(ai_label, -1)
+                
+                # 收集数据
+                ground_truth_labels.append(LABEL_REVERSE_MAP.get(gt_label, "Unknown"))
+                ai_labels.append(LABEL_REVERSE_MAP.get(ai_label, "Unknown") if ai_label is not None else "Unknown")
+                user_labels.append(user_diag)
+                view_times.append(rec.viewTime or 0)
+                
+                # 时间分析数据
+                case_time_data.append({
+                    "patientId": rec.patientId,
+                    "viewTime": rec.viewTime or 0,
+                    "groundTruth": LABEL_REVERSE_MAP.get(gt_label, "Unknown"),
+                    "isCorrect": user_label == gt_label
+                })
+                
+                # 病种统计
+                if gt_label in [0, 1, 2, 3]:
+                    gt_category = LABEL_REVERSE_MAP[gt_label]
+                    category_stats[gt_category]["total"] += 1
+                    if user_label == gt_label:
+                        category_stats[gt_category]["correct"] += 1
+                        correct_count += 1
+                    else:
+                        category_stats[gt_category]["error"] += 1
                 
                 # 计算敏感度/特异性 (Positive = 非0, Negative = 0)
                 is_user_pos = user_label > 0
@@ -495,17 +913,83 @@ async def submit_diagnosis_json(request: DiagnosisSubmitJsonRequest):
                 elif not is_user_pos and not is_gt_pos: tn += 1
                 elif is_user_pos and not is_gt_pos: fp += 1
                 elif not is_user_pos and is_gt_pos: fn += 1
-
-            # 3. 计算评估指标
+                
+                # [新增] AI依赖性分析
+                # 添加调试日志
+                if ai_label is not None:
+                    print(f"🔍 AI依赖分析 - 病例: {rec.patientId}, AI标签: {ai_label}, 真实标签: {gt_label}, 用户标签: {user_label}")
+                    
+                    ai_correct = (ai_label == gt_label)
+                    user_correct = (user_label == gt_label)
+                    
+                    if ai_correct and user_correct:
+                        ai_dependency["correct_reliance"] += 1
+                        print(f"  ✅ 正确依赖")
+                    elif ai_correct and not user_correct:
+                        ai_dependency["insufficient_reliance"] += 1
+                        print(f"  ⚠️ 依赖不足")
+                    elif not ai_correct and user_correct:
+                        ai_dependency["correct_independence"] += 1
+                        print(f"  💪 正确独立")
+                    elif not ai_correct and not user_correct:
+                        ai_dependency["over_reliance"] += 1
+                        print(f"  ❌ 过度依赖")
+                else:
+                    print(f"⚠️ 病例 {rec.patientId} 没有AI预测数据")
+            
+            print(f"📊 AI依赖性统计结果: {ai_dependency}")
+            
+            # 4. [新增] 计算时间分析
+            case_time_data.sort(key=lambda x: x["viewTime"], reverse=True)
+            top3_longest_cases = case_time_data[:3]
+            
+            # 病种级别时间比较
+            category_time_analysis = {}
+            for category in ["Normal", "VSD", "ASD", "PDA"]:
+                category_cases = [c for c in case_time_data if c["groundTruth"] == category]
+                if category_cases:
+                    avg_time = sum(c["viewTime"] for c in category_cases) / len(category_cases)
+                    correct_cases = [c for c in category_cases if c["isCorrect"]]
+                    error_cases = [c for c in category_cases if not c["isCorrect"]]
+                    
+                    category_time_analysis[category] = {
+                        "avg_view_time": round(avg_time, 1),
+                        "correct_avg_time": round(sum(c["viewTime"] for c in correct_cases) / len(correct_cases), 1) if correct_cases else 0,
+                        "error_avg_time": round(sum(c["viewTime"] for c in error_cases) / len(error_cases), 1) if error_cases else 0
+                    }
+            
+            # 5. 计算基础评估指标
             stats = {
+                # 基础指标
                 "accuracy": correct_count / total if total > 0 else 0,
                 "sensitivity": tp / (tp + fn) if (tp + fn) > 0 else 1.0,
                 "specificity": tn / (tn + fp) if (tn + fp) > 0 else 1.0,
                 "formatted_duration": request.totalTime.get("formatted", "0:00"),
-                "submitted_at": request.submittedAt
+                "submitted_at": request.submittedAt,
+                
+                # [新增] 病种统计
+                "category_stats": category_stats,
+                
+                # [新增] 时间分析
+                "time_analysis": {
+                    "top3_longest_cases": top3_longest_cases,
+                    "category_time_analysis": category_time_analysis
+                },
+                
+                # [新增] AI依赖性
+                "ai_dependency": ai_dependency,
+                
+                # [新增] 详细数据
+                "ground_truth_labels": ground_truth_labels,
+                "ai_labels": ai_labels,
+                "user_labels": user_labels,
+                "view_times": view_times,
+                
+                # 大模型分析状态
+                "llm_analysis_status": "pending"
             }
 
-            # 4. 存入 SYSTEM 个人成绩单 (Doctor_Diag_Result/{user}.json)
+            # 6. 存入 SYSTEM 个人成绩单 (Doctor_Diag_Result/{user}.json)
             user_res_path = Path(DATA_BATCH_STORAGE) / "SYSTEM" / "edu_data" / "Doctor_Diag_Result" / f"{request.username}.json"
             user_data = {}
             if user_res_path.exists():
@@ -518,7 +1002,11 @@ async def submit_diagnosis_json(request: DiagnosisSubmitJsonRequest):
                 json.dump(user_data, f, ensure_ascii=False, indent=2)
 
             print(f"📊 教育模式评分完成: {request.username} - 得分: {stats['accuracy']*100}%")
-            return {"message": "评估完成", "stats": stats}
+            
+            # 7. [新增] 异步调用大模型分析
+            asyncio.create_task(analyze_with_llm(request.username, request.taskFolder, stats))
+            
+            return {"message": "评估完成，AI分析报告生成中", "stats": stats}
 
         # --- 情况 B：普通判读模式 (保持原有逻辑) ---
         else:
@@ -540,6 +1028,91 @@ async def submit_diagnosis_json(request: DiagnosisSubmitJsonRequest):
     except Exception as e:
         print(f"❌ 提交逻辑崩溃: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+async def analyze_with_llm(username: str, task_folder: str, stats: Dict[str, Any]):
+    """
+    异步调用大模型分析
+    
+    Args:
+        username: 用户名
+        task_folder: 任务文件夹
+        stats: 统计数据
+    """
+    try:
+        # 1. 读取LLM配置（新格式）
+        if not LLM_MODELS_FILE.exists():
+            print("⚠️ LLM配置文件不存在，跳过AI分析")
+            return
+        
+        with open(LLM_MODELS_FILE, "r", encoding="utf-8") as f:
+            config = json.load(f)
+        
+        # 获取选中的模型
+        selected_model_id = config.get("selected_model_id")
+        if not selected_model_id:
+            print("⚠️ 未选择模型，跳过AI分析")
+            return
+        
+        # 查找选中的模型配置
+        selected_model = None
+        for model in config.get("models", []):
+            if model.get("id") == selected_model_id:
+                selected_model = model
+                break
+        
+        if not selected_model:
+            print("⚠️ 选中的模型不存在，跳过AI分析")
+            return
+        
+        if not selected_model.get("base_url") or not selected_model.get("api_key"):
+            print("⚠️ 模型配置不完整，跳过AI分析")
+            return
+        
+        # 2. 调用大模型
+        analyzer = LLMAnalyzer(
+            base_url=selected_model["base_url"],
+            api_key=selected_model["api_key"],
+            model=selected_model.get("model", "glm-4")
+        )
+        
+        print(f"🤖 正在调用大模型分析: {username} - {task_folder} (模型: {selected_model.get('display_name', 'unknown')})")
+        analysis_result = await analyzer.analyze_performance(stats)
+        
+        # 3. 更新成绩单
+        user_res_path = Path(DATA_BATCH_STORAGE) / "SYSTEM" / "edu_data" / "Doctor_Diag_Result" / f"{username}.json"
+        if user_res_path.exists():
+            with open(user_res_path, "r", encoding="utf-8") as f:
+                user_data = json.load(f)
+            
+            if task_folder in user_data:
+                user_data[task_folder]["llm_analysis_status"] = analysis_result.get("status", "failed")
+                user_data[task_folder]["llm_analysis"] = analysis_result
+                user_data[task_folder]["llm_model_used"] = selected_model.get("display_name", "unknown")
+                
+                with open(user_res_path, "w", encoding="utf-8") as f:
+                    json.dump(user_data, f, ensure_ascii=False, indent=2)
+                
+                print(f"✅ 大模型分析完成: {username} - {task_folder}")
+        
+    except Exception as e:
+        print(f"❌ 大模型分析失败: {e}")
+        
+        # 记录失败状态
+        try:
+            user_res_path = Path(DATA_BATCH_STORAGE) / "SYSTEM" / "edu_data" / "Doctor_Diag_Result" / f"{username}.json"
+            if user_res_path.exists():
+                with open(user_res_path, "r", encoding="utf-8") as f:
+                    user_data = json.load(f)
+                
+                if task_folder in user_data:
+                    user_data[task_folder]["llm_analysis_status"] = "failed"
+                    user_data[task_folder]["llm_analysis"] = {"error": str(e)}
+                    
+                    with open(user_res_path, "w", encoding="utf-8") as f:
+                        json.dump(user_data, f, ensure_ascii=False, indent=2)
+        except:
+            pass
 
 # 上传任务文件夹（接收zip压缩包）
 @app.post("/api/users/{username}/upload-task")

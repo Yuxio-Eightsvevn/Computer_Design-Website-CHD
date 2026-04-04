@@ -1,0 +1,15 @@
+{
+  "models": [
+    {
+      "id": "35d3af17",
+      "display_name": "智谱-GLM-4-Flash",
+      "base_url": "https://open.bigmodel.cn/api/paas/v4",
+      "api_key": "05ad3a58ef854d2bbc8f95709d3dfae5.bbdmT0RMKCs3Ub4r",
+      "model": "glm-4-flash",
+      "description": "GLM-4-Flash-免费",
+      "created_at": "2026-04-04T12:23:48.343151",
+      "updated_at": "2026-04-04T12:30:05.807190"
+    }
+  ],
+  "selected_model_id": "35d3af17"
+}

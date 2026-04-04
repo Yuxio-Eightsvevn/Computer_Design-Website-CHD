@@ -70,40 +70,69 @@
     let currentUser = null;
 
     async function loadUser() {
-        const r = await fetch('/api/users/current');
-        if (r.ok) {
-            const d = await r.json(); currentUser = d.data;
-            document.getElementById('u-name').textContent = currentUser.username;
-            document.getElementById('avatar').textContent = currentUser.username[0].toUpperCase();
-            fetchEduTasks();
+        try {
+            const r = await fetch('/api/users/current');
+            if (r.ok) {
+                const d = await r.json();
+                if (d && d.data) {
+                    currentUser = d.data;
+                    document.getElementById('u-name').textContent = currentUser.username;
+                    document.getElementById('avatar').textContent = currentUser.username[0].toUpperCase();
+                    fetchEduTasks();
+                    return;
+                }
+            }
+        } catch (e) {
+            console.error("Session Error", e);
         }
+        document.getElementById('u-name').textContent = "未登录";
     }
 
     async function fetchEduTasks() {
-        const r = await fetch(`/api/edu/user/tasks/${encodeURIComponent(currentUser.username)}`);
-        const { tasks } = await r.json();
-        const container = document.getElementById('taskList');
-        container.innerHTML = tasks.length ? '' : '<p style="text-align:center;color:#94a3b8">暂无已发布的教学任务</p>';
+        if (!currentUser || !currentUser.username) {
+            console.error("currentUser为空或username不存在，无法获取任务列表");
+            return;
+        }
         
-        tasks.forEach(t => {
-            const div = document.createElement('div');
-            div.className = `task-card ${t.is_completed ? 'completed' : 'pending'}`;
-            div.innerHTML = `
-                <div><div style="font-weight:700">${t.request_name}</div>
-                <div style="font-size:12px; color:#64748b; margin-top:4px">
-                    病例: ${t.request_case_cnt} | 视频: ${t.request_video_cnt} | ${t.is_completed ? '✅ 已评估' : '⏳ 待判读'}
-                </div></div>
-                <div style="display:flex; align-items:center; gap:15px">
-                    ${t.is_completed ? `<div class="score-badge">${(t.last_score*100).toFixed(0)}%</div>` : ''}
-                    <button class="btn ${t.is_completed ? 'btn-view' : 'btn-start'}" onclick="handleTask('${t.submission_id}', '${t.request_name}', ${t.is_completed})">
-                        ${t.is_completed ? '查看报告' : '开始判读'}
-                    </button>
-                </div>`;
-            container.appendChild(div);
-        });
+        try {
+            const r = await fetch(`/api/edu/user/tasks/${encodeURIComponent(currentUser.username)}`);
+            if (!r.ok) {
+                console.error("获取任务列表失败，状态码:", r.status);
+                return;
+            }
+            
+            const { tasks } = await r.json();
+            const container = document.getElementById('taskList');
+            container.innerHTML = tasks.length ? '' : '<p style="text-align:center;color:#94a3b8">暂无已发布的教学任务</p>';
+            
+            tasks.forEach(t => {
+                const div = document.createElement('div');
+                div.className = `task-card ${t.is_completed ? 'completed' : 'pending'}`;
+                div.innerHTML = `
+                    <div><div style="font-weight:700">${t.request_name}</div>
+                    <div style="font-size:12px; color:#64748b; margin-top:4px">
+                        病例: ${t.request_case_cnt} | 视频: ${t.request_video_cnt} | ${t.is_completed ? '✅ 已评估' : '⏳ 待判读'}
+                    </div></div>
+                    <div style="display:flex; align-items:center; gap:15px">
+                        ${t.is_completed ? `<div class="score-badge">${(t.last_score*100).toFixed(0)}%</div>` : ''}
+                        <button class="btn ${t.is_completed ? 'btn-view' : 'btn-start'}" onclick="handleTask('${t.submission_id}', '${t.request_name}', ${t.is_completed})">
+                            ${t.is_completed ? '查看报告' : '开始判读'}
+                        </button>
+                    </div>`;
+                container.appendChild(div);
+            });
+        } catch (e) {
+            console.error("获取任务列表失败:", e);
+        }
     }
 
     function handleTask(id, name, isComp) {
+        // 检查currentUser是否存在
+        if (!currentUser || !currentUser.username) {
+            alert('请先登录');
+            return;
+        }
+        
         if (isComp) {
             openResultModal(id, name);
         } else {
@@ -112,17 +141,325 @@
     }
 
     async function openResultModal(id, name) {
-        const r = await fetch(`/api/edu/user/result/${encodeURIComponent(currentUser.username)}/${id}`);
-        const data = await r.json();
-        document.getElementById('r-acc').textContent = (data.accuracy * 100).toFixed(1) + '%';
-        document.getElementById('r-sen').textContent = (data.sensitivity * 100).toFixed(1) + '%';
-        document.getElementById('r-spe').textContent = (data.specificity * 100).toFixed(1) + '%';
-        document.getElementById('r-dur').textContent = data.formatted_duration || '-';
+        // 检查currentUser是否存在
+        if (!currentUser || !currentUser.username) {
+            alert('请先登录');
+            return;
+        }
         
-        document.getElementById('btn-re-run').onclick = () => {
-            window.location.href = `/diagnosis?username=${encodeURIComponent(currentUser.username)}&task=${encodeURIComponent(id)}&taskName=${encodeURIComponent(name)}&mode=edu&clearCache=true`;
+        // 1. 显示加载状态
+        const modal = document.getElementById('resultModal');
+        const modalCard = modal.querySelector('.modal-card');
+        modalCard.innerHTML = `
+            <h2 style="color:#1e293b">📊 正在生成AI分析报告</h2>
+            <p style="color:#64748b; margin:20px 0;">请稍后，系统正在进行深度分析...</p>
+            <div style="text-align:center; padding:20px;">
+                <div style="font-size:40px; animation: spin 1s linear infinite;">⚙️</div>
+            </div>
+        `;
+        modal.style.display = 'flex';
+        
+        try {
+            // 2. 获取数据
+            const r = await fetch(`/api/edu/user/result/${encodeURIComponent(currentUser.username)}/${id}`);
+            if (!r.ok) {
+                throw new Error(`获取报告失败: ${r.status}`);
+            }
+            const data = await r.json();
+            
+            // 3. 检查大模型分析状态
+            if (data.llm_analysis_status === "pending") {
+                // 轮询等待分析完成
+                await pollForLLMAnalysis(id, name, data);
+            } else if (data.llm_analysis_status === "completed") {
+                // 显示完整报告
+                showCompleteReport(id, name, data);
+            } else {
+                // 显示基础报告（无大模型分析）
+                showBasicReport(id, name, data);
+            }
+        } catch (e) {
+            modalCard.innerHTML = `
+                <h2 style="color:#ef4444">❌ 加载失败</h2>
+                <p style="color:#64748b; margin:20px 0;">无法获取报告数据: ${e.message}</p>
+                <button class="btn btn-view" style="flex:1" onclick="closeModal()">关闭</button>
+            `;
+        }
+    }
+    
+    async function pollForLLMAnalysis(id, name, data) {
+        // 检查currentUser是否存在
+        if (!currentUser || !currentUser.username) {
+            showBasicReport(id, name, data);
+            return;
+        }
+        
+        const modal = document.getElementById('resultModal');
+        const modalCard = modal.querySelector('.modal-card');
+        
+        let attempts = 0;
+        const maxAttempts = 30; // 最多等待30次（约30秒）
+        
+        const poll = async () => {
+            attempts++;
+            
+            if (attempts > maxAttempts) {
+                // 超时，显示基础报告
+                showBasicReport(id, name, data);
+                return;
+            }
+            
+            try {
+                const r = await fetch(`/api/edu/user/result/${encodeURIComponent(currentUser.username)}/${id}`);
+                if (!r.ok) {
+                    showBasicReport(id, name, data);
+                    return;
+                }
+                const newData = await r.json();
+                
+                if (newData.llm_analysis_status === "completed") {
+                    // 分析完成，显示完整报告
+                    showCompleteReport(id, name, newData);
+                } else if (newData.llm_analysis_status === "failed") {
+                    // 分析失败，显示基础报告
+                    showBasicReport(id, name, newData);
+                } else {
+                    // 继续等待
+                    modalCard.querySelector('p').textContent = 
+                        `正在分析中... (${attempts}/${maxAttempts})`;
+                    setTimeout(poll, 1000);
+                }
+            } catch (e) {
+                showBasicReport(id, name, data);
+            }
         };
-        document.getElementById('resultModal').style.display = 'flex';
+        
+        setTimeout(poll, 1000);
+    }
+    
+    function showBasicReport(id, name, data) {
+        const modal = document.getElementById('resultModal');
+        const modalCard = modal.querySelector('.modal-card');
+        
+        modalCard.innerHTML = `
+            <h2 style="color:#1e293b">🎯 教学评估报告</h2>
+            <p style="font-size:13px; color:#64748b; margin:5px 0;">${name}</p>
+            
+            <div class="metric-grid">
+                <div class="metric-item">
+                    <div class="metric-val">${(data.accuracy * 100).toFixed(1)}%</div>
+                    <div class="metric-label">准确率</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-val">${(data.sensitivity * 100).toFixed(1)}%</div>
+                    <div class="metric-label">敏感度</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-val">${(data.specificity * 100).toFixed(1)}%</div>
+                    <div class="metric-label">特异性</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-val">${data.formatted_duration || '-'}</div>
+                    <div class="metric-label">总耗时</div>
+                </div>
+            </div>
+            
+            <div style="margin:20px 0; padding:15px; background:#fef3c7; border-radius:8px; font-size:13px; color:#92400e;">
+                ⚠️ AI深度分析报告暂未生成，请稍后再查看
+            </div>
+            
+            <div style="display:flex; gap:10px;">
+                <button class="btn btn-view" style="flex:1" onclick="closeModal()">关闭</button>
+                <button class="btn btn-start" style="flex:1" onclick="rerunTask('${id}', '${name}')">重新练习</button>
+            </div>
+        `;
+    }
+    
+function showCompleteReport(id, name, data) {
+        const modal = document.getElementById('resultModal');
+        const modalCard = modal.querySelector('.modal-card');
+        
+        // 显示加载动画
+        modalCard.innerHTML = `
+            <div style="text-align: center; padding: 40px 0;">
+                <div style="font-size: 48px; animation: bounce 1s infinite;">⚙️</div>
+            <div style="font-weight: 700; color: #1e293b; margin-top: 15px;">正在生成AI分析报告...</div>
+            <div style="color: #64748b; font-size: 14px; line-height: 1.6;">
+                系统正在生成AI分析报告，请稍后返回此页面查看详细报告。
+            </div>
+        `;
+        
+        modalCard.style.width = '900px';
+        modalCard.style.maxWidth = '900px';
+    }
+    
+    function closeModal() {
+        document.getElementById('resultModal').style.display = 'none';
+    }
+}
+        } else {
+            html += `<div style="color:#64748b;">暂无数据</div>`;
+        }
+        
+        html += `
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // 第三列：AI依赖情况 -->
+        <div style="background: #f8fafc; padding: 15px; border-radius: 8px;">
+            <h3 style="font-size:14px; margin-bottom:10px; color:#1e293b;">🤖 AI依赖情况</h3>
+            <div style="font-size:12px; line-height:1.8;">
+        `;
+        
+        if (data.ai_dependency) {
+            const total = (data.ai_dependency.correct_reliance || 0) + 
+                         (data.ai_dependency.insufficient_reliance || 0) + 
+                         (data.ai_dependency.correct_independence || 0) + 
+                         (data.ai_dependency.over_reliance || 0);
+            
+            html += `
+            <div>✅ <strong>正确依赖:</strong> ${data.ai_dependency.correct_reliance || 0} / ${total}</div>
+            <div>⚠️ <strong>依赖不足:</strong> ${data.ai_dependency.insufficient_reliance || 0} / ${total}</div>
+            <div>💪 <strong>正确独立:</strong> ${data.ai_dependency.correct_independence || 0} / ${total}</div>
+            <div>❌ <strong>过度依赖:</strong> ${data.ai_dependency.over_reliance || 0} / ${total}</div>
+        `;
+    } else {
+        html += `<div style="color:#64748b;">暂无数据</div>`;
+    }
+    
+    html += `
+                </div>
+            </div>
+        `;
+        
+        // 下方一列：AI专家评价
+    `;
+    
+    if (data.llm_analysis && data.llm_analysis.analysis) {
+        const analysis = data.llm_analysis.analysis;
+        
+        html += `
+        <div style="background: #f0f9ff; padding: 20px; border-radius: 8px; border-left: 4px solid #667eea;">
+            <h3 style="font-size:15px; margin-bottom:15px; color:#1e293b;">🤖 AI专家评价</h3>
+            
+            <div style="font-size:13px; line-height:1.8; margin-bottom:15px;">
+                <p style="margin-bottom:10px;"><strong>整体评价：</strong><br/>${analysis.overall_evaluation || '暂无'}</p>
+                <p style="margin-bottom:10px;"><strong>诊断能力：</strong><br/>${analysis.diagnosis_ability || '暂无'}</p>
+                <p style="margin-bottom:10px;"><strong>AI工具使用：</strong><br/>${analysis.ai_tool_usage || '暂无'}</p>
+            </div>
+        `;
+        
+        if (analysis.improvement_suggestions && analysis.improvement_suggestions.length > 0) {
+            html += `
+            <div style="margin-top:15px;">
+                <strong style="font-size:13px;">💡 改进建议：</strong>
+                <ul style="margin:8px 0; padding-left:20px; font-size:12px;">
+                    ${analysis.improvement_suggestions.map(s => `<li style="margin:3px 0;">${s}</li>`).join('')}
+                </ul>
+            `;
+        }
+        
+        if (analysis.strength_points && analysis.strength_points.length > 0) {
+            html += `
+            <div style="margin-top:10px; color:#10b981;">
+                <strong style="font-size:13px;">✨ 优势点：</strong>
+                <ul style="margin:5px 0; padding-left:20px; font-size:12px;">
+                    ${analysis.strength_points.map(s => `<li style="margin:2px 0;">${s}</li>`).join('')}
+                </ul>
+            `;
+        }
+        
+        if (analysis.weakness_points && analysis.weakness_points.length > 0) {
+            html += `
+            <div style="margin-top:10px; color:#ef4444;">
+                <strong style="font-size:13px;">⚠️ 不足点：</strong>
+                <ul style="margin:5px 0; padding-left:20px; font-size:12px;">
+                    ${analysis.weakness_points.map(s => `<li style="margin:2px 0;">${s}</li>`).join('')}
+                </ul>
+            `;
+        }
+        
+        html += `
+        </div>
+    `;
+    }
+    
+    html += `
+        <div style="display:flex; gap:10px; margin-top:20px;">
+            <button class="btn btn-view" style="flex:1" onclick="closeModal()">关闭</button>
+            <button class="btn btn-start" style="flex:1" onclick="rerunTask('${id}', '${name}')">重新练习</button>
+        </div>
+    `;
+    
+    modalCard.innerHTML = html;
+}
+            
+            html += `</div></div>`;
+        }
+        
+        // AI依赖性分析
+        if (data.ai_dependency) {
+            html += `
+                <div style="margin-top:15px; padding:15px; background:#f8fafc; border-radius:8px;">
+                    <h3 style="font-size:14px; margin-bottom:10px;">🤖 AI工具使用情况</h3>
+                    <div style="font-size:12px; line-height:1.8;">
+                        <div>✅ <strong>正确依赖:</strong> ${data.ai_dependency.correct_reliance || 0} 例 (AI正确且判读正确)</div>
+                        <div>⚠️ <strong>依赖不足:</strong> ${data.ai_dependency.insufficient_reliance || 0} 例 (AI正确但判读错误)</div>
+                        <div>💪 <strong>正确独立:</strong> ${data.ai_dependency.correct_independence || 0} 例 (AI错误但判读正确)</div>
+                        <div>❌ <strong>过度依赖:</strong> ${data.ai_dependency.over_reliance || 0} 例 (AI错误且判读错误)</div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // 大模型评价
+        if (data.llm_analysis && data.llm_analysis.analysis) {
+            const analysis = data.llm_analysis.analysis;
+            
+            html += `
+                <div style="margin-top:15px; padding:15px; background:#f0f9ff; border-radius:8px; border-left:3px solid #667eea;">
+                    <h3 style="font-size:14px; margin-bottom:10px;">🤖 AI专家评价</h3>
+                    
+                    <div style="font-size:13px; line-height:1.8;">
+                        <p style="margin-bottom:10px;"><strong>整体评价：</strong>${analysis.overall_evaluation || '暂无'}</p>
+                        <p style="margin-bottom:10px;"><strong>诊断能力：</strong>${analysis.diagnosis_ability || '暂无'}</p>
+                        <p style="margin-bottom:10px;"><strong>AI工具使用：</strong>${analysis.ai_tool_usage || '暂无'}</p>
+                    </div>
+            `;
+            
+            if (analysis.improvement_suggestions && analysis.improvement_suggestions.length > 0) {
+                html += `
+                    <div style="margin-top:10px;">
+                        <strong style="font-size:13px;">💡 改进建议：</strong>
+                        <ul style="margin:5px 0; padding-left:20px; font-size:12px;">
+                            ${analysis.improvement_suggestions.map(s => `<li style="margin:3px 0;">${s}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
+            
+            html += `</div>`;
+        }
+        
+        html += `
+            <div style="display:flex; gap:10px; margin-top:20px;">
+                <button class="btn btn-view" style="flex:1" onclick="closeModal()">关闭</button>
+                <button class="btn btn-start" style="flex:1" onclick="rerunTask('${id}', '${name}')">重新练习</button>
+            </div>
+        `;
+        
+        modalCard.innerHTML = html;
+    }
+    
+    function rerunTask(id, name) {
+        // 检查currentUser是否存在
+        if (!currentUser || !currentUser.username) {
+            alert('请先登录');
+            return;
+        }
+        window.location.href = `/diagnosis?username=${encodeURIComponent(currentUser.username)}&task=${encodeURIComponent(id)}&taskName=${encodeURIComponent(name)}&mode=edu&clearCache=true`;
     }
 
     function closeModal() { document.getElementById('resultModal').style.display = 'none'; }

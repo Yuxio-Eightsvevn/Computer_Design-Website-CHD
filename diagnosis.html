@@ -1201,6 +1201,10 @@
             taskName: ''
         };
         let isReturningToDashboard = false; // 标记是否正在返回主页
+        
+        // [新增] 查看时间追踪
+        let patientViewTimes = {};  // {patientId: seconds}
+        let currentPatientStartTime = null;
 
         // ========== 诊断草稿缓存（sessionStorage）==========
         function getDraftKey() {
@@ -1473,12 +1477,23 @@
                 restoreDiagnosis
             });
             
+            // [新增] 保存上一个病例的查看时间
+            if (currentPatientStartTime !== null && patients.length > 0) {
+                const viewTime = Math.floor((Date.now() - currentPatientStartTime) / 1000);
+                const prevPatientId = patients[currentPatientIndex]?.id;
+                if (prevPatientId) {
+                    patientViewTimes[prevPatientId] = (patientViewTimes[prevPatientId] || 0) + viewTime;
+                    console.log(`⏱️ 病例 ${prevPatientId} 查看时间: ${viewTime}秒，累计: ${patientViewTimes[prevPatientId]}秒`);
+                }
+            }
+            
             if (patientIndex < 0 || patientIndex >= patients.length) {
                 console.error('❌ 病人索引无效:', patientIndex, '总数:', patients.length);
                 return;
             }
             
             currentPatientIndex = patientIndex;
+            currentPatientStartTime = Date.now(); // [新增] 记录新病例的开始查看时间
             const patient = patients[patientIndex];
             console.log('📋 当前病人完整数据:', JSON.stringify(patient, null, 2));
             console.log('📹 视频数组:', patient.videos);
@@ -2253,6 +2268,16 @@ function selectOption(element, group) {
             // 直接提交，不显示汇总信息
             if (confirm('确定提交所有诊断结果吗？')) {
                 try {
+                    // [新增] 保存最后一个病例的查看时间
+                    if (currentPatientStartTime !== null) {
+                        const viewTime = Math.floor((Date.now() - currentPatientStartTime) / 1000);
+                        const currentPatientId = patients[currentPatientIndex]?.id;
+                        if (currentPatientId) {
+                            patientViewTimes[currentPatientId] = (patientViewTimes[currentPatientId] || 0) + viewTime;
+                            console.log(`⏱️ 最后病例 ${currentPatientId} 查看时间: ${viewTime}秒，累计: ${patientViewTimes[currentPatientId]}秒`);
+                        }
+                    }
+                    
                     // 构建JSON格式的诊断结果
                     const formattedMinutes = Math.floor(timerSeconds / 60);
                     const formattedSeconds = timerSeconds % 60;
@@ -2279,7 +2304,8 @@ function selectOption(element, group) {
                         records: Object.values(diagnosisRecords).map(record => ({
                             patientId: record.patientId,
                             diagnosis: record.diagnosis,
-                            severity: record.severity
+                            severity: record.severity,
+                            viewTime: patientViewTimes[record.patientId] || 0  // [新增] 查看时间
                         }))
                     };
                     
@@ -2303,7 +2329,8 @@ function selectOption(element, group) {
                     
                     // [核心修改] 根据模式返回对应的状态界面
                     if (currentMode === 'edu') {
-                        window.location.href = '/edu_status';
+                        // 显示教育模式完成提示弹窗
+                        showEduCompleteModal();
                     } else {
                         window.location.href = '/task_status';
                     }
@@ -2336,161 +2363,67 @@ function selectOption(element, group) {
             standardContent.classList.toggle('active');
         }
 
-        // 返回主页（清理缓存）
-        function returnToDashboard() {
-            // 检查是否有未保存的诊断
-            const completedCount = Object.keys(diagnosisRecords).length;
+        // 显示教育模式完成提示弹窗
+        function showEduCompleteModal() {
+            // 创建弹窗
+            const modal = document.createElement('div');
+            modal.id = 'eduCompleteModal';
+            modal.className = 'modal-overlay';
+            modal.style.display = 'flex';
             
-            if (completedCount > 0 && completedCount < patients.length) {
-                // 有部分诊断，提示用户
-                if (!confirm(`您已完成 ${completedCount}/${patients.length} 个病人的诊断。\n\n返回主页将清除所有未提交的诊断记录。\n\n确定要返回吗？`)) {
-                    return;
-                }
-            } else if (completedCount > 0) {
-                // 全部完成但未提交，提示用户
-                if (!confirm('您已完成全部诊断但尚未提交。\n\n返回主页将清除所有未提交的诊断记录。\n\n确定要返回吗？')) {
-                    return;
-                }
-            }
-            
-            // 设置标记，防止在页面卸载时保存草稿
-            isReturningToDashboard = true;
-            
-            // 停止计时器
-            if (timerInterval) {
-                clearInterval(timerInterval);
-            }
-            
-            // 强制清除所有相关的 sessionStorage 数据
-            try {
-                const key = getDraftKey();
-                console.log('🗑️ 准备清除草稿，Key:', key);
-                
-                // 清除特定的草稿
-                sessionStorage.removeItem(key);
-                
-                // 额外清除：遍历所有 sessionStorage，清除所有诊断相关的数据
-                const keysToRemove = [];
-                for (let i = 0; i < sessionStorage.length; i++) {
-                    const storageKey = sessionStorage.key(i);
-                    if (storageKey && storageKey.includes('diagnosisDraft')) {
-                        keysToRemove.push(storageKey);
-                    }
-                }
-                
-                keysToRemove.forEach(k => {
-                    sessionStorage.removeItem(k);
-                    console.log('🗑️ 清除了:', k);
-                });
-                
-                // 最终验证
-                const check = sessionStorage.getItem(key);
-                if (check) {
-                    console.error('⚠️ 主草稿清除失败！尝试再次清除...');
-                    sessionStorage.removeItem(key);
-                } else {
-                    console.log('✅ 主草稿清除成功');
-                }
-                
-                console.log('✅ 所有诊断草稿已清除');
-            } catch (e) {
-                console.error('清除草稿时出错:', e);
-            }
-            
-            // 延迟一下，确保清除操作完成
-            setTimeout(() => {
-                // [修复] 根据当前模式决定返回路径
-                if (currentMode === 'edu') {
-                    console.log('🏠 返回教育练习列表');
-                    window.location.href = '/edu_status';
-                } else {
-                    console.log('🏠 返回任务进度列表');
-                    window.location.href = '/task_status';
-                }
-            }, 100);
-        }
+            modal.innerHTML = `
+                <div class="modal-card" style="max-width: 500px; text-align: center; animation: slideUp 0.3s ease;">
+                    <div style="font-size: 48px; margin-bottom: 20px;">🎉</div>
+                    <h2 style="color: #1e293b; margin-bottom: 15px;">诊断已完成！</h2>
+                    <p style="color: #64748b; font-size: 14px; line-height: 1.6; margin-bottom: 20px;">
+                        您的诊断结果已提交成功。<br>
+                        系统正在生成AI分析报告，                        <div style="color: #64748b; font-size: 13px; margin-top: 15px;">
+                            ⏳️ AI分析报告生成中，                        <div style="color: #ef4444; font-size: 12px; margin-top: 10px;">
+                            请稍后返回此页面查看详细报告
+                        </div>
+                    </p>
+                    <button class="btn btn-primary" onclick="closeEduCompleteModal()" style="width: 100%; padding: 12px; font-size: 14px; font-weight: 600; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; cursor: pointer;">
+                        知道了
+                    </button>
+                </div>
+            `;
+        // 教育模式完成提示弹窗
+        <div id="eduCompleteModal" class="modal-overlay">
+            <div class="modal-card" style="max-width: 500px; text-align: center; animation: slideUp 0.3s ease; padding: 40px 30px;">
+                <div style="font-size: 60px; margin-bottom: 10px;">🎉</div>
+                <div style="font-size: 20px; color: #1e293b; margin-bottom: 5px;">诊断结果已提交成功！</div>
+                <div style="font-size: 14px; color: #64748b; line-height: 1.6; margin-bottom: 20px;">
+                    系统正在生成AI分析报告，请稍后返回此页面查看详细报告。
+                </div>
+                <button class="btn btn-primary" onclick="closeEduCompleteModal()" style="width: 100%; padding: 12px 24px; background: #667eea; color: white; border: none; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: pointer;">
+                    知道了
+                </button>
+            </div>
+        </div>
+    </div>
 
-        // 加载模型置信度
-        async function loadModelConfidence(patient) {
-            try {
-                // 从第一个视频的metadata获取置信度
-                if (!patient.videos || patient.videos.length === 0) {
-                    console.warn('该病人没有视频数据');
-                    resetModelConfidence();
-                    return;
-                }
-                
-                const firstVideo = patient.videos[0];
-                if (!firstVideo.metadataPath) {
-                    console.warn('第一个视频没有metadata路径');
-                    resetModelConfidence();
-                    return;
-                }
-                
-                // 获取metadata
-                const response = await fetch(firstVideo.metadataPath);
-                if (!response.ok) {
-                    throw new Error('无法加载metadata');
-                }
-                
-                const metadata = await response.json();
-                console.log('📊 加载的metadata:', metadata);
-                
-                // 更新置信度显示
-                if (metadata.confidence_scores) {
-                    updateModelConfidence(metadata.confidence_scores);
-                } else {
-                    console.warn('metadata中没有confidence_scores字段');
-                    resetModelConfidence();
-                }
-            } catch (error) {
-                console.error('加载模型置信度失败:', error);
-                resetModelConfidence();
-            }
+    <style>
+        #eduCompleteModal {
+            display: none;
         }
-
-        // 更新模型置信度显示
-        function updateModelConfidence(scores) {
-            const categories = ['normal', 'vsd', 'asd', 'pda'];
-            const scoreKeys = ['Normal', 'VSD', 'ASD', 'PDA'];
-            
-            categories.forEach((cat, index) => {
-                const scoreKey = scoreKeys[index];
-                const score = scores[scoreKey] || 0;
-                const percentage = (score * 100).toFixed(1);
-                
-                // 更新文字
-                const valueElem = document.getElementById(`conf-${cat}`);
-                if (valueElem) {
-                    valueElem.textContent = `${percentage}%`;
-                }
-                
-                // 更新进度条
-                const fillElem = document.getElementById(`fill-${cat}`);
-                if (fillElem) {
-                    fillElem.style.width = `${percentage}%`;
-                }
-            });
-            
-            console.log('✅ 模型置信度已更新:', scores);
+        
+        #eduCompleteModal .modal-card {
+            max-width: 500px;
+            padding: 40px 30px;
         }
+    </style>
 
-        // 重置模型置信度显示
-        function resetModelConfidence() {
-            const categories = ['normal', 'vsd', 'asd', 'pda'];
-            
-            categories.forEach(cat => {
-                const valueElem = document.getElementById(`conf-${cat}`);
-                if (valueElem) {
-                    valueElem.textContent = '0.0%';
-                }
-                
-                const fillElem = document.getElementById(`fill-${cat}`);
-                if (fillElem) {
-                    fillElem.style.width = '0%';
-                }
-            });
+    <script>
+        function showEduCompleteModal() {
+            document.getElementById('eduCompleteModal').style.display = 'flex';
+        }
+        
+        function closeEduCompleteModal() {
+            document.getElementById('eduCompleteModal').style.display = 'none';
+            // 跳转到教育任务列表
+            window.location.href = '/edu_status';
         }
     </script>
 </body>
 </html>
+
