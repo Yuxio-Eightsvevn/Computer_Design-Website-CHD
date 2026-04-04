@@ -1128,7 +1128,7 @@
                 </div>
 
                 <!-- 当前选择显示 -->
-                <div class="current-selection" id="currentSelection" style="display: none;">
+                <div class="current-selection" id="currentSelection" style="display: none;" onclick="cancelSelectedLevel()">
                     <span class="selection-label">当前选择：</span>
                     <span class="selection-value" id="selectionValue"></span>
                 </div>
@@ -1435,6 +1435,32 @@
                 alert('缺少必要参数，即将返回主页');
                 window.location.href = '/flow';
                 return;
+            }
+            
+            // 检查任务状态是否仍然有效（教育模式）
+            if (currentMode === 'edu') {
+                try {
+                    const statusCheck = await fetch(`/api/edu/check-task-status/${taskInfo.taskFolder}`);
+                    const statusData = await statusCheck.json();
+                    if (!statusData.valid) {
+                        console.log('⚠️ 任务已失效:', statusData.reason);
+                        alert('该任务已取消发布或不存在，草稿已清空');
+                        // 清除草稿
+                        const keysToRemove = [];
+                        for (let i = 0; i < sessionStorage.length; i++) {
+                            const key = sessionStorage.key(i);
+                            if (key && key.includes('diagnosisDraft')) {
+                                keysToRemove.push(key);
+                            }
+                        }
+                        keysToRemove.forEach(k => sessionStorage.removeItem(k));
+                        // 跳转回 edu_status
+                        window.location.href = '/edu_status';
+                        return;
+                    }
+                } catch (e) {
+                    console.warn('检查任务状态失败:', e);
+                }
             }
             
             // 显示用户信息
@@ -2132,6 +2158,25 @@ function selectOption(element, group) {
                 return;
             }
             
+            // 检查是否点击的是已选中的项，如果是则取消选中
+            const currentSelected = document.querySelector('.standard-item.selected');
+            const isSameItem = currentSelected && currentSelected === event.currentTarget;
+            
+            if (isSameItem) {
+                // 取消选中：移除所有selected类
+                document.querySelectorAll('.standard-item').forEach(item => {
+                    item.classList.remove('selected');
+                });
+                // 隐藏外部显示
+                const currentSelection = document.getElementById('currentSelection');
+                currentSelection.style.display = 'none';
+                currentSeverity = null;
+                // 保存当前病人的诊断记录（清除等级）
+                saveCurrentDiagnosisQuietly();
+                saveDraft('deselectStandardLevel');
+                return;
+            }
+            
             // 移除所有选中状态
             document.querySelectorAll('.standard-item').forEach(item => {
                 item.classList.remove('selected');
@@ -2165,6 +2210,30 @@ function selectOption(element, group) {
                 trigger.classList.remove('active');
                 standardContent.classList.remove('active');
             }, 300); // 延迟300ms，让用户能看到选中效果
+        }
+
+        // 取消已选择的诊断标准等级
+        function cancelSelectedLevel() {
+            if (!currentSeverity) return;
+            
+            // 移除所有选中状态
+            document.querySelectorAll('.standard-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            // 隐藏外部显示
+            document.getElementById('currentSelection').style.display = 'none';
+            currentSeverity = null;
+            // 保存以更新状态
+            saveCurrentDiagnosisQuietly();
+            saveDraft('cancelLevel');
+            
+            // 自动打开下拉面板，让用户看到可以选择的内容
+            const trigger = document.querySelector('.diagnosis-standard-trigger');
+            const standardContent = document.getElementById('diagnosisStandardContent');
+            trigger.classList.add('active');
+            standardContent.classList.add('active');
+            
+            console.log('🔙 已取消诊断标准等级选择，面板已展开');
         }
 
         // 上一个病人
@@ -2484,9 +2553,27 @@ function selectOption(element, group) {
             const trigger = document.querySelector('.diagnosis-standard-trigger');
             const standardContent = document.getElementById('diagnosisStandardContent');
             
-            // 切换激活状态
-            trigger.classList.toggle('active');
-            standardContent.classList.toggle('active');
+            // 如果面板已显示，点击时取消当前选中并隐藏
+            if (trigger.classList.contains('active')) {
+                // 移除所有选中状态
+                document.querySelectorAll('.standard-item').forEach(item => {
+                    item.classList.remove('selected');
+                });
+                // 隐藏外部显示
+                const currentSelection = document.getElementById('currentSelection');
+                currentSelection.style.display = 'none';
+                currentSeverity = null;
+                // 保存以更新状态
+                saveCurrentDiagnosisQuietly();
+                saveDraft('toggleClose');
+                // 隐藏面板
+                trigger.classList.remove('active');
+                standardContent.classList.remove('active');
+            } else {
+                // 正常打开面板
+                trigger.classList.add('active');
+                standardContent.classList.add('active');
+            }
         }
 
         // 显示教育模式完成提示弹窗

@@ -530,6 +530,10 @@ async def get_metadata(path: str):
 # 提供资源访问
 app.mount("/videos", StaticFiles(directory=DATA_BATCH_STORAGE), name="videos")
 app.mount("/data", StaticFiles(directory=DATA_BATCH_STORAGE), name="data")
+# 使用绝对路径挂载config目录
+import os
+config_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config")
+app.mount("/config", StaticFiles(directory=config_dir), name="config")
 
 
 # JSON格式提交诊断结果的请求模型

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>大模型配置指南</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: #f5f7fa; 
+            padding: 20px; 
+            line-height: 1.8;
+        }
+        .container { 
+            max-width: 900px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 40px; 
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+        h1 { color: #1e293b; margin-bottom: 20px; font-size: 28px; border-bottom: 3px solid #667eea; padding-bottom: 15px; }
+        h2 { color: #334155; margin: 30px 0 15px; font-size: 20px; border-left: 4px solid #667eea; padding-left: 12px; }
+        h3 { color: #475569; margin: 20px 0 10px; font-size: 16px; }
+        p { color: #64748b; margin-bottom: 12px; }
+        ul, ol { margin: 10px 0 10px 20px; color: #64748b; }
+        li { margin-bottom: 8px; }
+        code { 
+            background: #f1f5f9; 
+            padding: 2px 6px; 
+            border-radius: 4px; 
+            font-family: 'Consolas', monospace;
+            font-size: 13px;
+            color: #e11d48;
+        }
+        pre { 
+            background: #1e293b; 
+            color: #e2e8f0; 
+            padding: 15px; 
+            border-radius: 8px; 
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+        pre code { background: transparent; color: #e2e8f0; padding: 0; }
+        .warning { 
+            background: #fef3c7; 
+            border: 1px solid #f59e0b; 
+            border-radius: 8px; 
+            padding: 15px; 
+            margin: 15px 0;
+        }
+        .warning strong { color: #92400e; }
+        .tip { 
+            background: #ecfdf5; 
+            border: 1px solid #10b981; 
+            border-radius: 8px; 
+            padding: 15px; 
+            margin: 15px 0;
+        }
+        .tip strong { color: #065f46; }
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        th, td { border: 1px solid #e2e8f0; padding: 10px; text-align: left; }
+        th { background: #f8fafc; color: #334155; }
+        a { color: #667eea; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .emoji { font-size: 18px; }
+        hr { border: none; border-top: 1px solid #e2e8f0; margin: 30px 0; }
+    </style>
+</head>
+<body>
+    <div class="container" id="content">
+        <p style="text-align: center; padding: 40px;">加载中...</p>
+    </div>
+
+    <script>
+        // 读取同目录下的 LLM_MODELS_GUIDE.md 文件
+        async function loadGuide() {
+            try {
+                const response = await fetch('./LLM_MODELS_GUIDE.md');
+                if (!response.ok) throw new Error('文件加载失败: ' + response.status);
+                const markdown = await response.text();
+                
+                // 使用 marked.js 解析 Markdown
+                const html = marked.parse(markdown);
+                document.getElementById('content').innerHTML = html;
+            } catch (e) {
+                document.getElementById('content').innerHTML = 
+                    '<p style="color: #ef4444; text-align: center;">加载失败: ' + e.message + '</p>';
+            }
+        }
+        
+        loadGuide();
+    </script>
+</body>
+</html>

@@ -219,7 +219,7 @@
         <!-- 配置指南链接 -->
         <div style="margin-top: 15px; padding: 12px; background: #f0f9ff; border-radius: 8px; border-left: 3px solid #667eea;">
           <p style="font-size: 12px; color: #64748b; line-height: 1.6;">
-            💡 <strong>配置帮助</strong>：查看<a href="/config/LLM_MODELS_GUIDE.md" target="_blank" style="color: #667eea;">配置指南</a>了解如何获取API Key和配置参数
+            💡 <strong>配置帮助</strong>：查看<a href="#" onclick="showGuide(); return false;" style="color: #667eea;">配置指南</a>了解如何获取API Key和配置参数
           </p>
         </div>
       </div>
@@ -251,7 +251,7 @@
                placeholder="例如：https://open.bigmodel.cn/api"
                style="width:100%; padding:10px; border:1px solid #d7e2ff; border-radius:6px;">
         <small style="color:#64748b; font-size:12px;">
-          API服务地址，详见<a href="/config/LLM_MODELS_GUIDE.md" target="_blank" style="color:#667eea;">配置指南</a>
+          API服务地址，详见<a href="#" onclick="showGuide(); return false;" style="color:#667eea;">配置指南</a>
         </small>
       </div>
       
@@ -599,7 +599,7 @@
     }
     
     function showGuide() {
-      window.open('/config/LLM_MODELS_GUIDE.md', '_blank');
+      window.open('/config/guide.html', '_blank');
     }
 
     async function fetchTasks() {
@@ -774,16 +774,143 @@
             const r = await fetch(`/api/edu/admin/task-status/${taskId}`);
             const data = await r.json();
             document.getElementById('sd-title').textContent = `📊 进度追踪: ${data.task_name}`;
+            currentTaskId = taskId;
             
             container.innerHTML = data.user_statuses.map(u => `
                 <div class="user-status-row" style="display:flex; justify-content:space-between; align-items:center; padding:12px; border-bottom:1px solid #f1f5f9;">
                     <span><strong>👤 ${u.username}</strong></span>
-                    <span class="status-tag ${u.completed ? 'tag-done' : 'tag-wait'}" style="font-size:12px; padding:4px 8px; border-radius:6px; ${u.completed ? 'background:#dcfce7; color:#166534;' : 'background:#fef3c7; color:#92400e;'}">
-                        ${u.completed ? `已完成 (得分: ${(u.score*100).toFixed(1)}%)` : '⌛ 练习中'}
-                    </span>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        ${u.completed ? `<button class="btn btn-sm" style="background:#667eea; color:white; padding:4px 10px; font-size:12px; border:none; border-radius:4px; cursor:pointer;" onclick="viewUserReport('${u.username}', '${taskId}', '${data.task_name}')">查看报告</button>` : ''}
+                        <span class="status-tag ${u.completed ? 'tag-done' : 'tag-wait'}" style="font-size:12px; padding:4px 8px; border-radius:6px; ${u.completed ? 'background:#dcfce7; color:#166534;' : 'background:#fef3c7; color:#92400e;'}">
+                            ${u.completed ? `已完成 (得分: ${(u.score*100).toFixed(1)}%)` : '⌛ 练习中'}
+                        </span>
+                    </div>
                 </div>
             `).join('');
         } catch (e) { container.innerHTML = '获取失败'; }
+    }
+
+    let currentTaskId = null;
+
+    async function viewUserReport(username, taskId, taskName) {
+        const modal = document.getElementById('reportModal');
+        const modalCard = modal.querySelector('.modal-card');
+        
+        modalCard.innerHTML = `
+            <h2 style="color:#1e293b">📊 正在加载报告...</h2>
+            <p style="color:#64748b; margin:20px 0;">正在获取 ${username} 的诊断报告</p>
+            <div style="text-align:center; padding:20px;">
+                <div style="font-size:40px; animation: spin 1s linear infinite;">⚙️</div>
+            </div>
+        `;
+        modal.style.display = 'flex';
+        
+        try {
+            const r = await fetch(`/api/edu/user/result/${username}/${taskId}`);
+            if (!r.ok) throw new Error('获取报告失败');
+            const data = await r.json();
+            showReportContent(modalCard, username, taskName, data);
+        } catch (e) {
+            modalCard.innerHTML = `
+                <h2 style="color:#ef4444">❌ 加载失败</h2>
+                <p style="color:#64748b; margin:20px 0;">${e.message}</p>
+                <button class="btn btn-secondary" onclick="closeModal('reportModal')">关闭</button>
+            `;
+        }
+    }
+
+    function showReportContent(modalCard, username, taskName, data) {
+        let html = `
+            <h2 style="color:#1e293b">🎯 教学评估报告</h2>
+            <p style="font-size:13px; color:#64748b; margin:5px 0;">${taskName} - ${username}</p>
+            
+            <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:15px; margin:20px 0;">
+                <div style="background:#f8fafc; padding:15px; border-radius:10px; text-align:center;">
+                    <div style="font-size:22px; font-weight:700; color:#1e293b;">${(data.accuracy * 100).toFixed(1)}%</div>
+                    <div style="font-size:12px; color:#64748b;">准确率</div>
+                </div>
+                <div style="background:#f8fafc; padding:15px; border-radius:10px; text-align:center;">
+                    <div style="font-size:22px; font-weight:700; color:#1e293b;">${(data.sensitivity * 100).toFixed(1)}%</div>
+                    <div style="font-size:12px; color:#64748b;">敏感度</div>
+                </div>
+                <div style="background:#f8fafc; padding:15px; border-radius:10px; text-align:center;">
+                    <div style="font-size:22px; font-weight:700; color:#1e293b;">${(data.specificity * 100).toFixed(1)}%</div>
+                    <div style="font-size:12px; color:#64748b;">特异性</div>
+                </div>
+                <div style="background:#f8fafc; padding:15px; border-radius:10px; text-align:center;">
+                    <div style="font-size:22px; font-weight:700; color:#1e293b;">${data.formatted_duration || '-'}</div>
+                    <div style="font-size:12px; color:#64748b;">总耗时</div>
+                </div>
+            </div>
+        `;
+        
+        if (data.ai_dependency) {
+            html += `
+                <div style="margin-top:15px;">
+                    <h3 style="font-size:14px; margin-bottom:12px;">🤖 AI工具使用情况</h3>
+                    <div style="display:flex; gap:10px; justify-content:space-between;">
+                        <div style="flex:1; padding:12px; background:#ecfdf5; border-radius:8px; text-align:center;">
+                            <div style="font-size:18px; font-weight:700; color:#059669;">${data.ai_dependency.correct_reliance || 0}</div>
+                            <div style="font-size:11px; color:#065f46;">正确依赖</div>
+                        </div>
+                        <div style="flex:1; padding:12px; background:#fffbeb; border-radius:8px; text-align:center;">
+                            <div style="font-size:18px; font-weight:700; color:#d97706;">${data.ai_dependency.insufficient_reliance || 0}</div>
+                            <div style="font-size:11px; color:#92400e;">依赖不足</div>
+                        </div>
+                        <div style="flex:1; padding:12px; background:#eff6ff; border-radius:8px; text-align:center;">
+                            <div style="font-size:18px; font-weight:700; color:#2563eb;">${data.ai_dependency.correct_independence || 0}</div>
+                            <div style="font-size:11px; color:#1e40af;">正确独立</div>
+                        </div>
+                        <div style="flex:1; padding:12px; background:#fef2f2; border-radius:8px; text-align:center;">
+                            <div style="font-size:18px; font-weight:700; color:#dc2626;">${data.ai_dependency.over_reliance || 0}</div>
+                            <div style="font-size:11px; color:#991b1b;">过度依赖</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        if (data.llm_analysis && data.llm_analysis.analysis) {
+            const analysis = data.llm_analysis.analysis;
+            html += `
+                <div style="margin-top:15px; padding:15px; background:#f0f9ff; border-radius:8px; border-left:3px solid #667eea;">
+                    <h3 style="font-size:14px; margin-bottom:10px;">🤖 AI专家评价</h3>
+                    <div style="font-size:13px; line-height:1.8;">
+                        <p style="margin-bottom:8px;"><strong>整体评价：</strong>${analysis.overall_evaluation || '暂无'}</p>
+                        <p style="margin-bottom:8px;"><strong>诊断能力：</strong>${analysis.diagnosis_ability || '暂无'}</p>
+                    </div>
+                </div>
+            `;
+        }
+        
+        html += `
+            <div style="display:flex; gap:10px; margin-top:20px;">
+                <button class="btn btn-secondary" style="flex:1; padding:10px;" onclick="closeModal('reportModal')">关闭</button>
+            </div>
+        `;
+        
+        modalCard.innerHTML = html;
+    }
+
+    async function unpublishTask() {
+        if (!currentTaskId) return;
+        if (!confirm("⚠️ 确定要取消发布该任务吗？\n\n这将清空所有用户的诊断成绩和AI分析报告，任务将变为未发布状态。")) return;
+        
+        try {
+            const formData = new FormData();
+            formData.append('submission_id', currentTaskId);
+            const r = await fetch('/api/edu/admin/unpublish-task', { method: 'POST', body: formData });
+            if (r.ok) {
+                alert('✅ 任务已取消发布');
+                document.getElementById('statusDetailModal').style.display = 'none';
+                fetchTasks();
+            } else {
+                const err = await r.json();
+                alert('❌ ' + (err.detail || '操作失败'));
+            }
+        } catch (e) {
+            alert('❌ 网络异常');
+        }
     }
 
     async function deleteEduTask() {
@@ -814,9 +941,17 @@
       <div class="modal-card" style="max-width: 600px;">
           <h3 id="sd-title">判读进度明细</h3>
           <div id="sd-content" style="margin: 20px 0; max-height: 400px; overflow-y: auto;"></div>
-          <div style="display:flex; gap:12px; margin-top:15px;">
+          <div class="modal-footer" style="display:flex; gap:12px; margin-top:15px;">
+            <button class="btn" style="background:#dc3545; color:white; flex:1; padding:10px; border:none; border-radius:6px; cursor:pointer;" onclick="unpublishTask()">取消发布</button>
             <button class="btn btn-secondary" style="flex:1" onclick="deleteEduTask()">🗑️ 物理删除此任务</button>
             <button class="btn btn-primary" style="flex:1" onclick="closeModal('statusDetailModal')">返回列表</button>
+          </div>
+      </div>
+  </div>
+
+  <!-- 用户报告弹窗 -->
+  <div id="reportModal" class="modal-overlay">
+      <div class="modal-card" style="max-width: 700px; max-height: 80vh; overflow-y: auto;">
       </div>
   </div>
 

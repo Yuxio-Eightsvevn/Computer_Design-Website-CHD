@@ -731,6 +731,48 @@ async def get_edu_task_detail_status(submission_id: str):
     return {"task_name": task["request_name"], "user_statuses": user_status_list}
 
 
+@router.post("/api/edu/admin/unpublish-task")
+async def unpublish_edu_task(submission_id: str = Form(...)):
+    """取消发布任务：清空所有用户成绩并更新状态为未发布"""
+    index_path = SYSTEM_EDU_DIR / "data.json"
+    if not index_path.exists():
+        raise HTTPException(status_code=404, detail="任务索引文件不存在")
+    
+    with open(index_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    
+    task = next((t for t in data.get("tasks", []) if t["submission_id"] == submission_id), None)
+    if not task:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    
+    if task.get("status") != "published":
+        raise HTTPException(status_code=400, detail="任务未发布，无法取消发布")
+    
+    target_users = task.get("target_users", [])
+    
+    for username in target_users:
+        result_file = EDU_RESULTS_DIR / f"{username}.json"
+        if result_file.exists():
+            try:
+                with open(result_file, "r", encoding="utf-8") as f:
+                    user_data = json.load(f)
+                if submission_id in user_data:
+                    del user_data[submission_id]
+                with open(result_file, "w", encoding="utf-8") as f:
+                    json.dump(user_data, f, ensure_ascii=False, indent=2)
+            except Exception as e:
+                print(f"清空用户 {username} 成绩失败: {e}")
+    
+    task["status"] = "unreleased"
+    if "target_users" in task:
+        del task["target_users"]
+    
+    with open(index_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    
+    return {"message": "任务已取消发布，成绩已清空"}
+
+
 @router.get("/api/edu/user/tasks/{username}")
 async def get_user_edu_tasks(username: str):
     index_path = SYSTEM_EDU_DIR / "data.json"
@@ -740,13 +782,38 @@ async def get_user_edu_tasks(username: str):
     user_tasks = [t for t in all_tasks if t.get("status") == "published" and username in t.get("target_users", [])]
     result_file = EDU_RESULTS_DIR / f"{username}.json"
     user_results = {}
+
+    # 读取用户已完成的成绩
     if result_file.exists():
-        with open(result_file, "r", encoding="utf-8") as f: user_results = json.load(f)
+        with open(result_file, "r", encoding="utf-8") as f:
+            user_results = json.load(f)
     for t in user_tasks:
         sub_id = t["submission_id"]
         t["is_completed"] = sub_id in user_results
         t["last_score"] = user_results.get(sub_id, {}).get("accuracy") if t["is_completed"] else None
+
     return {"tasks": user_tasks}
+
+
+@router.get("/api/edu/check-task-status/{submission_id}")
+async def check_task_status(submission_id: str):
+    """检查教育任务状态，返回是否有效"""
+    index_path = SYSTEM_EDU_DIR / "data.json"
+    if not index_path.exists():
+        return {"valid": False, "reason": "任务不存在"}
+    
+    with open(index_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    
+    task = next((t for t in data.get("tasks", []) if t.get("submission_id") == submission_id), None)
+    if not task:
+        return {"valid": False, "reason": "任务不存在"}
+    
+    if task.get("status") != "published":
+        return {"valid": False, "reason": f"任务状态为 {task.get('status')}", "status": task.get("status")}
+    
+    return {"valid": True}
+
 
 @router.get("/api/edu/user/result/{username}/{submission_id}")
 async def get_user_edu_result(username: str, submission_id: str):

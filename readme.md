@@ -43,7 +43,7 @@
 | 数据库 | SQLite |
 | AI模型 | PyTorch + C3D (单视角/多视角) |
 | 前端 | 原生HTML/CSS/JavaScript |
-| 3D可视化 | Three.js 【待实现】 |
+| 3D可视化 | Three.js ✅ 已实现 |
 | 视频处理 | ffmpeg |
 | 运行时 | Python 3.x + Conda环境 |
 
@@ -69,7 +69,7 @@ Diagnostic_Platform_Stable_Version_C3D/
 ├── edu_admin.html             # 教育管理后台（管理员专用）
 ├── edu_status.html            # 教育练习中心（用户端）
 │
-├── video_3d_modal.js          # 3D可视化模块【待实现】
+├── video_3d_modal.js          # 3D可视化模块 ✅ 已实现
 ├── batch_extract_frames.py    # 视频帧提取工具
 │
 ├── model/                     # AI模型目录
@@ -744,7 +744,7 @@ data_batch_storage/SYSTEM/edu_data/
 
 ---
 
-## 九、3D可视化模块 【待实现】
+## 九、3D可视化模块 ✅ 已实现
 
 ### 9.1 当前状态
 
@@ -1070,5 +1070,142 @@ config/llm_config.json
 
 ---
 
+## 十二、2026年4月更新记录
+
+### 12.1 用户管理界面优化 (admin.html)
+
+**更新内容**:
+- 删除每行的"上传任务"和"下载结果"按钮
+- 新增"角色"列，显示"管理员"或"普通用户"标签
+- 编辑弹窗新增"设为管理员"复选框
+- 支持创建/编辑用户时设置管理员角色
+
+**后端变更**:
+- `database.py`: `update_user()` 函数新增 `is_admin` 参数
+- `main.py`: `UserUpdateRequest` 模型新增 `is_admin` 字段
+- API接口 `/api/users/{user_id}` 支持更新用户角色
+
+**相关文件**:
+| 文件 | 修改内容 |
+|------|----------|
+| admin.html | 表格UI、编辑弹窗、提交逻辑 |
+| database.py | update_user() 函数 |
+| main.py | UserUpdateRequest、API接口 |
+
+---
+
+### 12.2 教育管理后台增强 (edu_admin.html)
+
+**更新内容**:
+- 已发布任务的用户列表中，已完成用户显示"查看报告"按钮
+- 点击"查看报告"弹出完整评估报告（包含准确率、敏感度、特异性、AI依赖分析、AI专家评价）
+- 任务详情弹窗底部新增"取消发布"按钮
+- 点击"取消发布"清空所有用户成绩并将任务状态改为"未发布"
+
+**新增API**:
+| 接口 | 方法 | 位置 | 功能 |
+|------|------|------|------|
+| /api/edu/admin/unpublish-task | POST | routes_oridata.py | 取消发布并清空成绩 |
+
+**相关文件**:
+| 文件 | 修改内容 |
+|------|----------|
+| edu_admin.html | 用户报告弹窗、取消发布功能 |
+| routes_oridata.py | 新增unpublish-task接口 |
+
+---
+
+### 12.3 诊断界面UI修复 (diagnosis.html)
+
+**更新内容**:
+- 修复教育模式完成后弹窗显示位置错误问题
+- 弹窗改为独立居中显示，带遮罩背景
+- 添加 `.modal-card` 样式和 `@keyframes slideUp` 动画
+- 优化完成弹窗文字，提示用户去教育练习中心查看报告
+
+**相关文件**:
+| 文件 | 修改内容 |
+|------|----------|
+| diagnosis.html | 弹窗HTML结构、CSS样式、JS函数 |
+
+---
+
+### 12.4 教育状态页面优化 (edu_status.html)
+
+**更新内容**:
+- 修复 `loadUser` 函数处理API失败的情况
+- 报告弹窗宽度从450px增加到700px
+- AI依赖统计从垂直列表改为横向4列卡片布局
+- 添加缺失的 `</style>` 闭合标签修复语法错误
+
+**相关文件**:
+| 文件 | 修改内容 |
+|------|----------|
+| edu_status.html | loadUser函数、报告弹窗UI、CSS |
+
+---
+
+### 12.5 大模型分析模块修复 (llm_analyzer.py)
+
+**更新内容**:
+- 修复 `prompt` 变量未初始化问题
+- 修改 `_construct_prompt()` 函数使用 `prompt = f"""` 而非 `prompt += f"""`
+
+**相关文件**:
+| 文件 | 修改内容 |
+|------|----------|
+| llm_analyzer.py | _construct_prompt() 函数 |
+
+---
+
+### 12.6 置信度数据解析修复 (main.py + diagnosis.html)
+
+**更新内容**:
+- 后端API支持两种置信度数据格式：
+  - 直接格式: `{ Normal: 0.85, VSD: 0.12, ... }`
+  - 包装格式: `{ confidence_scores: { Normal: 0.85, ... } }`
+- 前端 `loadModelConfidence()` 函数同步支持两种格式解析
+
+**相关文件**:
+| 文件 | 修改内容 |
+|------|----------|
+| main.py | /api/get-metadata 接口 |
+| diagnosis.html | loadModelConfidence() 函数 |
+
+---
+
+### 12.7 数据库更新函数增强 (database.py)
+
+**更新内容**:
+- `update_user()` 函数新增 `is_admin` 可选参数
+- 支持同时更新密码和角色、仅更新角色、仅更新密码等多种场景
+
+**函数签名**:
+```python
+def update_user(user_id: int, doctor: str, organization: str, 
+                password: Optional[str] = None, is_admin: Optional[bool] = None) -> bool
+```
+
+---
+
+## 十三、协定的再次确认
+
+作为编程助手，我承诺遵循以下协定：
+
+1. **先理解再行动**：充分理解项目结构、用户期望和代码逻辑后再进行修改
+2. **明确指出改动**：在修改代码前，先说明要改动的地方、上下文和原因
+3. **不删除原有逻辑**：除非用户明确指出且的确有必要，否则不删除任何原有功能逻辑
+4. **考察影响范围**：检查实现方式是否会影响其他功能的异常
+5. **不明则问**：对变量的作用不明确时，必须搜索确认其用途
+6. **保持文档同步**：所有更新必须同步更新本README.md文档
+7. **遵循用户意图**：严格按照用户的具体要求实现功能，不自行添加额外逻辑
+
+**本项目协定的核心原则**：
+- 用户要求修改什么，就修改什么
+- 不修改不必要的代码
+- 修改前先计划，确认后再执行
+
+---
+
 *文档版本: 2026-04-04*
-*最后更新: 添加教育模式增强功能与大模型集成*
+*最后更新: 2026-04-04 - 添加用户管理、教育管理、界面修复等更新记录*

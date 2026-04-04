@@ -304,15 +304,15 @@ function showBasicReport(id, name, data) {
         
         <div class="metric-grid">
             <div class="metric-item">
-                <div class="metric-val">${(data.accuracy * 100).toFixed(1)}%</div>
+                <div class="metric-val">${data.accuracy != null ? (data.accuracy * 100).toFixed(1) + '%' : '-'}</div>
                 <div class="metric-label">准确率</div>
             </div>
             <div class="metric-item">
-                <div class="metric-val">${(data.sensitivity * 100).toFixed(1)}%</div>
+                <div class="metric-val">${data.sensitivity != null ? (data.sensitivity * 100).toFixed(1) + '%' : '-'}</div>
                 <div class="metric-label">敏感度</div>
             </div>
             <div class="metric-item">
-                <div class="metric-val">${(data.specificity * 100).toFixed(1)}%</div>
+                <div class="metric-val">${data.specificity != null ? (data.specificity * 100).toFixed(1) + '%' : '-'}</div>
                 <div class="metric-label">特异性</div>
             </div>
             <div class="metric-item">
@@ -342,15 +342,15 @@ function showCompleteReport(id, name, data) {
         
         <div class="metric-grid">
             <div class="metric-item">
-                <div class="metric-val">${(data.accuracy * 100).toFixed(1)}%</div>
+                <div class="metric-val">${data.accuracy != null ? (data.accuracy * 100).toFixed(1) + '%' : '-'}</div>
                 <div class="metric-label">准确率</div>
             </div>
             <div class="metric-item">
-                <div class="metric-val">${(data.sensitivity * 100).toFixed(1)}%</div>
+                <div class="metric-val">${data.sensitivity != null ? (data.sensitivity * 100).toFixed(1) + '%' : '-'}</div>
                 <div class="metric-label">敏感度</div>
             </div>
             <div class="metric-item">
-                <div class="metric-val">${(data.specificity * 100).toFixed(1)}%</div>
+                <div class="metric-val">${data.specificity != null ? (data.specificity * 100).toFixed(1) + '%' : '-'}</div>
                 <div class="metric-label">特异性</div>
             </div>
             <div class="metric-item">
