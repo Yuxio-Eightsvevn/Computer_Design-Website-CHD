@@ -217,19 +217,34 @@ def create_user(username: str, password: str, doctor: str, organization: str, is
         print(f"创建用户失败: {e}")
         return False
 
-def update_user(user_id: int, doctor: str, organization: str, password: Optional[str] = None) -> bool:
+def update_user(user_id: int, doctor: str, organization: str, password: Optional[str] = None, is_admin: Optional[bool] = None) -> bool:
     """更新用户信息"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        if password:
+        if password and is_admin is not None:
+            hashed = hash_password(password)
+            admin_value = 1 if is_admin else 0
+            cursor.execute('''
+                UPDATE users 
+                SET doctor = ?, organization = ?, password = ?, is_admin = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ''', (doctor, organization, hashed, admin_value, user_id))
+        elif password:
             hashed = hash_password(password)
             cursor.execute('''
                 UPDATE users 
                 SET doctor = ?, organization = ?, password = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
             ''', (doctor, organization, hashed, user_id))
+        elif is_admin is not None:
+            admin_value = 1 if is_admin else 0
+            cursor.execute('''
+                UPDATE users 
+                SET doctor = ?, organization = ?, is_admin = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ''', (doctor, organization, admin_value, user_id))
         else:
             cursor.execute('''
                 UPDATE users 

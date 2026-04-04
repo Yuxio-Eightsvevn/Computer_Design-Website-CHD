@@ -232,6 +232,7 @@ class UserUpdateRequest(BaseModel):
     doctor: str
     organization: str
     password: Optional[str] = None
+    is_admin: Optional[bool] = None
 
 # 获取所有用户列表
 @app.get("/api/users")
@@ -335,7 +336,8 @@ async def update_user(user_id: int, request: UserUpdateRequest):
         user_id,
         request.doctor,
         request.organization,
-        request.password
+        request.password,
+        request.is_admin
     )
     
     if not success:
@@ -876,10 +878,12 @@ async def submit_diagnosis_json(request: DiagnosisSubmitJsonRequest):
                 if ai_confidence_path.exists():
                     with open(ai_confidence_path, "r", encoding="utf-8") as f:
                         ai_data = json.load(f)
-                        scores = ai_data.get("confidence_scores", {})
+                        # 支持两种格式：直接格式 {Normal:0.85,...} 或 包装格式 {confidence_scores:{Normal:0.85,...}}
+                        scores = ai_data.get("confidence_scores", ai_data)
                         if scores:
-                            ai_label = max(scores, key=scores.get)
-                            ai_label = LABEL_MAP.get(ai_label, -1)
+                            ai_pred_name = max(scores, key=scores.get)
+                            ai_label = LABEL_MAP.get(ai_pred_name, -1)
+                            print(f"  🤖 AI预测: {ai_pred_name} -> {ai_label}, 置信度: {scores[ai_pred_name]}")
                 
                 # 收集数据
                 ground_truth_labels.append(LABEL_REVERSE_MAP.get(gt_label, "Unknown"))

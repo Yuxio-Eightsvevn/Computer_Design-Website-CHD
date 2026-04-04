@@ -684,6 +684,42 @@
             display: flex;
         }
 
+        /* 教育模式完成弹窗样式 */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-card {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
         @keyframes fadeIn {
             from {
                 opacity: 0;
@@ -1152,6 +1188,23 @@
                     <button class="action-btn btn-submit" onclick="nextVideo()">下一个</button>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- 教育模式完成弹窗 -->
+    <div class="modal-overlay" id="eduCompleteModal" style="display: none;">
+        <div class="modal-card" style="max-width: 500px; text-align: center; animation: slideUp 0.3s ease;">
+            <div style="font-size: 48px; margin-bottom: 20px;">🎉</div>
+            <h2 style="color: #1e293b; margin-bottom: 15px;">诊断已完成！</h2>
+            <p style="color: #64748b; font-size: 14px; line-height: 1.6; margin-bottom: 20px;">
+                您的诊断结果已提交成功。<br><br>
+                系统正在生成AI分析报告，请稍后在<br>
+                <strong style="color: #667eea;">教育练习中心 → 点击"查看报告"</strong><br>
+                查看详细评估结果。
+            </p>
+            <button class="btn btn-primary" onclick="closeEduCompleteModal()" style="width: 100%; padding: 12px; font-size: 14px; font-weight: 600; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; cursor: pointer;">
+                查看报告
+            </button>
         </div>
     </div>
 
@@ -1652,6 +1705,73 @@
             }
         }
 
+        // 加载模型置信度（从第一个视频的metadata）
+        async function loadModelConfidence(patient) {
+            try {
+                // 重置置信度显示
+                const confidenceTypes = ['normal', 'vsd', 'asd', 'pda'];
+                confidenceTypes.forEach(type => {
+                    const fill = document.getElementById(`fill-${type}`);
+                    const value = document.getElementById(`conf-${type}`);
+                    if (fill) fill.style.width = '0%';
+                    if (value) value.textContent = '0.0%';
+                });
+
+                // 获取第一个视频的 metadataPath
+                if (!patient.videos || patient.videos.length === 0) {
+                    console.log('⚠️ 该病人没有视频');
+                    return;
+                }
+
+                const firstVideo = patient.videos[0];
+                const metadataPath = firstVideo.metadataPath;
+
+                if (!metadataPath) {
+                    console.log('⚠️ 第一个视频没有 metadataPath');
+                    return;
+                }
+
+                console.log('📄 加载置信度 metadata:', metadataPath);
+
+                // 获取置信度数据
+                const response = await fetch(metadataPath);
+                if (!response.ok) {
+                    throw new Error(`获取置信度失败: ${response.status}`);
+                }
+
+                const data = await response.json();
+                console.log('📊 置信度数据:', data);
+
+                // 支持两种数据格式：直接格式 或 包装格式
+                const confidenceData = data.confidence_scores || data;
+
+                // 更新置信度显示
+                // 置信度数据结构: { Normal: 0.85, VSD: 0.12, ASD: 0.02, PDA: 0.01 }
+                const confidenceMap = {
+                    'Normal': 'normal',
+                    'VSD': 'vsd',
+                    'ASD': 'asd',
+                    'PDA': 'pda'
+                };
+
+                for (const [key, type] of Object.entries(confidenceMap)) {
+                    const value = confidenceData[key] || confidenceData[key.toLowerCase()] || 0;
+                    const percentage = (value * 100).toFixed(1);
+
+                    const fill = document.getElementById(`fill-${type}`);
+                    const valueElem = document.getElementById(`conf-${type}`);
+
+                    if (fill) fill.style.width = `${percentage}%`;
+                    if (valueElem) valueElem.textContent = `${percentage}%`;
+                }
+
+                console.log('✅ 置信度加载完成');
+
+            } catch (error) {
+                console.error('❌ 加载置信度失败:', error);
+            }
+        }
+
         // 打开视频弹窗
         async function openVideoModal(videoIndex) {
             const patient = patients[currentPatientIndex];
@@ -1906,6 +2026,12 @@
             }
 
             return frameCount;
+        }
+
+        // 返回主页
+        function returnToDashboard() {
+            isReturningToDashboard = true;
+            window.location.href = '/flow';
         }
 
         // 关闭视频弹窗
@@ -2365,62 +2491,17 @@ function selectOption(element, group) {
 
         // 显示教育模式完成提示弹窗
         function showEduCompleteModal() {
-            // 创建弹窗
-            const modal = document.createElement('div');
-            modal.id = 'eduCompleteModal';
-            modal.className = 'modal-overlay';
-            modal.style.display = 'flex';
-            
-            modal.innerHTML = `
-                <div class="modal-card" style="max-width: 500px; text-align: center; animation: slideUp 0.3s ease;">
-                    <div style="font-size: 48px; margin-bottom: 20px;">🎉</div>
-                    <h2 style="color: #1e293b; margin-bottom: 15px;">诊断已完成！</h2>
-                    <p style="color: #64748b; font-size: 14px; line-height: 1.6; margin-bottom: 20px;">
-                        您的诊断结果已提交成功。<br>
-                        系统正在生成AI分析报告，                        <div style="color: #64748b; font-size: 13px; margin-top: 15px;">
-                            ⏳️ AI分析报告生成中，                        <div style="color: #ef4444; font-size: 12px; margin-top: 10px;">
-                            请稍后返回此页面查看详细报告
-                        </div>
-                    </p>
-                    <button class="btn btn-primary" onclick="closeEduCompleteModal()" style="width: 100%; padding: 12px; font-size: 14px; font-weight: 600; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; cursor: pointer;">
-                        知道了
-                    </button>
-                </div>
-            `;
-        // 教育模式完成提示弹窗
-        <div id="eduCompleteModal" class="modal-overlay">
-            <div class="modal-card" style="max-width: 500px; text-align: center; animation: slideUp 0.3s ease; padding: 40px 30px;">
-                <div style="font-size: 60px; margin-bottom: 10px;">🎉</div>
-                <div style="font-size: 20px; color: #1e293b; margin-bottom: 5px;">诊断结果已提交成功！</div>
-                <div style="font-size: 14px; color: #64748b; line-height: 1.6; margin-bottom: 20px;">
-                    系统正在生成AI分析报告，请稍后返回此页面查看详细报告。
-                </div>
-                <button class="btn btn-primary" onclick="closeEduCompleteModal()" style="width: 100%; padding: 12px 24px; background: #667eea; color: white; border: none; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: pointer;">
-                    知道了
-                </button>
-            </div>
-        </div>
-    </div>
+            const modal = document.getElementById('eduCompleteModal');
+            if (modal) {
+                modal.style.display = 'flex';
+            }
+        }
 
-    <style>
-        #eduCompleteModal {
-            display: none;
-        }
-        
-        #eduCompleteModal .modal-card {
-            max-width: 500px;
-            padding: 40px 30px;
-        }
-    </style>
-
-    <script>
-        function showEduCompleteModal() {
-            document.getElementById('eduCompleteModal').style.display = 'flex';
-        }
-        
         function closeEduCompleteModal() {
-            document.getElementById('eduCompleteModal').style.display = 'none';
-            // 跳转到教育任务列表
+            const modal = document.getElementById('eduCompleteModal');
+            if (modal) {
+                modal.style.display = 'none';
+            }
             window.location.href = '/edu_status';
         }
     </script>

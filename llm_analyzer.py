@@ -177,8 +177,8 @@ class LLMAnalyzer:
    - 医学意义:需要培养批判性思维，不应盲目依赖AI
 """
         
-        # 巻加基础统计数据
-        prompt += f"""
+        # 构建完整提示词
+        prompt = f"""
 {background}
 
 请分析以下医学诊断练习数据，并给出专业评价：
