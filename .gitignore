@@ -16,9 +16,6 @@ app.log
 # 数据存储目录
 data_batch_storage/
 
-# 配置文件（包含敏感信息）
-config/llm_config.json
-
 # 临时文件
 *.tmp
 *.bak
@@ -36,3 +33,10 @@ venv/
 .vscode/
 *.swp
 *.swo
+
+# AI模型权重 (忽略但不跟踪)
+model/**/*.pth
+model/**/*.pt
+!model/Baseline_4size/.gitkeep
+!model/multiviews/.gitkeep
+!model/singleview/.gitkeep
