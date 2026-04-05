@@ -1,0 +1,155 @@
+================================================================================
+心脏超声诊断系统 - 依赖文件清单
+================================================================================
+
+本项目依赖以下文件目录，请确保这些文件存在后再运行程序。
+
+================================================================================
+1. 核心代码文件 (必须)
+================================================================================
+main.py                      # 主程序入口
+heart_diagnosis.py           # 核心诊断模块
+interface1_batch.py          # 批处理接口
+interface2_api.py            # API接口
+
+================================================================================
+2. Codes模块 (必须)
+================================================================================
+Codes/Nets/dual_tokens_net.py                     # 单视角神经网络
+Codes/Nets/Multi_Views_dual_tokens_net.py         # 多视角神经网络
+Codes/main_codes/original_ref.py                  # 提取的原函数（含video_loader等）
+Codes/config/test_config_ResnetrTransformerDualToken_1107_18cls_layersdecouple44.yaml  # 单视角配置
+Codes/config/test_config_ResnetrTransformerDualToken_MutilViews_1118_18cls_layersdecouple55.yaml  # 多视角配置
+
+================================================================================
+3. 单视角模型权重 (4个)
+================================================================================
+singleview/spatial_size_4.pth   # 4x4网格模型
+singleview/spatial_size_5.pth   # 5x5网格模型
+singleview/spatial_size_6.pth   # 6x6网格模型
+singleview/spatial_size_7.pth   # 7x7网格模型
+
+================================================================================
+4. 多视角模型权重
+================================================================================
+multiviews/epoch_97.98295452219057.pth
+
+================================================================================
+5. 基准特征文件 (Baseline)
+================================================================================
+Baseline_4size/final_baseline_features_4x4_512dim_1101.pt
+Baseline_4size/final_baseline_features_5x5_512dim_1101.pt
+Baseline_4size/final_baseline_features_6x6_512dim_1101.pt
+Baseline_4size/final_baseline_features_7x7_512dim_1101.pt
+
+================================================================================
+6. Python依赖包
+================================================================================
+torch>=2.0.0
+torchvision>=0.15.0
+numpy>=1.21.0
+opencv-python>=4.5.0
+pyyaml>=6.0
+tqdm>=4.60.0
+einops>=0.6.0
+entmax>=1.0
+Pillow>=9.0.0
+
+================================================================================
+目录结构要求
+================================================================================
+{项目根目录}/
+├── main.py
+├── heart_diagnosis.py
+├── interface1_batch.py
+├── interface2_api.py
+├── requirements.txt
+├── require_file.txt
+├── README.md
+├── Codes/
+│   ├── config/
+│   │   └── test_config_ResnetrTransformerDualToken_*.yaml
+│   ├── Nets/
+│   │   ├── dual_tokens_net.py
+│   │   └── Multi_Views_dual_tokens_net.py
+│   └── main_codes/
+│       └── original_ref.py          # 关键：包含提取的原函数
+├── singleview/
+│   ├── spatial_size_4.pth
+│   ├── spatial_size_5.pth
+│   ├── spatial_size_6.pth
+│   └── spatial_size_7.pth
+├── multiviews/
+│   └── epoch_97.98295452219057.pth
+├── Baseline_4size/
+│   ├── final_baseline_features_4x4_512dim_1101.pt
+│   ├── final_baseline_features_5x5_512dim_1101.pt
+│   ├── final_baseline_features_6x6_512dim_1101.pt
+│   └── final_baseline_features_7x7_512dim_1101.pt
+└── input_path/
+    └── request1/
+        ├── case1/
+        │   └── *.mp4
+        └── ...
+
+================================================================================
+运行前检查
+================================================================================
+1. 确认所有模型权重文件存在
+2. 确认配置文件存在
+3. 确认输入视频目录结构正确
+4. 安装Python依赖: pip install -r requirements.txt
+
+================================================================================
+输入目录结构
+================================================================================
+{target_dir}/
+├── case1/
+│   ├── video1.mp4
+│   ├── video2.mp4
+│   └── ...
+├── case2/
+│   └── video1.mp4
+└── ...
+
+================================================================================
+输出目录结构
+================================================================================
+{output_dir}/
+└── {request_name}/
+    └── case1/
+        ├── output_videos/
+        │   ├── video1_original.mp4       # 原视频副本
+        │   ├── video1_original/          # 序列帧目录
+        │   │   └── frames/
+        │   │       └── frame_*.png
+        │   ├── video1_bbox.mp4           # 边界框可视化
+        │   └── video1_heatmap.mp4       # 热力图可视化
+        ├── output_data/
+        │   ├── video1.json               # 热力图数据+预测框
+        │   ├── video1.mp4                # 原始视频副本
+        │   ├── confidence_scores.json    # 多视角诊断置信度
+        │   └── ...
+        └── output_data.zip               # 数据压缩包
+
+================================================================================
+接口使用说明
+================================================================================
+
+1. main.py (推荐)
+   python main.py
+   # 自动使用 heart_diagnosis.py 进行诊断
+
+2. 直接调用 API
+   from heart_diagnosis import diagnose
+   result = diagnose(target_dir, output_dir)
+
+3. 批处理模式
+   python interface1_batch.py -t <输入目录> -o <输出目录>
+
+4. API 接口 (单例模式)
+   from interface2_api import HeartInferenceEngine
+   engine = HeartInferenceEngine()
+   result = engine.process_single_case(case_input_dir, output_dir)
+
+================================================================================

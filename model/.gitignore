@@ -1,0 +1,8 @@
+# 测试/临时目录忽略
+output_path/
+input_path/
+
+# Python缓存忽略
+__pycache__/
+**/__pycache__/
+*.pyc

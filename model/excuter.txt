@@ -1,0 +1,2 @@
+conda activate nn-env
+python interface1_batch.py --target_dir "input_path/request1" --output_dir "output_path"
