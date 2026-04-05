@@ -439,8 +439,8 @@ function showCompleteReport(id, name, data) {
         if (analysis.improvement_suggestions && analysis.improvement_suggestions.length > 0) {
             html += `
                 <div style="margin-top:10px;">
-                    <strong style="font-size:13px;">💡 改进建议：</strong>
-                    <ul style="margin:5px 0; padding-left:20px; font-size:12px;">
+                    <strong style="font-size:13px;">💡 改进建议</strong>
+                    <ul style="margin:5px 0; padding-left:20px; font-size:12px; text-align:left; list-style-type:disc;">
                         ${analysis.improvement_suggestions.map(s => `<li style="margin:3px 0;">${s}</li>`).join('')}
                     </ul>
                 </div>

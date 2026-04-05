@@ -787,6 +787,35 @@
             display: block;
         }
 
+        .video-modal-keyframe {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .key-frame-label {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .key-frame-btn-header {
+            padding: 5px 12px;
+            cursor: pointer;
+            background: #1976d2;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        .key-frame-btn-header:hover {
+            background: #1565c0;
+        }
+
         .video-modal-body {
             background: #2a2a2a;
             padding: 0;
@@ -973,9 +1002,12 @@
                 min-height: 600px;
             }
 
-            .video-item:last-child {
-                grid-column: 1 / 2;
-            }
+        .video-item:last-child {
+            grid-column: 1 / 2;
+        }
+
+        .key-frame-btn:hover {
+            background: #45a049;
         }
     </style>
 </head>
@@ -1213,6 +1245,7 @@
         <div class="video-modal-content" onclick="event.stopPropagation()">
             <div class="video-modal-header">
                 <div class="video-modal-title" id="modalTitle">视频 1 - 放大查看</div>
+                <div class="video-modal-keyframe" id="modalKeyFrame"></div>
                 <button class="video-modal-close" onclick="closeVideoModal()"></button>
             </div>
             <div class="video-modal-body" id="modalBody">
@@ -1913,6 +1946,67 @@
                 video2dWrapper.appendChild(videoElement);
                 video2dSection.appendChild(video2dWrapper);
 
+                // 读取metadata获取关键帧索引（3D模式）
+                let keyFrameIndex3D = null;
+                const metadataUrl3D = videoGroup.videoJsonUrl || videoGroup.metadataPath;
+                console.log('🔍 3D模式关键帧调试:');
+                console.log('  - videoGroup.videoJsonUrl:', videoGroup.videoJsonUrl);
+                console.log('  - 最终metadataUrl:', metadataUrl3D);
+                if (metadataUrl3D) {
+                    try {
+                        const metadataResponse = await fetch(metadataUrl3D);
+                        console.log('  - metadataResponse状态:', metadataResponse.status);
+                        if (metadataResponse.ok) {
+                            const metadata = await metadataResponse.json();
+                            console.log('  - 读取到的metadata:', JSON.stringify(metadata));
+                            // 支持两种格式：直接读取或从confidence_scores读取
+                            let kf = metadata.predicted_key_frame_index;
+                            if (kf === undefined && metadata.confidence_scores) {
+                                kf = metadata.confidence_scores.predicted_key_frame_index;
+                            }
+                            if (kf !== undefined && kf !== null) {
+                                keyFrameIndex3D = kf;
+                                console.log('✅ 3D模式: 获取到关键帧索引:', keyFrameIndex3D);
+                            } else {
+                                console.warn('⚠️ 3D模式: metadata中没有predicted_key_frame_index字段');
+                            }
+                        }
+                    } catch (error) {
+                        console.warn('3D模式: 读取metadata失败:', error);
+                    }
+                }
+
+                // 在header中显示关键帧信息（3D模式）
+                const keyFrameDisplay3D = document.getElementById('modalKeyFrame');
+                keyFrameDisplay3D.innerHTML = '';
+                if (keyFrameIndex3D !== null) {
+                    const label3D = document.createElement('span');
+                    label3D.className = 'key-frame-label';
+                    label3D.textContent = '关键帧: 第' + keyFrameIndex3D + '帧';
+                    keyFrameDisplay3D.appendChild(label3D);
+
+                    const btn3D = document.createElement('button');
+                    btn3D.className = 'key-frame-btn-header';
+                    btn3D.textContent = '🎯 定位';
+                    btn3D.onclick = function() {
+                        const time = keyFrameIndex3D / 15.15;
+                        videoElement.currentTime = time;
+                        videoElement.pause();
+                        console.log('3D模式: 已定位到关键帧: 第' + keyFrameIndex3D + '帧 (' + time.toFixed(2) + '秒)');
+                    };
+                    keyFrameDisplay3D.appendChild(btn3D);
+                    
+                    window._currentKeyFrameIndex = keyFrameIndex3D;
+                    window._currentVideoElement = videoElement;
+                } else {
+                    const label3D = document.createElement('span');
+                    label3D.className = 'key-frame-label';
+                    label3D.textContent = '关键帧: 未检测到';
+                    label3D.style.background = '#ffebee';
+                    label3D.style.color = '#c62828';
+                    keyFrameDisplay3D.appendChild(label3D);
+                }
+
                 // 分隔线
                 const divider = document.createElement('div');
                 divider.className = 'video-3d-divider';
@@ -2024,6 +2118,73 @@
 
                 modalBody.appendChild(videoElement);
 
+                // 读取metadata获取关键帧索引
+                let keyFrameIndex = null;
+                const metadataUrl = videoGroup.videoJsonUrl || videoGroup.metadataPath;
+                
+                console.log('🔍 关键帧读取调试:');
+                console.log('  - videoGroup.videoJsonUrl:', videoGroup.videoJsonUrl);
+                console.log('  - videoGroup.metadataPath:', videoGroup.metadataPath);
+                console.log('  - 最终metadataUrl:', metadataUrl);
+                
+                if (metadataUrl) {
+                    try {
+                        const metadataResponse = await fetch(metadataUrl);
+                        console.log('  - metadataResponse状态:', metadataResponse.status);
+                        if (metadataResponse.ok) {
+                            const metadata = await metadataResponse.json();
+                            console.log('  - 读取到的metadata:', JSON.stringify(metadata));
+                            // 支持两种格式：直接读取或从confidence_scores读取
+                            let kf = metadata.predicted_key_frame_index;
+                            if (kf === undefined && metadata.confidence_scores) {
+                                kf = metadata.confidence_scores.predicted_key_frame_index;
+                            }
+                            if (kf !== undefined && kf !== null) {
+                                keyFrameIndex = kf;
+                                console.log('✅ 获取到关键帧索引:', keyFrameIndex);
+                            } else {
+                                console.warn('⚠️ metadata中没有predicted_key_frame_index字段');
+                            }
+                        }
+                    } catch (error) {
+                        console.warn('读取metadata失败:', error);
+                    }
+                } else {
+                    console.warn('⚠️ 没有可用的metadata URL');
+                }
+
+                // 在header中显示关键帧信息
+                const keyFrameDisplay = document.getElementById('modalKeyFrame');
+                keyFrameDisplay.innerHTML = '';
+                if (keyFrameIndex !== null) {
+                    const label = document.createElement('span');
+                    label.className = 'key-frame-label';
+                    label.textContent = '关键帧: 第' + keyFrameIndex + '帧';
+                    keyFrameDisplay.appendChild(label);
+
+                    const btn = document.createElement('button');
+                    btn.className = 'key-frame-btn-header';
+                    btn.textContent = '🎯 定位';
+                    btn.onclick = function() {
+                        const time = keyFrameIndex / 15.15;
+                        videoElement.currentTime = time;
+                        videoElement.pause();
+                        console.log('已定位到关键帧: 第' + keyFrameIndex + '帧 (' + time.toFixed(2) + '秒)');
+                    };
+                    keyFrameDisplay.appendChild(btn);
+                    
+                    // 保存到全局变量供按钮调用
+                    window._currentKeyFrameIndex = keyFrameIndex;
+                    window._currentVideoElement = videoElement;
+                } else {
+                    const label = document.createElement('span');
+                    label.className = 'key-frame-label';
+                    label.textContent = '关键帧: 未检测到';
+                    label.style.background = '#ffebee';
+                    label.style.color = '#c62828';
+                    keyFrameDisplay.appendChild(label);
+                }
+
                 modal.classList.add('active');
                 document.body.style.overflow = 'hidden';
             }
@@ -2080,6 +2241,11 @@
                     video.pause();
                     video.currentTime = 0;
                 }
+
+                // 清理关键帧全局变量
+                window._currentKeyFrameIndex = null;
+                window._currentVideoElement = null;
+                document.getElementById('modalKeyFrame').innerHTML = '';
             }
         }
 

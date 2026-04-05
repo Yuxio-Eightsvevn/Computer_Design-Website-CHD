@@ -491,17 +491,22 @@ async def get_task_patients(username: str, task_folder: str):
             videos_list = []
             for bn in sorted(video_groups.keys()):
                 abs_conf_path = case_folder / "output_data" / "confidence_scores.json"
+                abs_video_json_path = case_folder / "output_data" / f"{bn}.json"
                 metadata_url = None
+                video_json_url = None
                 if abs_conf_path.exists():
                     # [修改] path 参数同步使用动态前缀
                     metadata_url = f"/api/get-metadata?path={base_prefix}/{final_task_id}/{case_folder.name}/output_data/confidence_scores.json"
                     metadata_url = metadata_url.replace("//", "/")
+                if abs_video_json_path.exists():
+                    video_json_url = f"/api/get-metadata?path={base_prefix}/{final_task_id}/{case_folder.name}/output_data/{bn}.json"
+                    video_json_url = video_json_url.replace("//", "/")
 
                 group = video_groups[bn]
                 # 质量守卫
                 if 'original' not in group and group: group['original'] = list(group.values())[0]
                 
-                videos_list.append({'baseName': bn, 'modalities': group, 'metadataPath': metadata_url})
+                videos_list.append({'baseName': bn, 'modalities': group, 'metadataPath': metadata_url, 'videoJsonUrl': video_json_url})
             
             if videos_list:
                 patients.append({'id': case_folder.name, 'videos': videos_list})
