@@ -1014,10 +1014,10 @@
 <body>
     <!-- 顶部导航栏 -->
     <div class="navbar">
-        <div class="navbar-title">🩺 儿童先心病诊断平台 - 诊断模式</div>
+        <div class="navbar-title" id="navTitle">🩺 儿童先心病诊断平台 - 诊断模式</div>
         <div class="navbar-user">
             <span class="user-name" id="navUsername">Loading...</span>
-            <a href="javascript:void(0)" class="navbar-btn" onclick="returnToDashboard()">返回主页</a>
+            <a href="javascript:void(0)" class="navbar-btn" id="navBackBtn" onclick="returnToDashboard()">返回主页</a>
         </div>
     </div>
 
@@ -1271,6 +1271,7 @@
     <script>
         let userData = null;
         let currentMode = 'diag'; // [核心修复] 将变量提升至全局，默认为判读模式
+        let eduSubMode = 'assist'; // 教育子模式：single(禁用热力图) / assist(AI辅助)
         let video3DViewer = null; // 3D查看器实例
         let currentSeverity = null;
         let timerInterval = null;
@@ -1427,6 +1428,7 @@
             // 获取URL参数
             const urlParams = new URLSearchParams(window.location.search);
             currentMode = urlParams.get('mode') || 'diag'; // 默认为判读模式
+            eduSubMode = urlParams.get('eduSubMode') || 'assist'; // 教育子模式
             taskInfo.username = urlParams.get('username');
             taskInfo.taskFolder = urlParams.get('task');
             taskInfo.taskName = urlParams.get('taskName') || '诊断任务';
@@ -1461,12 +1463,24 @@
                 if (currentSel) currentSel.style.display = 'none';
 
                 console.log("🎨 当前处于：判读模式，已简化 UI");
+            } else if (currentMode === 'edu') {
+                // 更新导航栏标题和返回按钮
+                const navTitle = document.getElementById('navTitle');
+                if (navTitle) {
+                    navTitle.textContent = '🎓 儿童先心病诊断平台 - 教育模式';
+                }
+                const navBackBtn = document.getElementById('navBackBtn');
+                if (navBackBtn) {
+                    navBackBtn.textContent = '返回';
+                }
+                
+                console.log("🎨 当前处于：教育模式，已更新 UI");
             }
             
             // 检查必要参数
             if (!taskInfo.username || !taskInfo.taskFolder) {
                 alert('缺少必要参数，即将返回主页');
-                window.location.href = '/flow';
+                returnToDashboard();
                 return;
             }
             
@@ -1544,12 +1558,20 @@
         // 加载病人列表
         async function loadPatients() {
             try {
+                // 双阶段任务：去掉 _SINGLE 或 _AI-ASSIST 后缀，使用实际文件夹名称
+                // 只在教育模式下转换，避免管理员任务名以 _SINGLE/_AI-ASSIST 结尾导致的问题
+                let actualTaskFolder = taskInfo.taskFolder;
+                if (currentMode === 'edu' && (taskInfo.taskFolder.endsWith('_SINGLE') || taskInfo.taskFolder.endsWith('_AI-ASSIST'))) {
+                    actualTaskFolder = taskInfo.taskFolder.replace(/_SINGLE|_AI-ASSIST$/, '');
+                    console.log('双阶段任务：转换 taskFolder', taskInfo.taskFolder, '->', actualTaskFolder);
+                }
+                
                 console.log('正在加载病人列表...', {
                     username: taskInfo.username,
-                    taskFolder: taskInfo.taskFolder
+                    taskFolder: actualTaskFolder
                 });
                 
-                const response = await fetch(`/api/tasks/${taskInfo.username}/${taskInfo.taskFolder}/patients`);
+                const response = await fetch(`/api/tasks/${taskInfo.username}/${actualTaskFolder}/patients`);
                 
                 if (!response.ok) {
                     const errorText = await response.text();
@@ -1565,13 +1587,27 @@
                 
                 if (!patients || patients.length === 0) {
                     alert('该任务下没有病人数据');
-                    window.location.href = '/flow';
+                    returnToDashboard();
                     return;
                 }
                 
                 // 加载第一个病人的视频
                 loadPatientVideos(0);
                 updateProgressText();
+                
+                // 教育模式-单独判读：禁用模态切换按钮（只用第一个diagnosis-group）
+                if (currentMode === 'edu' && eduSubMode === 'single') {
+                    const modalityGroup = document.querySelector('.diagnosis-group'); // 第一个是模态切换
+                    if (modalityGroup) {
+                        const modalityButtons = modalityGroup.querySelectorAll('.option-btn');
+                        modalityButtons.forEach(btn => {
+                            btn.style.opacity = '0.5';
+                            btn.style.pointerEvents = 'none';
+                            btn.title = '单独判读模式不可切换';
+                        });
+                        console.log('已禁用模态切换按钮（单独判读模式）');
+                    }
+                }
                 
             } catch (error) {
                 console.error('加载病人列表失败:', error);
@@ -1976,10 +2012,11 @@
                     }
                 }
 
-                // 在header中显示关键帧信息（3D模式）
+                // 在header中显示关键帧信息（3D模式，仅非原视频显示）
                 const keyFrameDisplay3D = document.getElementById('modalKeyFrame');
                 keyFrameDisplay3D.innerHTML = '';
-                if (keyFrameIndex3D !== null) {
+                
+                if (currentModality !== 'original' && keyFrameIndex3D !== null) {
                     const label3D = document.createElement('span');
                     label3D.className = 'key-frame-label';
                     label3D.textContent = '关键帧: 第' + keyFrameIndex3D + '帧';
@@ -1992,12 +2029,19 @@
                         const time = keyFrameIndex3D / 15.15;
                         videoElement.currentTime = time;
                         videoElement.pause();
-                        console.log('3D模式: 已定位到关键帧: 第' + keyFrameIndex3D + '帧 (' + time.toFixed(2) + '秒)');
+                        showToast('已定位到关键帧: 第' + keyFrameIndex3D + '帧 (' + time.toFixed(2) + '秒)');
                     };
                     keyFrameDisplay3D.appendChild(btn3D);
                     
                     window._currentKeyFrameIndex = keyFrameIndex3D;
                     window._currentVideoElement = videoElement;
+                } else if (currentModality === 'original') {
+                    const label3D = document.createElement('span');
+                    label3D.className = 'key-frame-label';
+                    label3D.textContent = '原视频模式';
+                    label3D.style.background = '#e3f2fd';
+                    label3D.style.color = '#1565c0';
+                    keyFrameDisplay3D.appendChild(label3D);
                 } else {
                     const label3D = document.createElement('span');
                     label3D.className = 'key-frame-label';
@@ -2153,10 +2197,11 @@
                     console.warn('⚠️ 没有可用的metadata URL');
                 }
 
-                // 在header中显示关键帧信息
+                // 在header中显示关键帧信息（仅非原视频模式显示）
                 const keyFrameDisplay = document.getElementById('modalKeyFrame');
                 keyFrameDisplay.innerHTML = '';
-                if (keyFrameIndex !== null) {
+                
+                if (currentModality !== 'original' && keyFrameIndex !== null) {
                     const label = document.createElement('span');
                     label.className = 'key-frame-label';
                     label.textContent = '关键帧: 第' + keyFrameIndex + '帧';
@@ -2169,13 +2214,19 @@
                         const time = keyFrameIndex / 15.15;
                         videoElement.currentTime = time;
                         videoElement.pause();
-                        console.log('已定位到关键帧: 第' + keyFrameIndex + '帧 (' + time.toFixed(2) + '秒)');
+                        showToast('已定位到关键帧: 第' + keyFrameIndex + '帧 (' + time.toFixed(2) + '秒)');
                     };
                     keyFrameDisplay.appendChild(btn);
                     
-                    // 保存到全局变量供按钮调用
                     window._currentKeyFrameIndex = keyFrameIndex;
                     window._currentVideoElement = videoElement;
+                } else if (currentModality === 'original') {
+                    const label = document.createElement('span');
+                    label.className = 'key-frame-label';
+                    label.textContent = '原视频模式';
+                    label.style.background = '#e3f2fd';
+                    label.style.color = '#1565c0';
+                    keyFrameDisplay.appendChild(label);
                 } else {
                     const label = document.createElement('span');
                     label.className = 'key-frame-label';
@@ -2218,7 +2269,30 @@
         // 返回主页
         function returnToDashboard() {
             isReturningToDashboard = true;
-            window.location.href = '/flow';
+            // 教育模式返回edu_status，诊断模式返回task_status
+            if (currentMode === 'edu') {
+                window.location.href = '/edu_status';
+            } else {
+                window.location.href = '/task_status';
+            }
+        }
+
+        // Toast提示函数
+        function showToast(message) {
+            const toast = document.createElement('div');
+            toast.textContent = message;
+            toast.style.cssText = `
+                position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+                background: rgba(0,0,0,0.8); color: white; padding: 10px 20px;
+                border-radius: 20px; font-size: 14px; z-index: 10000;
+                animation: fadeIn 0.3s;
+            `;
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.3s';
+                setTimeout(() => toast.remove(), 300);
+            }, 1500);
         }
 
         // 关闭视频弹窗
@@ -2292,6 +2366,11 @@ function selectOption(element, group) {
 
             // 如果是模态切换，重新加载视频
             if (group === 'modality') {
+                // 教育模式1(single)禁止切换到热力图/识别框
+                if (eduSubMode === 'single') {
+                    alert('单独判读模式仅显示原视频');
+                    return;
+                }
                 const modalityText = element.textContent.trim();
                 if (modalityText === '普通') {
                     currentModality = 'original';
@@ -2648,6 +2727,7 @@ function selectOption(element, group) {
                         username: taskInfo.username,
                         taskFolder: taskInfo.taskFolder,
                         mode: currentMode, // [重点新增] 告知后端当前模式
+                        eduSubMode: currentMode === 'edu' ? eduSubMode : null, // 教育子模式
                         submittedAt: new Date().toLocaleString('zh-CN', {
                             year: 'numeric',
                             month: '2-digit',

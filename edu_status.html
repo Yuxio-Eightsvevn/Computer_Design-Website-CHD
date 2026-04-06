@@ -161,22 +161,52 @@ async function fetchEduTasks() {
         if (tasks.length > 0) {
             tasks.forEach(t => {
                 const div = document.createElement('div');
+                const isDualStage = t.is_dual_stage || t.edu_sub_mode === 'dual';
+                
                 div.className = `task-card ${t.is_completed ? 'completed' : 'pending'}`;
-                div.innerHTML = `
-                    <div><div style="font-weight:700;">${t.request_name}</div>
-                        <div style="font-size:12px; color:#64748b; margin-top:4px;">
-                            病例: ${t.request_case_cnt} | 
-                            视频: ${t.request_video_cnt} | 
-                            ${t.is_completed ? '✅ 已评估' : '⏳ 待判读'}
+                
+                if (isDualStage) {
+                    // 双阶段任务：两个竖向按钮
+                    const singleDone = t.single_done;
+                    const assistDone = t.assist_done;
+                    const bothDone = singleDone && assistDone;
+                    
+                    div.innerHTML = `
+                        <div>
+                            <div style="font-weight:700;">${t.request_name}</div>
+                            <div style="font-size:12px; color:#64748b; margin-top:4px;">
+                                病例: ${t.request_case_cnt} | 视频: ${t.request_video_cnt} | 
+                                ${bothDone ? '✅ 已完成(双阶段)' : (singleDone || assistDone ? '🔄 进行中' : '⏳ 待开始')}
+                            </div>
                         </div>
-                    </div>
-                    <div style="display:flex; align-items:center; gap:15px;">
-                        ${t.is_completed ? `<div class="score-badge">${(t.last_score*100).toFixed(0)}%</div>` : ''}
-                        <button class="btn ${t.is_completed ? 'btn-view' : 'btn-start'}" onclick="handleTask('${t.submission_id}', '${t.request_name}', ${t.is_completed})">
-                            ${t.is_completed ? '查看报告' : '开始判读'}
-                        </button>
-                    </div>
-                `;
+                        <div style="display:flex; flex-direction:column; gap:8px; align-items:center;">
+                            <button class="btn ${singleDone ? 'btn-view' : 'btn-start'}" style="width:120px;" onclick="handleTask('${t.submission_id}_SINGLE', '${t.request_name}_SINGLE', ${singleDone}, 'single', '${t.submission_id}')">
+                                ${singleDone ? '✅ 已完成' : '单独判读'}
+                            </button>
+                            <button class="btn ${assistDone ? 'btn-view' : 'btn-start'}" style="width:120px; ${!singleDone ? 'opacity:0.5;cursor:not-allowed;' : ''}" ${!singleDone ? 'disabled' : ''} onclick="${!singleDone ? '' : `handleTask('${t.submission_id}_AI-ASSIST', '${t.request_name}_AI-ASSIST', ${assistDone}, 'assist', '${t.submission_id}')`}">
+                                ${assistDone ? '✅ 已完成' : (singleDone ? 'AI判读' : '⚠️ AI判读')}
+                            </button>
+                            ${bothDone ? `<button class="btn btn-view" style="width:120px; margin-top:5px;" onclick="openResultModal('${t.submission_id}', '${t.request_name}', null, '${t.submission_id}')">查看报告</button>` : ''}
+                        </div>
+                    `;
+                } else {
+                    // 普通任务显示
+                    div.innerHTML = `
+                        <div><div style="font-weight:700;">${t.request_name}</div>
+                            <div style="font-size:12px; color:#64748b; margin-top:4px;">
+                                病例: ${t.request_case_cnt} | 
+                                视频: ${t.request_video_cnt} | 
+                                ${t.is_completed ? '✅ 已评估' : '⏳ 待判读'}
+                            </div>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:15px;">
+                            ${t.is_completed ? `<div class="score-badge">${(t.last_score*100).toFixed(0)}%</div>` : ''}
+                            <button class="btn ${t.is_completed ? 'btn-view' : 'btn-start'}" onclick="handleTask('${t.submission_id}', '${t.request_name}', ${t.is_completed})">
+                                ${t.is_completed ? '查看报告' : '开始判读'}
+                            </button>
+                        </div>
+                    `;
+                }
                 container.appendChild(div);
             });
         } else {
@@ -197,20 +227,21 @@ window.addEventListener('DOMContentLoaded', function() {
     loadUser();
 });
 
-function handleTask(id, name, isComp) {
+function handleTask(id, name, isComp, eduSubMode, parentId) {
     if (!currentUser || !currentUser.username) {
         alert('请先登录');
         return;
     }
     
     if (isComp) {
-        openResultModal(id, name);
+        openResultModal(id, name, eduSubMode, parentId);
     } else {
-        window.location.href = `/diagnosis?username=${encodeURIComponent(currentUser.username)}&task=${encodeURIComponent(id)}&taskName=${encodeURIComponent(name)}&mode=edu`;
+        const modeParam = eduSubMode ? `&eduSubMode=${eduSubMode}` : '';
+        window.location.href = `/diagnosis?username=${encodeURIComponent(currentUser.username)}&task=${encodeURIComponent(id)}&taskName=${encodeURIComponent(name)}&mode=edu${modeParam}`;
     }
 }
 
-async function openResultModal(id, name) {
+async function openResultModal(id, name, eduSubMode, parentId) {
     if (!currentUser || !currentUser.username) {
         alert('请先登录');
         return;
@@ -219,27 +250,115 @@ async function openResultModal(id, name) {
     const modal = document.getElementById('resultModal');
     const modalCard = modal.querySelector('.modal-card');
     modalCard.innerHTML = `
-        <h2 style="color:#1e293b">📊 正在生成AI分析报告</h2>
-        <p style="color:#64748b; margin:20px 0;">请稍后，系统正在进行深度分析...</p>
-        <div style="text-align:center; padding:20px;">
-            <div style="font-size:40px; animation: spin 1s linear infinite;">⚙️</div>
+        <div style="text-align:center; padding:40px;">
+            <div style="font-size:48px; animation: spin 1s linear infinite;">⚙️</div>
         </div>
     `;
     modal.style.display = 'flex';
     
     try {
-        const r = await fetch(`/api/edu/user/result/${encodeURIComponent(currentUser.username)}/${id}`);
-        if (!r.ok) {
-            throw new Error(`获取报告失败: ${r.status}`);
-        }
-        const data = await r.json();
+        // 判断是否为双阶段子任务
+        const isDualSub = id.endsWith('_SINGLE') || id.endsWith('_AI-ASSIST');
+        const taskParentId = parentId || (isDualSub ? id.replace(/_SINGLE|_AI-ASSIST$/, '') : id);
         
-        if (data.llm_analysis_status === "pending") {
-            await pollForLLMAnalysis(id, name, data);
-        } else if (data.llm_analysis_status === "completed") {
-            showCompleteReport(id, name, data);
+        // 尝试获取两个子任务的数据
+        let singleData = null;
+        let assistData = null;
+        
+        try {
+            const rSingle = await fetch(`/api/edu/user/result/${encodeURIComponent(currentUser.username)}/${taskParentId}_SINGLE`);
+            if (rSingle.ok) singleData = await rSingle.json();
+        } catch (e) { console.warn('_SINGLE data not found'); }
+        
+        try {
+            const rAssist = await fetch(`/api/edu/user/result/${encodeURIComponent(currentUser.username)}/${taskParentId}_AI-ASSIST`);
+            if (rAssist.ok) assistData = await rAssist.json();
+        } catch (e) { console.warn('_AI-ASSIST data not found'); }
+        
+        // 判断是否为双阶段任务的子任务
+        const isDualSubTask = eduSubMode && (eduSubMode === 'single' || eduSubMode === 'assist');
+        const isDual = isDualSubTask || (singleData && assistData);
+        
+        if (isDual && singleData && assistData) {
+            // 双阶段任务：显示对比报告
+            const singleStatus = singleData.llm_analysis_status;
+            const assistStatus = assistData.llm_analysis_status;
+            const singleCompleted = singleStatus === "completed";
+            const assistCompleted = assistStatus === "completed";
+            const singlePending = singleStatus === "pending";
+            const assistPending = assistStatus === "pending";
+            const singleFailed = singleStatus === "failed";
+            const assistFailed = assistStatus === "failed";
+            
+            // 如果两个都已完成，直接显示报告
+            if (singleCompleted && assistCompleted) {
+                showDualStageReport(taskParentId, name, singleData, assistData);
+                return;
+            }
+            
+            // 如果有failed状态，尝试重新触发
+            if (singleFailed) {
+                await fetch(`/api/edu/trigger-llm-analysis/${encodeURIComponent(currentUser.username)}/${taskParentId}_SINGLE`, { method: 'POST' });
+            }
+            if (assistFailed) {
+                await fetch(`/api/edu/trigger-llm-analysis/${encodeURIComponent(currentUser.username)}/${taskParentId}_AI-ASSIST`, { method: 'POST' });
+            }
+            
+            // 如果有pending状态或刚触发了failed，等待分析完成
+            if (singlePending || singleFailed || assistPending || assistFailed) {
+                modalCard.innerHTML = `
+                    <div style="text-align:center; padding:40px;">
+                        <div style="font-size:48px; animation: spin 1s linear infinite;">⚙️</div>
+                    </div>
+                `;
+                
+                // 使用更长的超时时间（60秒）用于双阶段等待
+                const originalMax = window.__maxAttempts;
+                window.__maxAttempts = 60;
+                
+                // 等待两个都完成（使用更长的超时）
+                await Promise.all([
+                    (!singleCompleted) ? pollForLLMAnalysisLong(taskParentId + '_SINGLE', name + '_SINGLE', singleData) : Promise.resolve(),
+                    (!assistCompleted) ? pollForLLMAnalysisLong(taskParentId + '_AI-ASSIST', name + '_AI-ASSIST', assistData) : Promise.resolve()
+                ]);
+                
+                window.__maxAttempts = originalMax;
+                
+                // 重新获取数据
+                const rSingle = await fetch(`/api/edu/user/result/${encodeURIComponent(currentUser.username)}/${taskParentId}_SINGLE`);
+                const rAssist = await fetch(`/api/edu/user/result/${encodeURIComponent(currentUser.username)}/${taskParentId}_AI-ASSIST`);
+                singleData = await rSingle.json();
+                assistData = await rAssist.json();
+            }
+            showDualStageReport(taskParentId, name, singleData, assistData);
         } else {
-            showBasicReport(id, name, data);
+            // 普通任务报告或单独查看一个阶段的报告
+            const r = await fetch(`/api/edu/user/result/${encodeURIComponent(currentUser.username)}/${id}`);
+            if (!r.ok) throw new Error(`获取报告失败: ${r.status}`);
+            const data = await r.json();
+            
+            // 检查状态：pending-等待轮询，completed-显示完整报告，failed-触发重新分析
+            if (data.llm_analysis_status === "pending") {
+                await pollForLLMAnalysis(id, name, data);
+            } else if (data.llm_analysis_status === "completed") {
+                showCompleteReport(id, name, data);
+            } else if (data.llm_analysis_status === "failed") {
+                // 尝试重新触发AI分析
+                const triggerR = await fetch(`/api/edu/trigger-llm-analysis/${encodeURIComponent(currentUser.username)}/${id}`, { method: 'POST' });
+                if (triggerR.ok) {
+                    await pollForLLMAnalysis(id, name, data);
+                } else {
+                    showBasicReport(id, name, data);
+                }
+            } else {
+                // 没有llm_analysis_status字段，可能是首次查看，触发分析
+                const triggerR = await fetch(`/api/edu/trigger-llm-analysis/${encodeURIComponent(currentUser.username)}/${id}`, { method: 'POST' });
+                if (triggerR.ok) {
+                    await pollForLLMAnalysis(id, name, data);
+                } else {
+                    showBasicReport(id, name, data);
+                }
+            }
         }
     } catch (e) {
         modalCard.innerHTML = `
@@ -259,14 +378,50 @@ async function pollForLLMAnalysis(id, name, data) {
     const modal = document.getElementById('resultModal');
     const modalCard = modal.querySelector('.modal-card');
     
+    // 首先检查是否已完成，如果已完成直接显示
+    try {
+        const checkR = await fetch(`/api/edu/user/result/${encodeURIComponent(currentUser.username)}/${id}`);
+        if (checkR.ok) {
+            const checkData = await checkR.json();
+            if (checkData.llm_analysis_status === "completed") {
+                showCompleteReport(id, name, checkData);
+                return;
+            }
+        }
+    } catch (e) {}
+    
     let attempts = 0;
     const maxAttempts = 30;
+    const isSingle = id.endsWith('_SINGLE');
+    const isAssist = id.endsWith('_AI-ASSIST');
+    const rerunLabel = isSingle ? '重新进行单独诊断' : (isAssist ? '重新进行AI辅助诊断' : '重新练习');
     
     const poll = async () => {
         attempts++;
         
         if (attempts > maxAttempts) {
-            showBasicReport(id, name, data);
+            // 超时后再次检查是否已完成，如果已完成直接显示完整报告
+            try {
+                const checkR = await fetch(`/api/edu/user/result/${encodeURIComponent(currentUser.username)}/${id}`);
+                if (checkR.ok) {
+                    const checkData = await checkR.json();
+                    if (checkData.llm_analysis_status === "completed") {
+                        showCompleteReport(id, name, checkData);
+                        return;
+                    }
+                }
+            } catch (e) {}
+            
+            // 超时且未完成，显示等待界面，提供重新触发按钮
+            const modal = document.getElementById('resultModal');
+            const modalCard = modal.querySelector('.modal-card');
+            modalCard.innerHTML = `
+                <div style="text-align:center; padding:40px;">
+                    <div style="font-size:48px; margin-bottom:20px;">⏳</div>
+                    <p style="color:#64748b; margin-bottom:20px;">AI分析超时，可选择重新触发</p>
+                    <button class="btn btn-start" onclick="triggerAndPoll('${id}', '${name}')">重新触发分析</button>
+                </div>
+            `;
             return;
         }
         
@@ -277,13 +432,15 @@ async function pollForLLMAnalysis(id, name, data) {
                 return;
             }
             const newData = await r.json();
+            const status = newData.llm_analysis_status;
             
-            if (newData.llm_analysis_status === "completed") {
+            if (status === "completed") {
                 showCompleteReport(id, name, newData);
-            } else if (newData.llm_analysis_status === "failed") {
+            } else if (status === "failed" || status === undefined || status === null) {
+                // 失败或无状态，显示基础报告（不再等待）
                 showBasicReport(id, name, newData);
             } else {
-                modalCard.querySelector('p').textContent = `正在分析中... (${attempts}/${maxAttempts})`;
+                // status === "pending" 或其他，继续等待
                 setTimeout(poll, 1000);
             }
         } catch (e) {
@@ -294,9 +451,81 @@ async function pollForLLMAnalysis(id, name, data) {
     setTimeout(poll, 1000);
 }
 
+// 长超时版本的pollForLLMAnalysis（用于双阶段）
+async function pollForLLMAnalysisLong(id, name, data) {
+    if (!currentUser || !currentUser.username) {
+        return;
+    }
+    
+    // 使用60秒超时（双阶段需要更长时间等待两个分析完成）
+    const maxAttempts = 60;
+    
+    // 首先检查是否已完成，如果已完成直接返回
+    try {
+        const checkR = await fetch(`/api/edu/user/result/${encodeURIComponent(currentUser.username)}/${id}`);
+        if (checkR.ok) {
+            const checkData = await checkR.json();
+            if (checkData.llm_analysis_status === "completed") {
+                return;
+            }
+        }
+    } catch (e) {}
+    
+    let attempts = 0;
+    
+    const poll = async () => {
+        attempts++;
+        
+        if (attempts > maxAttempts) {
+            return;
+        }
+        
+        try {
+            const r = await fetch(`/api/edu/user/result/${encodeURIComponent(currentUser.username)}/${id}`);
+            if (!r.ok) {
+                return;
+            }
+            const newData = await r.json();
+            const status = newData.llm_analysis_status;
+            
+            if (status === "completed") {
+                return;
+            } else if (status === "failed" || status === undefined || status === null) {
+                return;
+            } else {
+                setTimeout(poll, 1000);
+            }
+        } catch (e) {
+            return;
+        }
+    };
+    
+    setTimeout(poll, 1000);
+}
+
+async function triggerAndPoll(id, name) {
+    const modal = document.getElementById('resultModal');
+    const modalCard = modal.querySelector('.modal-card');
+    modalCard.innerHTML = `
+        <div style="text-align:center; padding:40px;">
+            <div style="font-size:48px; animation: spin 1s linear infinite;">⚙️</div>
+        </div>
+    `;
+    
+    try {
+        await fetch(`/api/edu/trigger-llm-analysis/${encodeURIComponent(currentUser.username)}/${id}`, { method: 'POST' });
+    } catch (e) {}
+    
+    pollForLLMAnalysis(id, name, {});
+}
+
 function showBasicReport(id, name, data) {
     const modal = document.getElementById('resultModal');
     const modalCard = modal.querySelector('.modal-card');
+    
+    const isSingle = id.endsWith('_SINGLE');
+    const isAssist = id.endsWith('_AI-ASSIST');
+    const rerunLabel = isSingle ? '重新进行单独诊断' : (isAssist ? '重新进行AI辅助诊断' : '重新练习');
     
     modalCard.innerHTML = `
         <h2 style="color:#1e293b">🎯 教学评估报告</h2>
@@ -327,7 +556,7 @@ function showBasicReport(id, name, data) {
         
         <div style="display:flex; gap:10px;">
             <button class="btn btn-view" style="flex:1" onclick="closeModal()">关闭</button>
-            <button class="btn btn-start" style="flex:1" onclick="rerunTask('${id}', '${name}')">重新练习</button>
+            <button class="btn btn-start" style="flex:1" onclick="rerunTask('${id}', '${name}')">${rerunLabel}</button>
         </div>
     `;
 }
@@ -465,11 +694,159 @@ function rerunTask(id, name) {
         alert('请先登录');
         return;
     }
-    window.location.href = `/diagnosis?username=${encodeURIComponent(currentUser.username)}&task=${encodeURIComponent(id)}&taskName=${encodeURIComponent(name)}&mode=edu&clearCache=true`;
+    // 根据id后缀确定eduSubMode
+    let eduSubMode = '';
+    if (id.endsWith('_SINGLE')) {
+        eduSubMode = '&eduSubMode=single';
+    } else if (id.endsWith('_AI-ASSIST')) {
+        eduSubMode = '&eduSubMode=assist';
+    }
+    window.location.href = `/diagnosis?username=${encodeURIComponent(currentUser.username)}&task=${encodeURIComponent(id)}&taskName=${encodeURIComponent(name)}&mode=edu${eduSubMode}`;
 }
 
 function closeModal() {
     document.getElementById('resultModal').style.display = 'none';
+}
+
+// 双阶段对比报告函数
+function showDualStageReport(parentId, name, singleData, assistData) {
+    const modal = document.getElementById('resultModal');
+    const modalCard = modal.querySelector('.modal-card');
+    
+    const s = singleData || {};
+    const a = assistData || {};
+    
+    // 计算性能差异
+    const accDiff = ((a.accuracy || 0) - (s.accuracy || 0)) * 100;
+    const sensDiff = ((a.sensitivity || 0) - (s.sensitivity || 0)) * 100;
+    const specDiff = ((a.specificity || 0) - (s.specificity || 0)) * 100;
+    
+    let html = `
+        <h2 style="color:#1e293b">📊 双阶段诊断对比报告</h2>
+        <p style="color:#64748b; margin:10px 0;">${name}</p>
+        
+        <div style="display:flex; gap:10px; margin:15px 0; font-size:12px;">
+            <div style="flex:1; padding:10px; background:#f0f9ff; border-radius:8px; text-align:center;">
+                <div style="font-weight:700; color:#1e293b;">_SINGLE (单独判读)</div>
+                <div style="font-size:24px; font-weight:700; color:#667eea;">${((s.accuracy || 0)*100).toFixed(1)}%</div>
+                <div style="color:#64748b;">准确率</div>
+            </div>
+            <div style="flex:1; padding:10px; background:#f0fdf4; border-radius:8px; text-align:center;">
+                <div style="font-weight:700; color:#1e293b;">_AI-ASSIST (AI辅助)</div>
+                <div style="font-size:24px; font-weight:700; color:#10b981;">${((a.accuracy || 0)*100).toFixed(1)}%</div>
+                <div style="color:#64748b;">准确率</div>
+            </div>
+            <div style="flex:1; padding:10px; ${accDiff > 0 ? 'background:#f0fdf4;' : (accDiff < 0 ? 'background:#fef2f2;' : 'background:#f3f4f6;')} border-radius:8px; text-align:center;">
+                <div style="font-weight:700; color:#1e293b;">AI辅助效果</div>
+                <div style="font-size:24px; font-weight:700; color:${accDiff > 0 ? '#10b981' : (accDiff < 0 ? '#ef4444' : '#64748b')};">${accDiff > 0 ? '+' : ''}${accDiff.toFixed(1)}%</div>
+                <div style="color:#64748b;">准确率变化</div>
+            </div>
+        </div>
+        
+        <div style="text-align:left; margin-top:15px;">
+            <h3 style="font-size:14px; color:#1e293b; margin-bottom:10px;">📈 性能对比</h3>
+            <table style="width:100%; font-size:12px; border-collapse:collapse;">
+                <tr style="background:#f8fafc;">
+                    <th style="padding:8px; text-align:left; border:1px solid #e2e8f0;">指标</th>
+                    <th style="padding:8px; text-align:center; border:1px solid #e2e8f0;">_SINGLE</th>
+                    <th style="padding:8px; text-align:center; border:1px solid #e2e8f0;">_AI-ASSIST</th>
+                    <th style="padding:8px; text-align:center; border:1px solid #e2e8f0;">差异</th>
+                </tr>
+                <tr>
+                    <td style="padding:8px; border:1px solid #e2e8f0;">准确率</td>
+                    <td style="padding:8px; text-align:center; border:1px solid #e2e8f0;">${((s.accuracy || 0)*100).toFixed(1)}%</td>
+                    <td style="padding:8px; text-align:center; border:1px solid #e2e8f0;">${((a.accuracy || 0)*100).toFixed(1)}%</td>
+                    <td style="padding:8px; text-align:center; border:1px solid #e2e8f0; color:${accDiff > 0 ? '#10b981' : (accDiff < 0 ? '#ef4444' : '#64748b')};">${accDiff > 0 ? '+' : ''}${accDiff.toFixed(1)}%</td>
+                </tr>
+                <tr style="background:#f8fafc;">
+                    <td style="padding:8px; border:1px solid #e2e8f0;">敏感度</td>
+                    <td style="padding:8px; text-align:center; border:1px solid #e2e8f0;">${((s.sensitivity || 0)*100).toFixed(1)}%</td>
+                    <td style="padding:8px; text-align:center; border:1px solid #e2e8f0;">${((a.sensitivity || 0)*100).toFixed(1)}%</td>
+                    <td style="padding:8px; text-align:center; border:1px solid #e2e8f0; color:${sensDiff > 0 ? '#10b981' : (sensDiff < 0 ? '#ef4444' : '#64748b')};">${sensDiff > 0 ? '+' : ''}${sensDiff.toFixed(1)}%</td>
+                </tr>
+                <tr>
+                    <td style="padding:8px; border:1px solid #e2e8f0;">特异性</td>
+                    <td style="padding:8px; text-align:center; border:1px solid #e2e8f0;">${((s.specificity || 0)*100).toFixed(1)}%</td>
+                    <td style="padding:8px; text-align:center; border:1px solid #e2e8f0;">${((a.specificity || 0)*100).toFixed(1)}%</td>
+                    <td style="padding:8px; text-align:center; border:1px solid #e2e8f0; color:${specDiff > 0 ? '#10b981' : (specDiff < 0 ? '#ef4444' : '#64748b')};">${specDiff > 0 ? '+' : ''}${specDiff.toFixed(1)}%</td>
+                </tr>
+            </table>
+        </div>
+    `;
+    
+    // 显示AI工具使用情况（仅AI辅助判读阶段）
+    if (a.ai_dependency) {
+        const total = (a.ai_dependency.correct_reliance || 0) + 
+                     (a.ai_dependency.insufficient_reliance || 0) + 
+                     (a.ai_dependency.correct_independence || 0) + 
+                     (a.ai_dependency.over_reliance || 0);
+        
+        html += `
+            <div style="margin-top:15px;">
+                <h3 style="font-size:14px; margin-bottom:12px;">🤖 AI工具使用情况（AI辅助判读阶段）</h3>
+                <div style="display:flex; gap:8px; justify-content:space-between;">
+                    <div style="flex:1; padding:10px; background:#ecfdf5; border-radius:8px; text-align:center;">
+                        <div style="font-size:16px; margin-bottom:5px;">✅</div>
+                        <div style="font-size:11px; color:#065f46; font-weight:600;">正确依赖</div>
+                        <div style="font-size:16px; font-weight:700; color:#059669;">${a.ai_dependency.correct_reliance || 0}</div>
+                        <div style="font-size:9px; color:#065f46;">AI正确+您正确</div>
+                    </div>
+                    <div style="flex:1; padding:10px; background:#fffbeb; border-radius:8px; text-align:center;">
+                        <div style="font-size:16px; margin-bottom:5px;">⚠️</div>
+                        <div style="font-size:11px; color:#92400e; font-weight:600;">依赖不足</div>
+                        <div style="font-size:16px; font-weight:700; color:#d97706;">${a.ai_dependency.insufficient_reliance || 0}</div>
+                        <div style="font-size:9px; color:#92400e;">AI正确+您错误</div>
+                    </div>
+                    <div style="flex:1; padding:10px; background:#eff6ff; border-radius:8px; text-align:center;">
+                        <div style="font-size:16px; margin-bottom:5px;">💪</div>
+                        <div style="font-size:11px; color:#1e40af; font-weight:600;">正确独立</div>
+                        <div style="font-size:16px; font-weight:700; color:#2563eb;">${a.ai_dependency.correct_independence || 0}</div>
+                        <div style="font-size:9px; color:#1e40af;">AI错误+您正确</div>
+                    </div>
+                    <div style="flex:1; padding:10px; background:#fef2f2; border-radius:8px; text-align:center;">
+                        <div style="font-size:16px; margin-bottom:5px;">❌</div>
+                        <div style="font-size:11px; color:#991b1b; font-weight:600;">过度依赖</div>
+                        <div style="font-size:16px; font-weight:700; color:#dc2626;">${a.ai_dependency.over_reliance || 0}</div>
+                        <div style="font-size:9px; color:#991b1b;">AI错误+您错误</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    // 显示AI分析（如果存在）
+    if (a.llm_analysis && a.llm_analysis.analysis) {
+        const analysis = a.llm_analysis.analysis;
+        html += `
+            <div style="margin-top:15px; padding:15px; background:#f0f9ff; border-radius:8px; border-left:3px solid #667eea;">
+                <h3 style="font-size:14px; margin-bottom:10px;">🤖 AI专家评价</h3>
+                <div style="font-size:13px; line-height:1.8;">
+                    <p style="margin-bottom:10px;"><strong>整体评价：</strong>${analysis.overall_evaluation || '暂无'}</p>
+                    <p style="margin-bottom:10px;"><strong>AI辅助效果分析：</strong>AI辅助使准确率${accDiff > 0 ? '提升' : (accDiff < 0 ? '下降' : '持平')}${Math.abs(accDiff).toFixed(1)}%，${accDiff > 0 ? '表明AI工具对诊断有积极帮助' : '需要进一步分析原因'}</p>
+                </div>
+        `;
+        if (analysis.improvement_suggestions && analysis.improvement_suggestions.length > 0) {
+            html += `
+                <div style="margin-top:10px;">
+                    <strong style="font-size:13px;">💡 改进建议</strong>
+                    <ul style="margin:5px 0; padding-left:20px; font-size:12px; text-align:left; list-style-type:disc;">
+                        ${analysis.improvement_suggestions.map(x => `<li style="margin:3px 0;">${x}</li>`).join('')}
+                    </ul>
+                </div>
+            `;
+        }
+        html += `</div>`;
+    }
+    
+    html += `
+        <div style="display:flex; gap:10px; margin-top:20px;">
+            <button class="btn btn-view" style="flex:1" onclick="closeModal()">关闭</button>
+            <button class="btn btn-start" style="flex:1" onclick="rerunTask('${parentId}_SINGLE', '${name}_SINGLE')">重新_SINGLE</button>
+            <button class="btn btn-start" style="flex:1" onclick="rerunTask('${parentId}_AI-ASSIST', '${name}_AI-ASSIST')">重新_AI-ASSIST</button>
+        </div>
+    `;
+    
+    modalCard.innerHTML = html;
 }
   </script>
 </body>

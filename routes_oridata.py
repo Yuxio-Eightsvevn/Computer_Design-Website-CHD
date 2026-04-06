@@ -654,13 +654,16 @@ async def confirm_edu_upload(
         if orig_v_dir.exists() and not any(orig_v_dir.iterdir()):
             orig_v_dir.rmdir()
 
-        # 3. 记录索引与分发任务
+        # 3. 记录索引与分发任务（单个任务，后端自动处理双阶段）
         update_edu_task_index({
-            "submission_id": submission_id, "request_name": request_name,
-            "request_pos": f"processed/{submission_id}", 
-            "request_case_cnt": len(epoch_data), 
+            "submission_id": submission_id,
+            "request_name": request_name,
+            "is_dual_stage": True,  # 标记为双阶段任务
+            "request_pos": f"processed/{submission_id}",
+            "request_case_cnt": len(epoch_data),
             "request_video_cnt": sum(len(c.get("videos", [])) for c in epoch_data.values()),
-            "status": "processing", "is_cmp": False
+            "status": "processing",
+            "is_cmp": False
         })
         
         # 触发模型处理，SYSTEM 空间的输出路径也要对齐
@@ -690,12 +693,24 @@ async def get_edu_admin_tasks():
     }
 
 @router.post("/api/edu/publish-task")
-async def publish_edu_task(submission_id: str = Form(...), target_users: str = Form(...)):
+async def publish_edu_task(submission_id: str = Form(...), target_users: str = Form(...), publish_mode: str = Form("dual")):
     try:
         users = json.loads(target_users)
         if not users: raise HTTPException(status_code=400, detail="发布对象不能为空")
-        update_edu_task_index({"submission_id": submission_id, "status": "published", "target_users": users})
-        return {"message": "任务已成功发布"}
+        
+        # 根据 publish_mode 设置 is_dual_stage
+        is_dual_stage = (publish_mode == "dual")
+        
+        # 更新任务状态
+        update_edu_task_index({
+            "submission_id": submission_id,
+            "status": "published",
+            "target_users": users,
+            "is_dual_stage": is_dual_stage
+        })
+        
+        mode_msg = "双阶段任务" if is_dual_stage else "单阶段任务"
+        return {"message": f"{mode_msg}已成功发布"}
     except Exception as e: raise HTTPException(status_code=400, detail=f"发布失败: {e}")
 
 @router.get("/api/edu/admin/task-status/{submission_id}")
@@ -711,7 +726,9 @@ async def get_edu_task_detail_status(submission_id: str):
     if not task: raise HTTPException(status_code=404, detail="任务不存在")
 
     target_users = task.get("target_users", [])
+    is_dual_stage = task.get("is_dual_stage", False)
     user_status_list = []
+    print(f"🔍 [admin-task-status] submission_id={submission_id}, is_dual_stage={is_dual_stage}")
 
     # 扫描每个用户的成绩单
     for username in target_users:
@@ -721,10 +738,34 @@ async def get_edu_task_detail_status(submission_id: str):
         if result_file.exists():
             with open(result_file, "r", encoding="utf-8") as f:
                 res_data = json.load(f)
-                if submission_id in res_data:
-                    user_info["completed"] = True
-                    user_info["score"] = res_data[submission_id].get("accuracy")
-                    user_info["details"] = res_data[submission_id] # 包含敏感度等详细数据
+                
+                if is_dual_stage:
+                    # 双阶段任务：检查两个子任务是否都提交了诊断结果
+                    # 完成条件：两个阶段都提交了诊断结果
+                    single_key = f"{submission_id}_SINGLE"
+                    assist_key = f"{submission_id}_AI-ASSIST"
+                    single_exists = single_key in res_data
+                    assist_exists = assist_key in res_data
+                    
+                    print(f"🔍 [admin-task-status] user={username}, single_exists={single_exists}, assist_exists={assist_exists}")
+                    
+                    if single_exists and assist_exists:
+                        user_info["completed"] = True
+                        # 取两个阶段的平均分
+                        single_score = res_data[single_key].get("accuracy", 0)
+                        assist_score = res_data[assist_key].get("accuracy", 0)
+                        user_info["score"] = (single_score + assist_score) / 2
+                        user_info["details"] = {
+                            "single": res_data[single_key],
+                            "assist": res_data[assist_key]
+                        }
+                else:
+                    # 普通任务：检查原始task ID是否已提交诊断结果
+                    if submission_id in res_data:
+                        print(f"🔍 [admin-task-status] user={username}, exists=True")
+                        user_info["completed"] = True
+                        user_info["score"] = res_data[submission_id].get("accuracy")
+                        user_info["details"] = res_data[submission_id]
         
         user_status_list.append(user_info)
     
@@ -787,10 +828,35 @@ async def get_user_edu_tasks(username: str):
     if result_file.exists():
         with open(result_file, "r", encoding="utf-8") as f:
             user_results = json.load(f)
+    
+    # 不再拆分双阶段任务，只标记完成状态
     for t in user_tasks:
         sub_id = t["submission_id"]
-        t["is_completed"] = sub_id in user_results
-        t["last_score"] = user_results.get(sub_id, {}).get("accuracy") if t["is_completed"] else None
+        is_dual = t.get("is_dual_stage", False)
+        
+        if is_dual:
+            # 双阶段任务：检查两个子任务是否都完成
+            single_id = f"{sub_id}_SINGLE"
+            assist_id = f"{sub_id}_AI-ASSIST"
+            single_done = single_id in user_results
+            assist_done = assist_id in user_results
+            both_done = single_done and assist_done
+            
+            t["is_completed"] = both_done
+            t["single_done"] = single_done
+            t["assist_done"] = assist_done
+            t["edu_sub_mode"] = "dual"  # 标记为双阶段任务
+            
+            if both_done:
+                t["last_score"] = max(
+                    user_results.get(single_id, {}).get("accuracy", 0),
+                    user_results.get(assist_id, {}).get("accuracy", 0)
+                )
+            else:
+                t["last_score"] = None
+        else:
+            t["is_completed"] = sub_id in user_results
+            t["last_score"] = user_results.get(sub_id, {}).get("accuracy") if t["is_completed"] else None
 
     return {"tasks": user_tasks}
 
@@ -798,6 +864,11 @@ async def get_user_edu_tasks(username: str):
 @router.get("/api/edu/check-task-status/{submission_id}")
 async def check_task_status(submission_id: str):
     """检查教育任务状态，返回是否有效"""
+    # 处理双阶段任务：提取父任务ID
+    parent_id = submission_id
+    if submission_id.endswith('_SINGLE') or submission_id.endswith('_AI-ASSIST'):
+        parent_id = submission_id.rsplit('_', 1)[0]  # 去掉 _SINGLE 或 _AI-ASSIST 后缀
+    
     index_path = SYSTEM_EDU_DIR / "data.json"
     if not index_path.exists():
         return {"valid": False, "reason": "任务不存在"}
@@ -805,7 +876,7 @@ async def check_task_status(submission_id: str):
     with open(index_path, "r", encoding="utf-8") as f:
         data = json.load(f)
     
-    task = next((t for t in data.get("tasks", []) if t.get("submission_id") == submission_id), None)
+    task = next((t for t in data.get("tasks", []) if t.get("submission_id") == parent_id), None)
     if not task:
         return {"valid": False, "reason": "任务不存在"}
     
@@ -822,6 +893,50 @@ async def get_user_edu_result(username: str, submission_id: str):
     with open(result_file, "r", encoding="utf-8") as f: data = json.load(f)
     if submission_id not in data: raise HTTPException(status_code=404)
     return data[submission_id]
+
+
+@router.post("/api/edu/trigger-llm-analysis/{username}/{submission_id}")
+async def trigger_llm_analysis(username: str, submission_id: str):
+    """
+    手动触发AI分析（当自动触发失败时使用）
+    """
+    from main import analyze_with_llm, DATA_BATCH_STORAGE
+    from pathlib import Path
+    import json
+    
+    result_file = EDU_RESULTS_DIR / f"{username}.json"
+    if not result_file.exists():
+        raise HTTPException(status_code=404, detail="成绩文件不存在")
+    
+    with open(result_file, "r", encoding="utf-8") as f:
+        user_data = json.load(f)
+    
+    if submission_id not in user_data:
+        raise HTTPException(status_code=404, detail="任务记录不存在")
+    
+    stats = user_data[submission_id]
+    
+    # 检查是否已有分析结果或错误
+    current_status = stats.get("llm_analysis_status", "pending")
+    if current_status == "completed":
+        return {"message": "分析已完成", "status": "completed"}
+    if current_status == "failed":
+        # 清空失败状态，允许重新触发
+        stats["llm_analysis_status"] = "pending"
+        stats.pop("llm_analysis", None)
+        with open(result_file, "w", encoding="utf-8") as f:
+            json.dump(user_data, f, ensure_ascii=False, indent=2)
+    
+    # 异步调用大模型分析
+    import asyncio
+    asyncio.create_task(analyze_with_llm(username, submission_id, stats))
+    
+    # 更新状态为pending
+    stats["llm_analysis_status"] = "pending"
+    with open(result_file, "w", encoding="utf-8") as f:
+        json.dump(user_data, f, ensure_ascii=False, indent=2)
+    
+    return {"message": "已触发AI分析", "status": "pending"}
 
 
 
@@ -854,3 +969,60 @@ async def delete_edu_task(submission_id: str):
         return {"message": "任务已彻底从系统空间删除"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# --- [新增] 清空无效的教育任务 ---
+@router.delete("/api/edu/admin/clear-stuck-tasks")
+async def clear_stuck_edu_tasks():
+    """
+    清理无效的教育任务（卡住的任务）
+    
+    清理条件：
+    1. status = "processing" (AI处理中)
+    2. 不存在 .processing 文件 (没有后台任务在运行)
+    
+    保护机制：
+    - 已发布/未发布的任务不受影响
+    - 正在运行的任务不受影响
+    """
+    index_path = SYSTEM_EDU_DIR / "data.json"
+    if not index_path.exists():
+        raise HTTPException(status_code=404, detail="任务索引不存在")
+    
+    with open(index_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    
+    tasks = data.get("tasks", [])
+    deleted_tasks = []
+    kept_tasks = []
+    
+    for task in tasks:
+        submission_id = task.get("submission_id")
+        status = task.get("status", "")
+        
+        # 只处理 processing 状态的任务
+        if status != "processing":
+            kept_tasks.append(task)
+            continue
+        
+        # 检查是否有 .processing 文件（正在运行）
+        processed_path = SYSTEM_EDU_DIR / "processed" / submission_id
+        processing_flag = processed_path / ".processing"
+        
+        if processing_flag.exists():
+            # 正在运行，保留
+            kept_tasks.append(task)
+            print(f"⏭️ 任务 {submission_id} 正在运行，跳过")
+        else:
+            # 无效任务，可以清理
+            # 将状态改为 unreleased，而不是物理删除
+            task["status"] = "unreleased"
+            kept_tasks.append(task)
+            deleted_tasks.append(submission_id)
+            print(f"🧹 任务 {submission_id} 已标记为无效（无processing文件），已移至未发布")
+    
+    data["tasks"] = kept_tasks
+    with open(index_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    
+    return {"message": f"已清理 {len(deleted_tasks)} 个无效任务", "deleted_count": len(deleted_tasks)}

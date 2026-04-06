@@ -552,6 +552,7 @@ class DiagnosisSubmitJsonRequest(BaseModel):
     username: str
     taskFolder: str
     mode: Optional[str] = "diag"  # [新增] 默认为判读模式
+    eduSubMode: Optional[str] = None  # 教育子模式: single / assist
     submittedAt: str
     totalTime: Dict[str, Any]
     patientCount: int
@@ -837,8 +838,11 @@ async def submit_diagnosis_json(request: DiagnosisSubmitJsonRequest):
         
         # --- 情况 A：教育模式 (Assessment) ---
         if request.mode == "edu":
+            # 提取原始任务ID（去除双阶段后缀）
+            original_task_folder = re.sub(r'_SINGLE|_AI-ASSIST$', '', request.taskFolder)
+            
             # 1. 定位标准答案
-            gt_path = Path(DATA_BATCH_STORAGE) / "SYSTEM" / "edu_data" / request.taskFolder / "epoch_data.json"
+            gt_path = Path(DATA_BATCH_STORAGE) / "SYSTEM" / "edu_data" / original_task_folder / "epoch_data.json"
             if not gt_path.exists():
                 raise HTTPException(status_code=404, detail="教育批次答案文件丢失")
             
@@ -883,7 +887,7 @@ async def submit_diagnosis_json(request: DiagnosisSubmitJsonRequest):
                 
                 # 获取AI预测
                 ai_label = None
-                ai_confidence_path = Path(DATA_BATCH_STORAGE) / "SYSTEM" / "edu_data" / "processed" / request.taskFolder / rec.patientId / "output_data" / "confidence_scores.json"
+                ai_confidence_path = Path(DATA_BATCH_STORAGE) / "SYSTEM" / "edu_data" / "processed" / original_task_folder / rec.patientId / "output_data" / "confidence_scores.json"
                 if ai_confidence_path.exists():
                     with open(ai_confidence_path, "r", encoding="utf-8") as f:
                         ai_data = json.load(f)
@@ -1009,15 +1013,27 @@ async def submit_diagnosis_json(request: DiagnosisSubmitJsonRequest):
                 with open(user_res_path, "r", encoding="utf-8") as f:
                     user_data = json.load(f)
             
-            user_data[request.taskFolder] = stats # 以 submission_id 为键保存
+            # 根据 eduSubMode 添加后缀（如果 taskFolder 不带后缀则添加）
+            save_key = request.taskFolder
+            if request.eduSubMode and not save_key.endswith('_SINGLE') and not save_key.endswith('_AI-ASSIST'):
+                if request.eduSubMode == 'single':
+                    save_key = f"{request.taskFolder}_SINGLE"
+                elif request.eduSubMode == 'assist':
+                    save_key = f"{request.taskFolder}_AI-ASSIST"
+            
+            # 在stats中添加模式标识
+            stats['edu_sub_mode'] = request.eduSubMode
+            user_data[save_key] = stats
             
             with open(user_res_path, "w", encoding="utf-8") as f:
                 json.dump(user_data, f, ensure_ascii=False, indent=2)
 
-            print(f"📊 教育模式评分完成: {request.username} - 得分: {stats['accuracy']*100}%")
+            print(f"📊 教育模式评分完成: {request.username} - 模式: {request.eduSubMode} - 得分: {stats['accuracy']*100}%")
             
-            # 7. [新增] 异步调用大模型分析
-            asyncio.create_task(analyze_with_llm(request.username, request.taskFolder, stats))
+            # 7. [新增] 异步调用大模型分析（使用带后缀的save_key确保key匹配）
+            print(f"🔔 准备触发AI分析: username={request.username}, save_key={save_key}")
+            asyncio.create_task(analyze_with_llm(request.username, save_key, stats))
+            print(f"🔔 已创建AI分析任务")
             
             return {"message": "评估完成，AI分析报告生成中", "stats": stats}
 
@@ -1052,14 +1068,17 @@ async def analyze_with_llm(username: str, task_folder: str, stats: Dict[str, Any
         task_folder: 任务文件夹
         stats: 统计数据
     """
+    print(f"🔍 [AI分析] 开始执行: username={username}, task_folder={task_folder}")
     try:
         # 1. 读取LLM配置（新格式）
+        print(f"🔍 [AI分析] 检查配置文件: {LLM_MODELS_FILE}")
         if not LLM_MODELS_FILE.exists():
             print("⚠️ LLM配置文件不存在，跳过AI分析")
             return
         
         with open(LLM_MODELS_FILE, "r", encoding="utf-8") as f:
             config = json.load(f)
+        print(f"🔍 [AI分析] 配置读取成功, selected_model_id={config.get('selected_model_id')}")
         
         # 获取选中的模型
         selected_model_id = config.get("selected_model_id")
@@ -1082,6 +1101,8 @@ async def analyze_with_llm(username: str, task_folder: str, stats: Dict[str, Any
             print("⚠️ 模型配置不完整，跳过AI分析")
             return
         
+        print(f"🔍 [AI分析] 使用模型: {selected_model.get('display_name')}")
+        
         # 2. 调用大模型
         analyzer = LLMAnalyzer(
             base_url=selected_model["base_url"],
@@ -1091,12 +1112,20 @@ async def analyze_with_llm(username: str, task_folder: str, stats: Dict[str, Any
         
         print(f"🤖 正在调用大模型分析: {username} - {task_folder} (模型: {selected_model.get('display_name', 'unknown')})")
         analysis_result = await analyzer.analyze_performance(stats)
+        print(f"🔍 [AI分析] 大模型返回结果: {analysis_result.get('status')}")
         
         # 3. 更新成绩单
         user_res_path = Path(DATA_BATCH_STORAGE) / "SYSTEM" / "edu_data" / "Doctor_Diag_Result" / f"{username}.json"
+        print(f"🔍 [AI分析] 成绩单路径: {user_res_path}")
+        print(f"🔍 [AI分析] 成绩单存在: {user_res_path.exists()}")
+        
         if user_res_path.exists():
             with open(user_res_path, "r", encoding="utf-8") as f:
                 user_data = json.load(f)
+            
+            print(f"🔍 [AI分析] 当前成绩单keys: {list(user_data.keys())}")
+            print(f"🔍 [AI分析] 查找key: {task_folder}")
+            print(f"🔍 [AI分析] key存在: {task_folder in user_data}")
             
             if task_folder in user_data:
                 user_data[task_folder]["llm_analysis_status"] = analysis_result.get("status", "failed")
@@ -1107,6 +1136,10 @@ async def analyze_with_llm(username: str, task_folder: str, stats: Dict[str, Any
                     json.dump(user_data, f, ensure_ascii=False, indent=2)
                 
                 print(f"✅ 大模型分析完成: {username} - {task_folder}")
+            else:
+                print(f"⚠️ [AI分析] 成绩单中未找到key: {task_folder}")
+        else:
+            print(f"⚠️ [AI分析] 成绩单文件不存在")
         
     except Exception as e:
         print(f"❌ 大模型分析失败: {e}")

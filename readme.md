@@ -43,7 +43,6 @@
 | 数据库 | SQLite |
 | AI模型 | PyTorch + C3D (单视角/多视角) |
 | 前端 | 原生HTML/CSS/JavaScript |
-| 3D可视化 | Three.js ✅ 已实现 |
 | 视频处理 | ffmpeg |
 | 运行时 | Python 3.x + Conda环境 |
 
@@ -68,9 +67,6 @@ Diagnostic_Platform_Stable_Version_C3D/
 ├── diagnosis.html             # 医师判读界面
 ├── edu_admin.html             # 教育管理后台（管理员专用）
 ├── edu_status.html            # 教育练习中心（用户端）
-│
-├── video_3d_modal.js          # 3D可视化模块 ✅ 已实现
-├── batch_extract_frames.py    # 视频帧提取工具
 │
 ├── model/                     # AI模型目录
 │   ├── model_main.py          # 模型入口函数
@@ -744,52 +740,7 @@ data_batch_storage/SYSTEM/edu_data/
 
 ---
 
-## 九、3D可视化模块 ✅ 已实现
-
-### 9.1 当前状态
-
-**状态**: ⚠️ 待实现/存在已知问题
-
-该模块已创建基础框架，但存在以下问题需要修复：
-
-### 9.2 文件位置
-
-| 文件 | 位置 | 说明 |
-|------|------|------|
-| 3D模块 | video_3d_modal.js | Three.js 3D切片可视化 |
-| 调用位置 | diagnosis.html | openVideoModal()函数中初始化 |
-
-### 9.3 已知问题与修复记录
-
-根据 `CLAUDE.md` 记录，已完成以下修复：
-
-| 问题 | 修复位置 | 状态 |
-|------|----------|------|
-| 动态导入模块失败 | main.py:731-733 添加路由 | ✅ 已修复 |
-| Video3DModal无构造函数 | video_3d_modal.js 添加export default | ✅ 已修复 |
-| 硬编码帧数导致404 | diagnosis.html 动态检测帧数 | ✅ 已修复 |
-| 高亮帧只在前三帧循环 | video_3d_modal.js 帧索引计算 | ✅ 已修复 |
-| 关键帧高亮位置错误 | diagnosis.html 从metadata读取key_frame_index | ✅ 已修复 |
-
-**待验证功能**:
-- [ ] 3D切片正确加载
-- [ ] 视频播放同步高亮
-- [ ] OrbitControls交互
-- [ ] 后处理Bloom效果
-
-### 9.4 预期功能
-
-| 功能 | 说明 |
-|------|------|
-| 3D切片显示 | 将视频帧作为纹理贴在3D切片上 |
-| 视频同步 | 视频播放时高亮对应的3D切片 |
-| 交互控制 | OrbitControls拖拽旋转 |
-| 关键帧高亮 | 从metadata.json读取key_frame_index |
-| 后处理效果 | Bloom发光效果 |
-
----
-
-## 十、开发指南
+## 九、开发指南
 
 ### 10.1 本地启动方式
 
@@ -1188,6 +1139,120 @@ def update_user(user_id: int, doctor: str, organization: str,
 
 ---
 
+### 12.8 双阶段教育系统 (单独判读 + AI辅助判读)
+
+**更新内容**:
+
+教育模式新增**双阶段判读**功能，用户需要完成两个阶段：
+1. **单独判读**: 仅显示原始视频，禁用heatmap/bbox模态按钮
+2. **AI辅助判读**: 显示完整模态（original/heatmap/bbox），需先完成单独判读才可解锁
+3. **对比报告**: 显示两个阶段的详细对比分析
+
+**后端变更**:
+
+| 接口/函数 | 修改位置 | 修改内容 |
+|-----------|----------|----------|
+| /api/edu/confirm-upload | routes_oridata.py | 新增 `is_dual_stage` 字段 |
+| /api/edu/publish-task | routes_oridata.py | 新增 `publish_mode` 参数(single/dual) |
+| DiagnosisSubmitJsonRequest | main.py | 新增 `eduSubMode` 字段 |
+| /api/diagnosis/submit-json | main.py | 保存时添加 `_SINGLE` / `_AI-ASSIST` 后缀 |
+| /api/edu/check-task-status | routes_oridata.py | 修复 `_SINGLE`/`_AI-ASSIST` 后缀处理 |
+
+**前端变更**:
+
+| 页面 | 修改内容 |
+|------|----------|
+| edu_admin.html | 发布模式下拉框(single/dual)，默认dual |
+| edu_status.html | 双按钮垂直排列("单独判读"+"AI判读")，对比报告入口 |
+| diagnosis.html | 单独判读模式禁用heatmap/bbox按钮，检查前置任务完成状态 |
+
+**任务状态处理**:
+
+```
+任务ID: task123
+├── task123_SINGLE      # 单独判读结果
+└── task123_AI-ASSIST  # AI辅助判读结果
+```
+
+**对比报告内容**:
+- 两个阶段的准确率、敏感度、特异性对比
+- AI依赖性分析对比
+- 各病种表现对比
+
+**相关文件**:
+| 文件 | 修改内容 |
+|------|----------|
+| routes_oridata.py | is_dual_stage、publish_mode、check-task-status修复 |
+| main.py | DiagnosisSubmitJsonRequest、eduSubMode |
+| edu_admin.html | 发布模式选择UI |
+| edu_status.html | 双按钮、对比报告 |
+| diagnosis.html | 模态按钮禁用、状态检查 |
+
+---
+
+### 12.11 AI分析等待界面与触发逻辑修复
+
+**更新内容**:
+
+| 问题 | 修复位置 | 详细说明 |
+|------|----------|----------|
+| 等待界面显示秒数 | edu_status.html | 简化等待界面，不显示秒数/次数 |
+| AI分析key不匹配 | main.py | analyze_with_llm参数从original_task_folder改为save_key |
+| 缺少手动触发API | routes_oridata.py | 新增 /api/edu/trigger-llm-analysis 接口 |
+| 前端未触发分析 | edu_status.html | 检查failed/无状态时自动触发重新分析 |
+| 双阶段failed处理 | edu_status.html | failed状态时触发重新分析 |
+
+**技术细节**:
+
+1. **等待界面简化**：
+   - 移除 "正在生成AI分析报告" 文字
+   - 移除轮询时的 `(attempts/maxAttempts)` 显示
+   - 只显示旋转齿轮动画
+
+2. **AI分析key修复**：
+   ```python
+   # 修改前（key不匹配）
+   asyncio.create_task(analyze_with_llm(request.username, original_task_folder, stats))
+   
+   # 修改后（key匹配）
+   asyncio.create_task(analyze_with_llm(request.username, save_key, stats))
+   ```
+
+3. **手动触发API**：
+   - 支持 failed 状态重新触发
+   - 自动更新状态为 pending
+
+**相关文件**:
+| 文件 | 修改内容 |
+|------|----------|
+| edu_status.html | 等待界面、failed处理、双阶段处理 |
+| main.py | analyze_with_llm 参数 |
+| routes_oridata.py | trigger-llm-analysis 接口 |
+
+---
+
+### 12.12 AI分析检测与双阶段报告修复
+
+**更新内容**:
+
+| 问题 | 修复位置 | 详细说明 |
+|------|----------|----------|
+| 已有报告仍超时 | edu_status.html | pollForLLMAnalysis开始时先检查是否completed |
+| 双阶段已完成仍等待 | edu_status.html | 直接检查singleCompleted && assistCompleted |
+| 超时后显示错误 | edu_status.html | 改为显示等待界面+重新触发按钮 |
+| 按钮文字固定 | edu_status.html | 根据id后缀动态显示单独判别/AI辅助判别 |
+| 管理员任务状态错误 | routes_oridata.py | 双阶段任务检查两个子任务是否都完成 |
+| 管理员查看AI报告 | edu_admin.html | 双阶段报告显示AI评价内容 |
+
+**相关文件**:
+| 文件 | 修改内容 |
+|------|----------|
+| edu_status.html | 检测completed状态、超时处理、双阶段逻辑 |
+| routes_oridata.py | task-status API支持双阶段检查 |
+| edu_admin.html | 双阶段对比报告、显示AI评价 |
+
+---
+
 ## 十三、协定的再次确认
 
 作为编程助手，我承诺遵循以下协定：
@@ -1207,5 +1272,5 @@ def update_user(user_id: int, doctor: str, organization: str,
 
 ---
 
-*文档版本: 2026-04-04*
-*最后更新: 2026-04-04 - 添加用户管理、教育管理、界面修复等更新记录*
+*文档版本: 2026-04-06*
+*最后更新: 2026-04-06 - 添加AI分析检测与双阶段报告修复*

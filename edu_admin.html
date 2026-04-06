@@ -43,8 +43,8 @@
     .task-name { font-weight: 700; font-size: 14px; margin-bottom: 6px; color: #1e293b; }
     .task-meta { font-size: 12px; color: #64748b; line-height: 1.5; }
     .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; }
-    .modal-card { background: white; border-radius: 12px; padding: 25px; width: 90%; max-width: 500px; animation: slideUp 0.3s ease; }
-    .user-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; max-height: 300px; overflow-y: auto; margin: 15px 0; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; }
+    .modal-card { background: white; border-radius: 12px; padding: 25px; width: 90%; max-width: 700px; animation: slideUp 0.3s ease; }
+    .user-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-height: 500px; overflow-y: auto; margin: 15px 0; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; }
     .user-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
     .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.2s; }
     .btn-primary { background: #667eea; color: white; }
@@ -161,7 +161,10 @@
 
       <div class="kanban-container">
         <div class="kanban-col">
-          <div class="col-title">🔄 模型判读中 <span id="cnt-processing" style="font-weight:400; color:#94a3b8">0</span></div>
+          <div class="col-title" style="display:flex; justify-content:space-between; align-items:center;">
+            <span>🔄 模型判读中 <span id="cnt-processing" style="font-weight:400; color:#94a3b8">0</span></span>
+            <button class="btn" style="padding:4px 10px; font-size:11px; background:#f97316; color:white; border:none; border-radius:4px; font-weight:600;" onclick="clearStuckEduTasks()">⚠️ 清理无效</button>
+          </div>
           <div id="col-processing"></div>
         </div>
         <div class="kanban-col">
@@ -317,6 +320,13 @@
   <div id="publishModal" class="modal-overlay">
     <div class="modal-card">
       <h3 id="p-task-title">发布任务</h3>
+      <div style="margin: 15px 0;">
+        <label style="font-size:13px; font-weight:600;">发布模式：</label>
+        <select id="publishMode" style="margin-left:10px; padding:6px 10px; border-radius:6px; border:1px solid #e2e8f0; font-size:13px;">
+          <option value="single">单阶段 (普通模式)</option>
+          <option value="dual" selected>双阶段 (单独判读 + AI辅助)</option>
+        </select>
+      </div>
       <p style="font-size:12px; color:#64748b; margin-top:5px;">请选择允许参与判读的医师：</p>
       <div class="user-grid" id="userList"></div>
       <div style="display:flex; gap:10px; justify-content:flex-end;">
@@ -748,16 +758,19 @@
       const selected = Array.from(document.querySelectorAll('input[name="targetUser"]:checked')).map(cb => cb.value);
       if (selected.length === 0) return alert("请选择至少一个医师进行发布");
 
+      const publishMode = document.getElementById('publishMode').value;
       const formData = new FormData();
       formData.append('submission_id', currentTargetTaskId);
       formData.append('target_users', JSON.stringify(selected));
+      formData.append('publish_mode', publishMode);
 
       try {
         const r = await fetch('/api/edu/publish-task', { method: 'POST', body: formData });
         if (r.ok) {
             closeModal('publishModal');
             fetchTasks();
-            alert("✅ 发布成功，医师现在可以在教育模式中看到该批次。");
+            const modeText = publishMode === 'dual' ? '双阶段' : '单阶段';
+            alert(`✅ 发布成功（${modeText}），医师现在可以在教育模式中看到该批次。`);
         }
       } catch (e) { alert("发布失败，请检查网络"); }
     };
@@ -806,10 +819,30 @@
         modal.style.display = 'flex';
         
         try {
-            const r = await fetch(`/api/edu/user/result/${username}/${taskId}`);
-            if (!r.ok) throw new Error('获取报告失败');
-            const data = await r.json();
-            showReportContent(modalCard, username, taskName, data);
+            // 尝试获取双阶段数据
+            let singleData = null;
+            let assistData = null;
+            
+            try {
+                const rSingle = await fetch(`/api/edu/user/result/${username}/${taskId}_SINGLE`);
+                if (rSingle.ok) singleData = await rSingle.json();
+            } catch (e) {}
+            
+            try {
+                const rAssist = await fetch(`/api/edu/user/result/${username}/${taskId}_AI-ASSIST`);
+                if (rAssist.ok) assistData = await rAssist.json();
+            } catch (e) {}
+            
+            if (singleData && assistData) {
+                // 双阶段报告
+                showDualStageReport(modalCard, username, taskName, singleData, assistData);
+            } else {
+                // 普通报告
+                const r = await fetch(`/api/edu/user/result/${username}/${taskId}`);
+                if (!r.ok) throw new Error('获取报告失败');
+                const data = await r.json();
+                showReportContent(modalCard, username, taskName, data);
+            }
         } catch (e) {
             modalCard.innerHTML = `
                 <h2 style="color:#ef4444">❌ 加载失败</h2>
@@ -817,6 +850,107 @@
                 <button class="btn btn-secondary" onclick="closeModal('reportModal')">关闭</button>
             `;
         }
+    }
+    
+    function showDualStageReport(modalCard, username, taskName, singleData, assistData) {
+        const s = singleData || {};
+        const a = assistData || {};
+        
+        let html = `
+            <h2 style="color:#1e293b">🎯 教学评估对比报告</h2>
+            <p style="font-size:13px; color:#64748b; margin:5px 0;">${taskName} - ${username}</p>
+            
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin:20px 0;">
+                <div style="background:#f0f9ff; padding:15px; border-radius:10px; text-align:center;">
+                    <div style="font-size:14px; color:#0369a1; margin-bottom:10px;">单独判读</div>
+                    <div style="font-size:24px; font-weight:700; color:#1e293b;">${(s.accuracy * 100).toFixed(1)}%</div>
+                    <div style="font-size:12px; color:#64748b;">准确率</div>
+                </div>
+                <div style="background:#f0fdf4; padding:15px; border-radius:10px; text-align:center;">
+                    <div style="font-size:14px; color:#15803d; margin-bottom:10px;">AI辅助判读</div>
+                    <div style="font-size:24px; font-weight:700; color:#1e293b;">${(a.accuracy * 100).toFixed(1)}%</div>
+                    <div style="font-size:12px; color:#64748b;">准确率</div>
+                </div>
+            </div>
+            
+            <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:15px;">
+                <div style="background:#f8fafc; padding:12px; border-radius:8px; text-align:center;">
+                    <div style="font-size:18px; font-weight:600; color:#1e293b;">${(s.sensitivity * 100).toFixed(1)}%</div>
+                    <div style="font-size:11px; color:#64748b;">敏感度 (单独)</div>
+                </div>
+                <div style="background:#f8fafc; padding:12px; border-radius:8px; text-align:center;">
+                    <div style="font-size:18px; font-weight:600; color:#1e293b;">${(a.sensitivity * 100).toFixed(1)}%</div>
+                    <div style="font-size:11px; color:#64748b;">敏感度 (AI)</div>
+                </div>
+                <div style="background:#f8fafc; padding:12px; border-radius:8px; text-align:center;">
+                    <div style="font-size:18px; font-weight:600; color:#1e293b;">${(s.specificity * 100).toFixed(1)}%</div>
+                    <div style="font-size:11px; color:#64748b;">特异性 (单独)</div>
+                </div>
+                <div style="background:#f8fafc; padding:12px; border-radius:8px; text-align:center;">
+                    <div style="font-size:18px; font-weight:600; color:#1e293b;">${(a.specificity * 100).toFixed(1)}%</div>
+                    <div style="font-size:11px; color:#64748b;">特异性 (AI)</div>
+                </div>
+            </div>
+        `;
+        
+        // 显示AI工具使用情况（仅AI辅助判读阶段）
+        if (a.ai_dependency) {
+            html += `
+                <div style="margin-top:15px;">
+                    <h3 style="font-size:14px; margin-bottom:12px;">🤖 AI工具使用情况（AI辅助判读阶段）</h3>
+                    <div style="display:flex; gap:8px; justify-content:space-between;">
+                        <div style="flex:1; padding:10px; background:#ecfdf5; border-radius:8px; text-align:center;">
+                            <div style="font-size:16px; margin-bottom:5px;">✅</div>
+                            <div style="font-size:11px; color:#065f46; font-weight:600;">正确依赖</div>
+                            <div style="font-size:16px; font-weight:700; color:#059669;">${a.ai_dependency.correct_reliance || 0}</div>
+                            <div style="font-size:9px; color:#065f46;">AI正确+您正确</div>
+                        </div>
+                        <div style="flex:1; padding:10px; background:#fffbeb; border-radius:8px; text-align:center;">
+                            <div style="font-size:16px; margin-bottom:5px;">⚠️</div>
+                            <div style="font-size:11px; color:#92400e; font-weight:600;">依赖不足</div>
+                            <div style="font-size:16px; font-weight:700; color:#d97706;">${a.ai_dependency.insufficient_reliance || 0}</div>
+                            <div style="font-size:9px; color:#92400e;">AI正确+您错误</div>
+                        </div>
+                        <div style="flex:1; padding:10px; background:#eff6ff; border-radius:8px; text-align:center;">
+                            <div style="font-size:16px; margin-bottom:5px;">💪</div>
+                            <div style="font-size:11px; color:#1e40af; font-weight:600;">正确独立</div>
+                            <div style="font-size:16px; font-weight:700; color:#2563eb;">${a.ai_dependency.correct_independence || 0}</div>
+                            <div style="font-size:9px; color:#1e40af;">AI错误+您正确</div>
+                        </div>
+                        <div style="flex:1; padding:10px; background:#fef2f2; border-radius:8px; text-align:center;">
+                            <div style="font-size:16px; margin-bottom:5px;">❌</div>
+                            <div style="font-size:11px; color:#991b1b; font-weight:600;">过度依赖</div>
+                            <div style="font-size:16px; font-weight:700; color:#dc2626;">${a.ai_dependency.over_reliance || 0}</div>
+                            <div style="font-size:9px; color:#991b1b;">AI错误+您错误</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // 显示AI分析报告（优先使用单独判读的报告）
+        const llmData = (s.llm_analysis && s.llm_analysis.analysis) ? s : (a.llm_analysis && a.llm_analysis.analysis ? a : null);
+        if (llmData && llmData.llm_analysis && llmData.llm_analysis.analysis) {
+            const analysis = llmData.llm_analysis.analysis;
+            html += `
+                <div style="margin-top:20px; padding:15px; background:#f0f9ff; border-radius:8px; border-left:3px solid #667eea;">
+                    <h3 style="font-size:14px; margin-bottom:10px;">🤖 AI专家评价</h3>
+                    <div style="font-size:13px; line-height:1.8;">
+                        <p style="margin-bottom:8px;"><strong>整体评价：</strong>${analysis.overall_evaluation || '暂无'}</p>
+                        <p style="margin-bottom:8px;"><strong>诊断能力：</strong>${analysis.diagnosis_ability || '暂无'}</p>
+                        <p style="margin-bottom:8px;"><strong>AI工具使用：</strong>${analysis.ai_tool_usage || '暂无'}</p>
+                    </div>
+                </div>
+            `;
+        }
+        
+        html += `
+            <div style="margin-top:20px; text-align:center;">
+                <button class="btn btn-secondary" onclick="closeModal('reportModal')">关闭</button>
+            </div>
+        `;
+        
+        modalCard.innerHTML = html;
     }
 
     function showReportContent(modalCard, username, taskName, data) {
@@ -925,6 +1059,23 @@
                 fetchTasks(); // 刷新看板
             }
         } catch (e) { alert("网络异常，无法删除"); }
+    }
+
+    async function clearStuckEduTasks() {
+        if (!confirm("确定要清理无效的教育任务吗？\n\n这将把卡住的任务（AI处理中但无后台运行）移至未发布列表。")) return;
+        try {
+            const r = await fetch('/api/edu/admin/clear-stuck-tasks', { method: 'DELETE' });
+            if (r.ok) {
+                const result = await r.json();
+                alert(`✅ 已清理 ${result.deleted_count} 个无效任务`);
+                fetchTasks(); // 刷新看板
+            } else {
+                const error = await r.json();
+                alert(`清理失败: ${error.detail}`);
+            }
+        } catch (e) {
+            alert("网络错误，请重试");
+        }
     }
 
 

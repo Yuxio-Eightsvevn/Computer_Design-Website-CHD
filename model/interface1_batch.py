@@ -387,13 +387,15 @@ def save_visuals(video_path, result, output_dir, video_name):
         # 非Normal时叠加绿色边界框和AI Pred标注
         if not is_normal:
             cv2.rectangle(f_box, (bx[0], bx[1]), (bx[2], bx[3]), (0, 255, 0), 2)
-            cv2.putText(f_box, "AI Pred", (bx[0], bx[3] + 25), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+            cv2.putText(f_box, "AI Pred", (bx[0], bx[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
             if i == kf:
                 cv2.putText(f_box, "KEY FRAME", (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 255), 3)
         vw_box.write(f_box)
         
         # 热力图可视化 - 仅在ROI区域叠加
         f_heat = frame.copy()
+        # 绘制ROI白色细框
+        cv2.rectangle(f_heat, (rx1, ry1), (rx2, ry2), (255, 255, 255), 1)
         roi_frame = f_heat[ry1:ry2, rx1:rx2]
         blended_roi = cv2.addWeighted(roi_frame, 0.6, h_roi_bgr, 0.4, 0)
         f_heat[ry1:ry2, rx1:rx2] = blended_roi
