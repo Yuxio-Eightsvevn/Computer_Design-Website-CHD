@@ -40,3 +40,5 @@ model/**/*.pt
 !model/Baseline_4size/.gitkeep
 !model/multiviews/.gitkeep
 !model/singleview/.gitkeep
+诊断平台网页使用指南.pdf
+诊断平台网页使用指南_v2.md

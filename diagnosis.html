@@ -1966,9 +1966,10 @@
                 const videoElement = document.createElement('video');
                 videoElement.controls = true;
                 videoElement.autoplay = true;
+                videoElement.muted = true;
                 videoElement.loop = true;
-                videoElement.src = videoPath;
 
+                // 先绑定事件，再设置src（避免事件丢失）
                 videoElement.onloadedmetadata = function() {
                     videoElement.play().catch(err => {
                         if (err.name !== 'AbortError') {
@@ -1986,6 +1987,8 @@
                         </div>
                     `;
                 };
+
+                videoElement.src = videoPath;
 
                 video2dWrapper.appendChild(videoElement);
                 video2dSection.appendChild(video2dWrapper);
@@ -2152,20 +2155,20 @@
                 const videoElement = document.createElement('video');
                 videoElement.controls = true;
                 videoElement.autoplay = true;
+                videoElement.muted = true;
                 videoElement.loop = true;
                 videoElement.style.cssText = 'width: 100%; height: 100%; max-height: calc(85vh - 60px); object-fit: contain;';
-                videoElement.src = videoPath;
 
+                // 先绑定事件，再设置src（避免事件丢失）
                 videoElement.onloadedmetadata = function() {
+                    console.log('✅ 视频元数据加载成功，尝试自动播放...');
                     videoElement.play().catch(err => {
-                        if (err.name !== 'AbortError') {
-                            console.warn('自动播放失败:', err);
-                        }
+                        console.error('❌ 自动播放失败:', err.name, err.message);
                     });
                 };
 
                 videoElement.onerror = function(e) {
-                    console.error('弹窗视频加载失败:', videoPath, e);
+                    console.error('❌ 弹窗视频加载失败:', videoPath, 'error code:', videoElement.error);
                     modalBody.innerHTML = `
                         <div class="video-modal-placeholder">
                             <div class="video-modal-placeholder-icon">⚠️</div>
@@ -2177,6 +2180,10 @@
                 };
 
                 modalBody.appendChild(videoElement);
+
+                // [修复] 设置视频src（必须在绑定事件之后）
+                console.log('📹 设置视频路径:', videoPath);
+                videoElement.src = videoPath;
 
                 // 读取metadata获取关键帧索引
                 let keyFrameIndex = null;

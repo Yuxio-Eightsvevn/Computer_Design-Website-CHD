@@ -386,6 +386,9 @@ def diagnose(target_dir: str, output_dir: str, save_videos: bool = True) -> dict
     处理诊断请求
     入口函数 - 完全复用原函数，仅修改路径
     """
+    import time
+    start_time = time.time()
+    
     transform = v2.Compose([
         v2.ToDtype(torch.float32, scale=True),
         v2.Normalize(mean=[0.48145466, 0.4578275, 0.40821073], std=[0.26862954, 0.26130258, 0.27577711])
@@ -494,7 +497,8 @@ def diagnose(target_dir: str, output_dir: str, save_videos: bool = True) -> dict
         "total_cases": len(case_dirs),
         "success_cases": sum(1 for r in results if r['success_count'] > 0),
         "failed_cases": sum(1 for r in results if r['success_count'] == 0),
-        "results": results
+        "results": results,
+        "duration": round(time.time() - start_time, 2)
     }
 
 
