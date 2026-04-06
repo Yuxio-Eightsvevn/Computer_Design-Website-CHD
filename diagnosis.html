@@ -138,10 +138,6 @@
             z-index: 10;
         }
 
-        .video-item:last-child {
-            grid-column: 2 / 3;
-        }
-
         .video-item video {
             width: 100%;
             height: 100%;
@@ -959,10 +955,6 @@
                 grid-template-columns: repeat(2, 1fr);
                 grid-template-rows: repeat(3, 1fr);
             }
-
-            .video-item:last-child {
-                grid-column: 1 / 3;
-            }
         }
 
         @media (max-width: 768px) {
@@ -1002,8 +994,6 @@
                 min-height: 600px;
             }
 
-        .video-item:last-child {
-            grid-column: 1 / 2;
         }
 
         .key-frame-btn:hover {
@@ -1582,8 +1572,23 @@
                 const result = await response.json();
                 console.log('API返回数据:', result);
                 
+                // 调试：显示返回的数据结构
+                if (result.detail) {
+                    console.error('API错误:', result.detail);
+                    alert('获取任务数据失败: ' + result.detail);
+                    returnToDashboard();
+                    return;
+                }
+                
                 patients = result.data;
                 console.log('病人列表:', patients);
+                console.log('病人数量:', patients ? patients.length : 0);
+                
+                // 调试：显示任务路径信息
+                console.log('尝试访问路径:', {
+                    user_proc_root: `/data/${taskInfo.username}/processed/${taskInfo.taskFolder}`,
+                    system_edu_root: `/data/SYSTEM/edu_data/processed/${taskInfo.taskFolder}`
+                });
                 
                 if (!patients || patients.length === 0) {
                     alert('该任务下没有病人数据');
@@ -1802,6 +1807,21 @@
 
         // 加载模型置信度（从第一个视频的metadata）
         async function loadModelConfidence(patient) {
+            // 教育模式-单独判读：不显示置信度
+            if (currentMode === 'edu' && eduSubMode === 'single') {
+                const confidenceContainer = document.getElementById('modelConfidence');
+                if (confidenceContainer) {
+                    confidenceContainer.style.display = 'none';
+                }
+                return;
+            }
+
+            // 其他模式显示置信度
+            const confidenceContainer = document.getElementById('modelConfidence');
+            if (confidenceContainer) {
+                confidenceContainer.style.display = 'block';
+            }
+
             try {
                 // 重置置信度显示
                 const confidenceTypes = ['normal', 'vsd', 'asd', 'pda'];

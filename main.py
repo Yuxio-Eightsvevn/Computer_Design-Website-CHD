@@ -459,6 +459,9 @@ async def get_task_patients(username: str, task_folder: str):
         print(f"❌ 404 彻底找不到：{task_folder}")
         raise HTTPException(status_code=404, detail="找不到任务文件夹")
 
+    print(f"✅ 找到任务路径: {task_path}")
+    print(f"📁 任务目录内容: {list(task_path.iterdir())}")
+    
     patients = []
     
     # 2. 扫描病例文件夹
