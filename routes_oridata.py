@@ -29,6 +29,7 @@ if str(CURRENT_ROOT) not in sys.path:
 SYSTEM_EDU_DIR = Path("data_batch_storage") / "SYSTEM" / "edu_data"
 EDU_RESULTS_DIR = SYSTEM_EDU_DIR / "Doctor_Diag_Result"
 BASE_DATA_DIR = Path("data_batch_storage")
+INFERENCE_STATS_FILE = SYSTEM_EDU_DIR / "inference_stats.json"
 
 # --- [核心修复] 环境自愈：确保代码能看到 Conda 环境中的 ffmpeg ---
 def patch_ffmpeg_env():
@@ -300,6 +301,28 @@ async def run_model_inference_wrapper(request_path: Path, output_root: Path, req
                 "is_cmp": True, 
                 "cmp_time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             })
+        
+        # 4.5 将推理时间持久化到独立统计文件（不受任务删除影响）
+        try:
+            stats_data = {"total_duration": 0, "total_cases": 0}
+            if INFERENCE_STATS_FILE.exists():
+                with open(INFERENCE_STATS_FILE, "r", encoding="utf-8") as f:
+                    stats_data = json.load(f)
+            
+            stats_data["total_duration"] = stats_data.get("total_duration", 0) + inference_duration
+            
+            # 获取病例数
+            case_count = 0
+            if processed_task_dir.exists():
+                case_count = sum(1 for d in processed_task_dir.iterdir() if d.is_dir())
+            stats_data["total_cases"] = stats_data.get("total_cases", 0) + case_count
+            
+            with open(INFERENCE_STATS_FILE, "w", encoding="utf-8") as f:
+                json.dump(stats_data, f, ensure_ascii=False, indent=2)
+            
+            print(f"💾 [AI任务] 推理统计已保存: 时间={inference_duration}秒, 病例={case_count}")
+        except Exception as e:
+            print(f"⚠️ [AI任务] 保存推理统计失败: {e}")
         
         # 4. 成功完成：删除处理中标记
         if processing_flag.exists():
@@ -691,6 +714,33 @@ async def get_edu_admin_tasks():
         "unreleased": [t for t in tasks if t.get("status") == "unreleased"],
         "published": [t for t in tasks if t.get("status") == "published"]
     }
+
+
+@router.get("/api/admin/inference-stats")
+async def get_inference_stats():
+    """获取所有任务的模型推理统计（从独立统计文件读取，不受任务删除影响）"""
+    total_duration = 0
+    total_cases = 0
+    
+    # 从独立统计文件读取（推理完成后立即保存）
+    if INFERENCE_STATS_FILE.exists():
+        try:
+            with open(INFERENCE_STATS_FILE, "r", encoding="utf-8") as f:
+                stats_data = json.load(f)
+            total_duration = stats_data.get("total_duration", 0)
+            total_cases = stats_data.get("total_cases", 0)
+        except Exception as e:
+            print(f"⚠️ 读取推理统计失败: {e}")
+    
+    # 计算每病例平均时间
+    avg_per_case = total_duration / total_cases if total_cases > 0 else 0
+    
+    return {
+        "total_duration": round(total_duration, 2),
+        "total_cases": total_cases,
+        "avg_per_case": round(avg_per_case, 2)
+    }
+
 
 @router.post("/api/edu/publish-task")
 async def publish_edu_task(submission_id: str = Form(...), target_users: str = Form(...), publish_mode: str = Form("dual")):

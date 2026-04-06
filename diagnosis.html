@@ -1969,6 +1969,14 @@
                 videoElement.loop = true;
                 videoElement.src = videoPath;
 
+                videoElement.onloadedmetadata = function() {
+                    videoElement.play().catch(err => {
+                        if (err.name !== 'AbortError') {
+                            console.warn('自动播放失败:', err);
+                        }
+                    });
+                };
+
                 videoElement.onerror = function(e) {
                     console.error('弹窗视频加载失败:', videoPath, e);
                     modalBody.innerHTML = `
@@ -2147,6 +2155,14 @@
                 videoElement.loop = true;
                 videoElement.style.cssText = 'width: 100%; height: 100%; max-height: calc(85vh - 60px); object-fit: contain;';
                 videoElement.src = videoPath;
+
+                videoElement.onloadedmetadata = function() {
+                    videoElement.play().catch(err => {
+                        if (err.name !== 'AbortError') {
+                            console.warn('自动播放失败:', err);
+                        }
+                    });
+                };
 
                 videoElement.onerror = function(e) {
                     console.error('弹窗视频加载失败:', videoPath, e);
