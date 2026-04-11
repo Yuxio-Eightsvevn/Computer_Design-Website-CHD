@@ -1270,6 +1270,7 @@
         let currentVideoIndex = 0;
         let currentPatientIndex = 0;
         let currentModality = 'original'; // 当前选择的模态：original, heatmap, bbox
+        let isNegativeDiagnosis = false; // 标记当前病例是否为阴性（AI判别为Normal）
         let patients = [];
         let diagnosisRecords = {}; // 存储所有病人的诊断记录 {patientId: {diagnosis, severity}}
         let taskInfo = {
@@ -1750,7 +1751,20 @@
                             videoDiv.appendChild(video);
                             
                             // 设置视频源（在添加到DOM后）
-                            video.src = videoPath;
+                            // [修改] 仅在bbox模态下，如果是阴性诊断则隐藏并显示提示
+                            if (currentModality === 'bbox' && isNegativeDiagnosis) {
+                                console.log('🔍 该病例为阴性诊断，隐藏bbox视频');
+                                video.style.display = 'none';
+                                const placeholder = document.createElement('div');
+                                placeholder.className = 'video-placeholder';
+                                placeholder.innerHTML = `
+                                    <div class="video-placeholder-icon" style="font-size: 36px;">🔍</div>
+                                    <p style="color: #60a5fa; font-weight: 500;">阴性，无识别框</p>
+                                `;
+                                videoDiv.appendChild(placeholder);
+                            } else {
+                                video.src = videoPath;
+                            }
                         } else {
                             // 该模态不存在，显示占位符
                             console.warn(`❌ 视频 ${i + 1} 的 ${currentModality} 模态不存在`);
@@ -1879,6 +1893,17 @@
                     if (fill) fill.style.width = `${percentage}%`;
                     if (valueElem) valueElem.textContent = `${percentage}%`;
                 }
+
+                // 判断是否为阴性（Normal概率最高且超过阈值）
+                const normalValue = confidenceData['Normal'] || confidenceData['normal'] || 0;
+                const maxConfidence = Math.max(
+                    normalValue,
+                    confidenceData['VSD'] || confidenceData['vsd'] || 0,
+                    confidenceData['ASD'] || confidenceData['asd'] || 0,
+                    confidenceData['PDA'] || confidenceData['pda'] || 0
+                );
+                isNegativeDiagnosis = (normalValue === maxConfidence && normalValue > 0.6);
+                console.log(`🔍 阴性诊断判断: isNegativeDiagnosis = ${isNegativeDiagnosis} (Normal=${normalValue})`);
 
                 console.log('✅ 置信度加载完成');
 

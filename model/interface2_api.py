@@ -379,10 +379,8 @@ def save_visuals(video_path, result, output_dir, video_name):
     bx = result['bbox']
     kf = result['kf']
     for i, frame in enumerate(result['frames']):
-        # 边界框可视化
+        # 边界框可视化（不包含ROI白框）
         f_box = frame.copy()
-        # 绘制ROI白色细框（所有帧）
-        cv2.rectangle(f_box, (rx1, ry1), (rx2, ry2), (255, 255, 255), 1)
         # 非Normal时叠加绿色边界框和AI Pred标注
         if not is_normal:
             cv2.rectangle(f_box, (bx[0], bx[1]), (bx[2], bx[3]), (0, 255, 0), 2)
@@ -393,8 +391,8 @@ def save_visuals(video_path, result, output_dir, video_name):
         
         # 热力图可视化 - 仅在ROI区域叠加
         f_heat = frame.copy()
-        # 绘制ROI白色细框
-        cv2.rectangle(f_heat, (rx1, ry1), (rx2, ry2), (255, 255, 255), 1)
+        # 绘制ROI白色粗框
+        cv2.rectangle(f_heat, (rx1, ry1), (rx2, ry2), (255, 255, 255), 2)
         roi_frame = f_heat[ry1:ry2, rx1:rx2]
         blended_roi = cv2.addWeighted(roi_frame, 0.6, h_roi_bgr, 0.4, 0)
         f_heat[ry1:ry2, rx1:rx2] = blended_roi
