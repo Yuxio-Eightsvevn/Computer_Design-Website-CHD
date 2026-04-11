@@ -542,6 +542,12 @@ app.mount("/data", StaticFiles(directory=DATA_BATCH_STORAGE), name="data")
 import os
 config_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config")
 app.mount("/config", StaticFiles(directory=config_dir), name="config")
+# 挂载UI目录
+ui_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "UI")
+app.mount("/UI", StaticFiles(directory=ui_dir), name="UI")
+# 挂载UI/res目录（静态资源）
+res_dir = os.path.join(ui_dir, "res")
+app.mount("/res", StaticFiles(directory=res_dir), name="res")
 
 
 # JSON格式提交诊断结果的请求模型

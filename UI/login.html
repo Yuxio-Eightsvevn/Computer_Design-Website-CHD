@@ -1,224 +1,268 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login</title>
+    <title>登录 - 儿童先心病智能诊断平台</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="res/admin/css/main.css">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        #header .top-right {
+            position: absolute;
+            top: 30px;
+            right: 30px;
         }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
+        #header .click-login {
+            margin-top: 15px;
+        }
+        .login-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
             align-items: center;
-            padding: 20px;
+            justify-content: center;
         }
-
-        .container {
+        .login-modal.show { display: flex; }
+        .login-modal-card {
             background: white;
-            border-radius: 15px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            padding: 50px;
-            width: 100%;
-            max-width: 450px;
-        }
-
-        .header {
-            text-align: center;
-            margin-bottom: 40px;
-        }
-
-        .icon {
-            font-size: 64px;
-            margin-bottom: 20px;
-        }
-
-        h1 {
-            color: #333;
-            margin-bottom: 10px;
-            font-size: 28px;
-        }
-
-        .subtitle {
-            color: #666;
-            font-size: 14px;
-        }
-
-        .form-group {
-            margin-bottom: 25px;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 8px;
-            color: #333;
-            font-weight: 500;
-            font-size: 14px;
-        }
-
-        input[type="text"],
-        input[type="password"] {
-            width: 100%;
-            padding: 12px 15px;
-            border: 2px solid #e0e0e0;
+            padding: 40px;
             border-radius: 8px;
-            font-size: 14px;
-            transition: all 0.3s ease;
+            width: 360px;
+            max-width: 90%;
+            position: relative;
         }
-
-        input[type="text"]:focus,
-        input[type="password"]:focus {
+        .login-modal-card .close-btn {
+            position: absolute;
+            top: 12px;
+            right: 15px;
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            -webkit-box-shadow: none !important;
+            font-size: 14px;
+            cursor: pointer;
+            color: #333 !important;
+            padding: 5px 10px;
+            text-shadow: none !important;
+            outline: none !important;
+            display: inline-block;
+        }
+        .login-modal-card .close-btn:visited,
+        .login-modal-card .close-btn:focus,
+        .login-modal-card .close-btn:active {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            color: #333 !important;
+        }
+        .login-modal-card .close-btn:hover { color: #333; }
+        .login-modal-card h2 {
+            margin-bottom: 25px;
+            text-align: center;
+            font-size: 22px;
+        }
+        .login-modal-card .form-group {
+            margin-bottom: 18px;
+        }
+        .login-modal-card .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 14px;
+        }
+        .login-modal-card .form-group input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .login-modal-card .form-group input:focus {
             outline: none;
             border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
-
-        .login-btn {
+        .login-modal-card .login-btn {
             width: 100%;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 14px 24px;
+            background: #3a7bd5;
             color: white;
             border: none;
-            padding: 15px;
-            border-radius: 8px;
+            border-radius: 4px;
             font-size: 16px;
-            font-weight: 600;
             cursor: pointer;
-            transition: transform 0.2s ease, box-shadow 0.3s ease;
+            margin-top: 10px;
+        }
+        .login-modal-card .login-btn:hover { background: #3069b4; }
+        .login-modal-card .login-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .login-modal-card .error-msg {
+            background: #fdf0f0;
+            color: #c00;
+            padding: 10px;
+            border-radius: 4px;
             margin-bottom: 15px;
-        }
-
-        .login-btn:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
-        }
-
-        .login-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .error-message {
-            background: #fee;
-            color: #c33;
-            padding: 12px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            font-size: 14px;
+            font-size: 13px;
             display: none;
         }
-
-        .error-message.show {
-            display: block;
-        }
-
-        @media (max-width: 768px) {
-            .container {
-                padding: 30px 20px;
-            }
-        }
+        .login-modal-card .error-msg.show { display: block; }
     </style>
 </head>
-<body>
-    <div class="container">
-        <div class="header">
-            <div class="icon">🩺</div>
-            <h1>儿童先心病诊断平台</h1>
-        </div>
+<body class="no-sidebar is-preload">
+    <div id="page-wrapper">
 
-        <div class="error-message" id="errorMessage"></div>
-
-        <form id="loginForm">
-            <div class="form-group">
-                <label for="username">用户名</label>
-                <input type="text" id="username" name="username" required autocomplete="username">
+        <!-- Header -->
+        <section id="header">
+            <div class="container" style="position: relative;">
+                <h1 id="logo"></h1>
+                <p id="subtitle"></p>
+                <button class="button click-login" id="btnBelow" onclick="openLoginModal()"></button>
+                <div class="top-right">
+                    <a href="#" class="button" id="btnTopRight" onclick="openLoginModal()"></a>
+                </div>
             </div>
+        </section>
 
-            <div class="form-group">
-                <label for="password">密码</label>
-                <input type="password" id="password" name="password" required autocomplete="current-password">
+        <!-- Main -->
+        <section id="main">
+            <div class="container">
+                <div id="content">
+                    <article class="box post">
+                        <header>
+                            <h2 id="tagline" style="font-size:24px;"></h2>
+                        </header>
+                        <span class="image featured"><img src="res/admin/images/pic04.jpg" alt="" /></span>
+                        
+                        <h3 id="featuresTitle">核心功能</h3>
+                        <div class="row" id="featuresRow">
+                        </div>
+                    </article>
+                </div>
             </div>
+        </section>
 
-            <button type="submit" class="login-btn" id="loginBtn">登录</button>
-        </form>
     </div>
 
-    <script>
-        const loginForm = document.getElementById('loginForm');
-        const errorMessage = document.getElementById('errorMessage');
-        const loginBtn = document.getElementById('loginBtn');
+    <!-- Login Modal -->
+    <div class="login-modal" id="loginModal">
+        <div class="login-modal-card">
+            <span class="close-btn" onclick="closeLoginModal()">关闭</span>
+            <h2>登录</h2>
+            <div class="error-msg" id="loginError"></div>
+            <div class="form-group">
+                <label>用户名</label>
+                <input type="text" id="loginUsername" placeholder="请输入用户名" required>
+            </div>
+            <div class="form-group">
+                <label>密码</label>
+                <input type="password" id="loginPassword" placeholder="请输入密码" required>
+            </div>
+            <button class="login-btn" id="loginBtn" onclick="doLogin()">登录</button>
+        </div>
+    </div>
 
-        // 显示错误信息
-        function showError(message) {
-            errorMessage.textContent = message;
-            errorMessage.classList.add('show');
-            setTimeout(() => {
-                errorMessage.classList.remove('show');
-            }, 5000);
+    <script src="res/admin/js/jquery.min.js"></script>
+    <script src="res/admin/js/browser.min.js"></script>
+    <script src="res/admin/js/breakpoints.min.js"></script>
+    <script src="res/admin/js/util.js"></script>
+    <script src="res/admin/js/main.js"></script>
+    <script>
+        var config = {};
+
+        async function loadConfig() {
+            try {
+                var resp = await fetch('UI/login_config.json');
+                config = await resp.json();
+                renderContent();
+            } catch (e) {
+                console.error('加载配置失败:', e);
+            }
         }
 
-        // 表单提交
-        loginForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const username = document.getElementById('username').value.trim();
-            const password = document.getElementById('password').value;
+        function renderContent() {
+            if (config.platform) {
+                document.title = '登录 - ' + config.platform.name;
+                document.getElementById('logo').textContent = config.platform.name;
+                document.getElementById('subtitle').textContent = config.platform.subtitle;
+                document.getElementById('tagline').innerHTML = config.platform.tagline + '<br />' + (config.platform.tagline2 || '');
+            }
+
+            if (config.buttons) {
+                document.getElementById('btnTopRight').textContent = config.buttons.topRight || '医师入口';
+                document.getElementById('btnBelow').textContent = config.buttons.titleBelow || '点击登录';
+            }
+
+            var featuresRow = document.getElementById('featuresRow');
+            if (config.features && featuresRow) {
+                featuresRow.innerHTML = config.features.map(function(f) {
+                    return '<div class="col-4 col-12-small">' +
+                        '<section class="box">' +
+                            '<header><h3>' + f.title + '</h3></header>' +
+                            '<p>' + f.description + '</p>' +
+                        '</section>' +
+                    '</div>';
+                }).join('');
+            }
+        }
+
+        function openLoginModal() {
+            document.getElementById('loginModal').classList.add('show');
+            document.getElementById('loginUsername').focus();
+        }
+
+        function closeLoginModal() {
+            document.getElementById('loginModal').classList.remove('show');
+        }
+
+        document.getElementById('loginModal').addEventListener('click', function(e) {
+            if (e.target === this) closeLoginModal();
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closeLoginModal();
+        });
+
+        function showLoginError(msg) {
+            var el = document.getElementById('loginError');
+            el.textContent = msg;
+            el.classList.add('show');
+            setTimeout(function() { el.classList.remove('show'); }, 5000);
+        }
+
+        async function doLogin() {
+            var username = document.getElementById('loginUsername').value.trim();
+            var password = document.getElementById('loginPassword').value;
+            var btn = document.getElementById('loginBtn');
 
             if (!username || !password) {
-                showError('请填写用户名和密码');
+                showLoginError('请填写用户名和密码');
                 return;
             }
 
-            // 禁用按钮防止重复提交
-            loginBtn.disabled = true;
-            loginBtn.textContent = '登录中...';
+            btn.disabled = true;
+            btn.textContent = '登录中...';
 
             try {
-                const response = await fetch('/api/login', {
+                var res = await fetch('/api/login', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        username: username,
-                        password: password
-                    })
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
                 });
-
-                const result = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(result.detail || '登录失败');
-                }
-
-                // 登录成功，保存用户数据
-                localStorage.setItem('userData', JSON.stringify(result.data));
-
-                // 登录成功后重定向到导流页（flow），以便用户选择模式
-                // 说明：flow 页面将显示欢迎语并提供到 dashboard/diagnosis/admin 的入口
+                var data = await res.json();
+                if (!res.ok) throw new Error(data.detail || '登录失败');
+                localStorage.setItem('userData', JSON.stringify(data.data));
                 window.location.href = '/flow';
-
-            } catch (error) {
-                console.error('登录错误:', error);
-                showError(error.message);
-            } finally {
-                loginBtn.disabled = false;
-                loginBtn.textContent = '登录';
+            } catch (e) {
+                showLoginError(e.message);
+                btn.disabled = false;
+                btn.textContent = '登录';
             }
+        }
+
+        document.getElementById('loginPassword').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') doLogin();
         });
 
-        // Enter key shortcut for login
-        document.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && !loginBtn.disabled) {
-                loginForm.dispatchEvent(new Event('submit'));
-            }
-        });
+        loadConfig();
     </script>
 </body>
 </html>
