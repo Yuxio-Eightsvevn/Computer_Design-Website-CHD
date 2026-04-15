@@ -536,17 +536,22 @@ async def get_metadata(path: str):
 
 
 # 提供资源访问
+# 确保data_batch_storage目录存在
+Path(DATA_BATCH_STORAGE).mkdir(exist_ok=True)
 app.mount("/videos", StaticFiles(directory=DATA_BATCH_STORAGE), name="videos")
 app.mount("/data", StaticFiles(directory=DATA_BATCH_STORAGE), name="data")
 # 使用绝对路径挂载config目录
 import os
 config_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config")
+Path(config_dir).mkdir(exist_ok=True)
 app.mount("/config", StaticFiles(directory=config_dir), name="config")
 # 挂载UI目录
 ui_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "UI")
+Path(ui_dir).mkdir(exist_ok=True)
 app.mount("/UI", StaticFiles(directory=ui_dir), name="UI")
 # 挂载UI/res目录（静态资源）
 res_dir = os.path.join(ui_dir, "res")
+Path(res_dir).mkdir(exist_ok=True)
 app.mount("/res", StaticFiles(directory=res_dir), name="res")
 
 
