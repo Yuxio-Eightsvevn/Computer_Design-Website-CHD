@@ -105,6 +105,79 @@
             display: none;
         }
         .login-modal-card .error-msg.show { display: block; }
+
+        /* 轮播图样式 */
+        .carousel-container {
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto 30px;
+        }
+        .carousel-viewport {
+            position: relative;
+            width: 100%;
+            height: 400px;
+            perspective: 1000px;
+            overflow: hidden;
+        }
+        .carousel-stack {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+        .carousel-card {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 8px;
+            overflow: hidden;
+            transition: transform 0.6s ease, opacity 0.6s ease;
+            cursor: pointer;
+            background: #f0f0f0;
+        }
+        .carousel-card img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .carousel-card .card-caption {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 20px;
+            background: linear-gradient(transparent, rgba(0,0,0,0.7));
+            color: white;
+            font-size: 16px;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .carousel-card:hover .card-caption {
+            opacity: 1;
+        }
+        .carousel-dots {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 15px;
+        }
+        .carousel-dot {
+            width: 8px;
+            height: 8px;
+            background: #ccc;
+            border-radius: 2px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .carousel-dot.active {
+            background: #333;
+            width: 24px;
+        }
+        .carousel-dot:hover {
+            background: #666;
+        }
     </style>
 </head>
 <body class="no-sidebar is-preload">
@@ -130,11 +203,17 @@
                         <header>
                             <h2 id="tagline" style="font-size:24px;"></h2>
                         </header>
-                        <span class="image featured"><img src="res/admin/images/pic04.jpg" alt="" /></span>
-                        
-                        <h3 id="featuresTitle">核心功能</h3>
-                        <div class="row" id="featuresRow">
+
+                        <!-- 轮播图 -->
+                        <div class="carousel-container">
+                            <div class="carousel-viewport">
+                                <div class="carousel-stack" id="carouselStack"></div>
+                            </div>
+                            <div class="carousel-dots" id="carouselDots"></div>
                         </div>
+
+                        <h3 id="featuresTitle">核心功能</h3>
+                        <div class="row" id="featuresRow"></div>
                     </article>
                 </div>
             </div>
@@ -167,6 +246,9 @@
     <script src="res/admin/js/main.js"></script>
     <script>
         var config = {};
+        var carouselImages = [];
+        var currentSlide = 0;
+        var carouselInterval = null;
 
         async function loadConfig() {
             try {
@@ -176,6 +258,84 @@
             } catch (e) {
                 console.error('加载配置失败:', e);
             }
+        }
+
+        async function loadCarouselImages() {
+            try {
+                var resp = await fetch('res/admin/images/carousel_images.json');
+                carouselImages = await resp.json();
+                renderCarousel();
+                startAutoPlay();
+            } catch (e) {
+                console.error('加载轮播图片失败:', e);
+            }
+        }
+
+        function renderCarousel() {
+            var stack = document.getElementById('carouselStack');
+            var dots = document.getElementById('carouselDots');
+            if (!stack || !carouselImages.length) return;
+
+            stack.innerHTML = carouselImages.map(function(img, i) {
+                return '<div class="carousel-card" data-index="' + i + '">' +
+                    '<img src="res/admin/images/' + img.filename + '" alt="' + img.caption + '">' +
+                    '<div class="card-caption">' + img.caption + '</div>' +
+                '</div>';
+            }).join('');
+
+            dots.innerHTML = carouselImages.map(function(_, i) {
+                return '<div class="carousel-dot' + (i === 0 ? ' active' : '') + '" data-index="' + i + '"></div>';
+            }).join('');
+
+            updateCarouselPositions();
+
+            dots.querySelectorAll('.carousel-dot').forEach(function(dot) {
+                dot.addEventListener('click', function() {
+                    goToSlide(parseInt(this.dataset.index));
+                });
+            });
+        }
+
+        function updateCarouselPositions() {
+            var cards = document.querySelectorAll('.carousel-card');
+            var total = carouselImages.length;
+
+            cards.forEach(function(card, i) {
+                var offset = i - currentSlide;
+                var absOffset = Math.abs(offset);
+
+                if (offset === 0) {
+                    card.style.transform = 'translateX(0) scale(1)';
+                    card.style.zIndex = total;
+                    card.style.opacity = '1';
+                } else {
+                    var scale = 1 - (absOffset * 0.05);
+                    var translateX = offset > 0 ? '30px' : '-30px';
+                    var translateY = absOffset * 8 + 'px';
+                    card.style.transform = 'translateX(' + translateX + ') translateY(' + translateY + ') scale(' + scale + ')';
+                    card.style.zIndex = total - absOffset;
+                    card.style.opacity = absOffset > 2 ? '0' : '0.6';
+                }
+            });
+
+            document.querySelectorAll('.carousel-dot').forEach(function(dot, i) {
+                dot.classList.toggle('active', i === currentSlide);
+            });
+        }
+
+        function goToSlide(index) {
+            currentSlide = index;
+            updateCarouselPositions();
+        }
+
+        function nextSlide() {
+            currentSlide = (currentSlide + 1) % carouselImages.length;
+            updateCarouselPositions();
+        }
+
+        function startAutoPlay() {
+            if (carouselInterval) clearInterval(carouselInterval);
+            carouselInterval = setInterval(nextSlide, 5000);
         }
 
         function renderContent() {
@@ -263,6 +423,7 @@
         });
 
         loadConfig();
+        loadCarouselImages();
     </script>
 </body>
 </html>
