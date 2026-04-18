@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>教育练习 - 儿童先心病诊断平台</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f7fa; color: #333; min-height: 100vh; }
@@ -68,6 +69,8 @@
 
   <script>
 let currentUser = null;
+let radarSingleChart = null;
+let radarAssistChart = null;
 
 async function loadUser() {
     console.log("🔍 开始加载用户信息...");
@@ -184,7 +187,7 @@ async function fetchEduTasks() {
                                 ${singleDone ? '✅ 已完成' : '单独判读'}
                             </button>
                             <button class="btn ${assistDone ? 'btn-view' : 'btn-start'}" style="width:120px; ${!singleDone ? 'opacity:0.5;cursor:not-allowed;' : ''}" ${!singleDone ? 'disabled' : ''} onclick="${!singleDone ? '' : `handleTask('${t.submission_id}_AI-ASSIST', '${t.request_name}_AI-ASSIST', ${assistDone}, 'assist', '${t.submission_id}')`}">
-                                ${assistDone ? '✅ 已完成' : (singleDone ? 'AI判读' : '⚠️ AI判读')}
+                                ${assistDone ? '✅ 已完成' : (singleDone ? 'AI辅助判读' : '⚠️ AI辅助判读')}
                             </button>
                             ${bothDone ? `<button class="btn btn-view" style="width:120px; margin-top:5px;" onclick="openResultModal('${t.submission_id}', '${t.request_name}', null, '${t.submission_id}')">查看报告</button>` : ''}
                         </div>
@@ -772,7 +775,82 @@ function showDualStageReport(parentId, name, singleData, assistData) {
                 </tr>
             </table>
         </div>
+        
+        <div style="margin-top:20px;">
+            <h3 style="font-size:14px; color:#1e293b; margin-bottom:12px;">🎯 六维判读能力雷达图对比</h3>
+            <div style="display:flex; gap:20px; justify-content:center; flex-wrap:wrap;">
+                <div style="text-align:center;">
+                    <div style="font-weight:600; margin-bottom:8px; color:#667eea;">单独判读 (SINGLE)</div>
+                    <canvas id="radarSingle" width="280" height="280"></canvas>
+                </div>
+                <div style="text-align:center;">
+                    <div style="font-weight:600; margin-bottom:8px; color:#10b981;">AI辅助 (AI-ASSIST)</div>
+                    <canvas id="radarAssist" width="280" height="280"></canvas>
+                </div>
+            </div>
+        </div>
     `;
+    
+    // 渲染雷达图
+    setTimeout(() => {
+        // 销毁旧图表
+        if (radarSingleChart) { radarSingleChart.destroy(); radarSingleChart = null; }
+        if (radarAssistChart) { radarAssistChart.destroy(); radarAssistChart = null; }
+        
+        const labels = ['准确率', '敏感度', '特异性', '阳性检出', '效率', 'AI提升'];
+        
+        // 计算各维度值（归一化到0-1）
+        const singleVals = [
+            (s.accuracy || 0),
+            (s.sensitivity || 0),
+            (s.specificity || 0),
+            Math.min(1, ((s.ai_dependency?.correct_reliance || 0) + (s.ai_dependency?.correct_independence || 0)) / 10),
+            Math.min(1, s.patientCount && s.totalTime?.seconds ? (s.patientCount / (s.totalTime.seconds / 60)) / 10 : 0),
+            0.5
+        ];
+        const assistVals = [
+            (a.accuracy || 0),
+            (a.sensitivity || 0),
+            (a.specificity || 0),
+            Math.min(1, ((a.ai_dependency?.correct_reliance || 0) + (a.ai_dependency?.correct_independence || 0)) / 10),
+            Math.min(1, a.patientCount && a.totalTime?.seconds ? (a.patientCount / (a.totalTime.seconds / 60)) / 10 : 0),
+            (a.accuracy || 0) - (s.accuracy || 0) + 0.5
+        ];
+        
+        const radarConfig = (ctxId, data, color) => {
+            return new Chart(document.getElementById(ctxId), {
+                type: 'radar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: color + '40',
+                        borderColor: color,
+                        borderWidth: 2,
+                        pointBackgroundColor: color,
+                        pointRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        r: {
+                            beginAtZero: true,
+                            max: 1,
+                            ticks: { stepSize: 0.2, display: false },
+                            grid: { color: '#e2e8f0' },
+                            angleLines: { color: '#e2e8f0' },
+                            pointLabels: { font: { size: 11 }, color: '#475569' }
+                        }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        };
+        
+        radarSingleChart = radarConfig('radarSingle', singleVals, '#667eea');
+        radarAssistChart = radarConfig('radarAssist', assistVals, '#10b981');
+    }, 100);
     
     // 显示AI工具使用情况（仅AI辅助判读阶段）
     if (a.ai_dependency) {

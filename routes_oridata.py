@@ -841,6 +841,7 @@ async def unpublish_edu_task(submission_id: str = Form(...)):
         raise HTTPException(status_code=400, detail="任务未发布，无法取消发布")
     
     target_users = task.get("target_users", [])
+    is_dual_stage = task.get("is_dual_stage", False)
     
     for username in target_users:
         result_file = EDU_RESULTS_DIR / f"{username}.json"
@@ -848,8 +849,15 @@ async def unpublish_edu_task(submission_id: str = Form(...)):
             try:
                 with open(result_file, "r", encoding="utf-8") as f:
                     user_data = json.load(f)
-                if submission_id in user_data:
-                    del user_data[submission_id]
+                keys_to_delete = [submission_id]
+                if is_dual_stage:
+                    keys_to_delete.extend([
+                        f"{submission_id}_SINGLE",
+                        f"{submission_id}_AI-ASSIST"
+                    ])
+                for key in keys_to_delete:
+                    if key in user_data:
+                        del user_data[key]
                 with open(result_file, "w", encoding="utf-8") as f:
                     json.dump(user_data, f, ensure_ascii=False, indent=2)
             except Exception as e:

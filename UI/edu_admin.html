@@ -340,17 +340,17 @@
     <div class="modal-card">
       <h3 id="p-task-title">发布任务</h3>
       <div style="margin: 15px 0;">
-        <label style="font-size:13px; font-weight:600;">发布模式：</label>
-        <select id="publishMode" style="margin-left:10px; padding:6px 10px; border-radius:6px; border:1px solid #e2e8f0; font-size:13px;">
-          <option value="single">单阶段 (普通模式)</option>
-          <option value="dual" selected>双阶段 (单独判读 + AI辅助)</option>
-        </select>
+        <span style="font-size:13px; font-weight:600;">发布模式：</span>
+        <span style="font-size:13px; color:#10b981; margin-left:10px;">双阶段模式（单独判读 + AI辅助）</span>
       </div>
       <p style="font-size:12px; color:#64748b; margin-top:5px;">请选择允许参与判读的医师：</p>
       <div class="user-grid" id="userList"></div>
-      <div style="display:flex; gap:10px; justify-content:flex-end;">
-        <button class="btn btn-ghost" onclick="closeModal('publishModal')">取消</button>
-        <button class="btn btn-primary" id="btn-final-publish" style="background:#10b981">确认发布</button>
+      <div style="display:flex; gap:10px; justify-content:space-between;">
+        <button class="btn btn-ghost" style="background:#dc3545; color:white;" onclick="deleteEduTask()">🗑️ 删除任务</button>
+        <div style="display:flex; gap:10px;">
+          <button class="btn btn-ghost" onclick="closeModal('publishModal')">取消</button>
+          <button class="btn btn-primary" id="btn-final-publish" style="background:#10b981">确认发布</button>
+        </div>
       </div>
     </div>
   </div>
@@ -675,7 +675,7 @@
             if (type === 'unreleased') {
                 div.onclick = () => openPublishModal(t);
             } else if (type === 'published') {
-                div.onclick = () => openStatusDetail(t.submission_id);
+                div.onclick = () => openStatusDetail(t.submission_id, 'published');
             }
             container.appendChild(div);
         });
@@ -770,6 +770,7 @@
 
     async function openPublishModal(task) {
       currentTargetTaskId = task.submission_id;
+      taskPendingDeletion = task.submission_id; // 记录当前ID，用于删除
       document.getElementById('p-task-title').textContent = "发布任务: " + task.request_name;
       const listContainer = document.getElementById('userList');
       listContainer.innerHTML = '<p style="text-align:center;width:100%;">正在加载医师列表...</p>';
@@ -792,30 +793,50 @@
       const selected = Array.from(document.querySelectorAll('input[name="targetUser"]:checked')).map(cb => cb.value);
       if (selected.length === 0) return alert("请选择至少一个医师进行发布");
 
-      const publishMode = document.getElementById('publishMode').value;
       const formData = new FormData();
       formData.append('submission_id', currentTargetTaskId);
       formData.append('target_users', JSON.stringify(selected));
-      formData.append('publish_mode', publishMode);
+      formData.append('publish_mode', 'dual'); // 固定为双阶段模式
 
       try {
         const r = await fetch('/api/edu/publish-task', { method: 'POST', body: formData });
         if (r.ok) {
             closeModal('publishModal');
             fetchTasks();
-            const modeText = publishMode === 'dual' ? '双阶段' : '单阶段';
-            alert(`✅ 发布成功（${modeText}），医师现在可以在教育模式中看到该批次。`);
+            alert(`✅ 发布成功（双阶段），医师现在可以在教育模式中看到该批次。`);
         }
       } catch (e) { alert("发布失败，请检查网络"); }
     };
 
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
     init();
-    async function openStatusDetail(taskId) {
+    async function openStatusDetail(taskId, taskStatus) {
         taskPendingDeletion = taskId; // [关键] 记录当前 ID，否则删除按钮无效
         const container = document.getElementById('sd-content');
+        const footer = document.getElementById('statusDetailFooter');
         container.innerHTML = '<p style="text-align:center; padding:20px;">正在拉取实时进度...</p>';
         document.getElementById('statusDetailModal').style.display = 'flex';
+
+        // 根据任务状态显示不同按钮
+        if (taskStatus === 'published') {
+            // 已发布任务：显示取消发布和关闭
+            footer.innerHTML = `
+                <button class="btn" style="background:#dc3545; color:white; flex:1; padding:10px; border:none; border-radius:6px; cursor:pointer;" onclick="unpublishTask()">取消发布</button>
+                <button class="btn btn-primary" style="flex:1" onclick="closeModal('statusDetailModal')">关闭</button>
+            `;
+        } else if (taskStatus === 'unreleased') {
+            // 未发布任务：显示删除、确认发布、关闭（删除在最左侧）
+            footer.innerHTML = `
+                <button class="btn" style="flex:1; background:#dc3545; color:white;" onclick="deleteEduTask()">🗑️ 删除任务</button>
+                <button class="btn btn-primary" style="flex:1; background:#10b981;" onclick="confirmPublishFromDetail('${taskId}')">确认发布</button>
+                <button class="btn btn-ghost" style="flex:1" onclick="closeModal('statusDetailModal')">关闭</button>
+            `;
+        } else {
+            // 处理中任务：只显示关闭
+            footer.innerHTML = `
+                <button class="btn btn-primary" style="flex:1" onclick="closeModal('statusDetailModal')">关闭</button>
+            `;
+        }
 
         try {
             const r = await fetch(`/api/edu/admin/task-status/${taskId}`);
@@ -835,6 +856,26 @@
                 </div>
             `).join('');
         } catch (e) { container.innerHTML = '获取失败'; }
+    }
+
+    async function confirmPublishFromDetail(taskId) {
+        // 从详情弹窗发布（简化版，不需要选择用户）
+        if (!confirm("确认发布该任务？（双阶段模式）")) return;
+        const formData = new FormData();
+        formData.append('submission_id', taskId);
+        formData.append('target_users', '[]'); // 使用之前的发布用户
+        formData.append('publish_mode', 'dual');
+        try {
+            const r = await fetch('/api/edu/publish-task', { method: 'POST', body: formData });
+            if (r.ok) {
+                alert('✅ 发布成功');
+                closeModal('statusDetailModal');
+                fetchTasks();
+            } else {
+                const err = await r.json();
+                alert('❌ ' + (err.detail || '发布失败'));
+            }
+        } catch (e) { alert('网络异常'); }
     }
 
     let currentTaskId = null;
@@ -1126,10 +1167,8 @@
       <div class="modal-card" style="max-width: 600px;">
           <h3 id="sd-title">判读进度明细</h3>
           <div id="sd-content" style="margin: 20px 0; max-height: 400px; overflow-y: auto;"></div>
-          <div class="modal-footer" style="display:flex; gap:12px; margin-top:15px;">
-            <button class="btn" style="background:#dc3545; color:white; flex:1; padding:10px; border:none; border-radius:6px; cursor:pointer;" onclick="unpublishTask()">取消发布</button>
-            <button class="btn btn-secondary" style="flex:1" onclick="deleteEduTask()">🗑️ 物理删除此任务</button>
-            <button class="btn btn-primary" style="flex:1" onclick="closeModal('statusDetailModal')">返回列表</button>
+          <div id="statusDetailFooter" class="modal-footer" style="display:flex; gap:12px; margin-top:15px;">
+            <!-- 按钮由openStatusDetail函数动态生成 -->
           </div>
       </div>
   </div>
