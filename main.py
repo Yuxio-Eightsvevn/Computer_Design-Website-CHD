@@ -995,6 +995,8 @@ async def submit_diagnosis_json(request: DiagnosisSubmitJsonRequest):
                 "accuracy": correct_count / total if total > 0 else 0,
                 "sensitivity": tp / (tp + fn) if (tp + fn) > 0 else 1.0,
                 "specificity": tn / (tn + fp) if (tn + fp) > 0 else 1.0,
+                "totalTime": request.totalTime,
+                "patientCount": request.patientCount,
                 "formatted_duration": request.totalTime.get("formatted", "0:00"),
                 "submitted_at": request.submittedAt,
                 

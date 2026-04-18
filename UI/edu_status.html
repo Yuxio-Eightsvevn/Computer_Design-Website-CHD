@@ -28,6 +28,7 @@
     .metric-item { background: #f8fafc; padding: 15px; border-radius: 10px; }
     .metric-val { font-size: 22px; font-weight: 700; color: #1e293b; }
     .metric-label { font-size: 12px; color: #64748b; margin-top: 4px; }
+    .modal-content-scroll { max-height: 80vh; overflow-y: auto; padding-right: 10px; }
   </style>
 </head>
 <body>
@@ -52,17 +53,13 @@
 
   <!-- 成绩报告弹窗 -->
   <div id="resultModal" class="modal-overlay">
-      <div class="modal-card">
-          <h2 style="color:#1e293b">🎯 教学评估报告</h2>
-          <div class="metric-grid">
-              <div class="metric-item"><div class="metric-val" id="r-acc">-</div><div class="metric-label">准确率</div></div>
-              <div class="metric-item"><div class="metric-val" id="r-sen">-</div><div class="metric-label">敏感度</div></div>
-              <div class="metric-item"><div class="metric-val" id="r-spe">-</div><div class="metric-label">特异性</div></div>
-              <div class="metric-item"><div class="metric-val" id="r-dur">-</div><div class="metric-label">总耗时</div></div>
-          </div>
-          <div style="display:flex; gap:10px;">
+      <div class="modal-card" style="display:flex; flex-direction:column; max-height:90vh;">
+          <div id="resultModalContent" class="modal-content-scroll" style="flex:1; overflow-y:auto;"></div>
+          <div style="display:flex; gap:10px; margin-top:15px; flex-shrink:0;">
               <button class="btn btn-view" style="flex:1" onclick="closeModal()">关闭</button>
               <button class="btn btn-start" style="flex:1" id="btn-re-run">重新练习</button>
+              <button class="btn btn-start" style="flex:1; display:none;" id="btn-re-run-single">重新进行单独判读</button>
+              <button class="btn btn-start" style="flex:1; display:none;" id="btn-re-run-assist">重新进行AI辅助判读</button>
           </div>
       </div>
   </div>
@@ -252,7 +249,7 @@ async function openResultModal(id, name, eduSubMode, parentId) {
     
     const modal = document.getElementById('resultModal');
     const modalCard = modal.querySelector('.modal-card');
-    modalCard.innerHTML = `
+    document.getElementById('resultModalContent').innerHTML = `
         <div style="text-align:center; padding:40px;">
             <div style="font-size:48px; animation: spin 1s linear infinite;">⚙️</div>
         </div>
@@ -309,11 +306,11 @@ async function openResultModal(id, name, eduSubMode, parentId) {
             
             // 如果有pending状态或刚触发了failed，等待分析完成
             if (singlePending || singleFailed || assistPending || assistFailed) {
-                modalCard.innerHTML = `
-                    <div style="text-align:center; padding:40px;">
-                        <div style="font-size:48px; animation: spin 1s linear infinite;">⚙️</div>
-                    </div>
-                `;
+document.getElementById('resultModalContent').innerHTML = `
+        <div style="text-align:center; padding:40px;">
+            <div style="font-size:48px; animation: spin 1s linear infinite;">⚙️</div>
+        </div>
+    `;
                 
                 // 使用更长的超时时间（60秒）用于双阶段等待
                 const originalMax = window.__maxAttempts;
@@ -364,11 +361,11 @@ async function openResultModal(id, name, eduSubMode, parentId) {
             }
         }
     } catch (e) {
-        modalCard.innerHTML = `
+        document.getElementById('resultModalContent').innerHTML = `
             <h2 style="color:#ef4444">❌ 加载失败</h2>
             <p style="color:#64748b; margin:20px 0;">无法获取报告数据: ${e.message}</p>
-            <button class="btn btn-view" style="flex:1" onclick="closeModal()">关闭</button>
         `;
+        document.getElementById('btn-re-run').style.display = 'none';
     }
 }
 
@@ -418,7 +415,7 @@ async function pollForLLMAnalysis(id, name, data) {
             // 超时且未完成，显示等待界面，提供重新触发按钮
             const modal = document.getElementById('resultModal');
             const modalCard = modal.querySelector('.modal-card');
-            modalCard.innerHTML = `
+            document.getElementById('resultModalContent').innerHTML = `
                 <div style="text-align:center; padding:40px;">
                     <div style="font-size:48px; margin-bottom:20px;">⏳</div>
                     <p style="color:#64748b; margin-bottom:20px;">AI分析超时，可选择重新触发</p>
@@ -509,7 +506,7 @@ async function pollForLLMAnalysisLong(id, name, data) {
 async function triggerAndPoll(id, name) {
     const modal = document.getElementById('resultModal');
     const modalCard = modal.querySelector('.modal-card');
-    modalCard.innerHTML = `
+    document.getElementById('resultModalContent').innerHTML = `
         <div style="text-align:center; padding:40px;">
             <div style="font-size:48px; animation: spin 1s linear infinite;">⚙️</div>
         </div>
@@ -530,7 +527,7 @@ function showBasicReport(id, name, data) {
     const isAssist = id.endsWith('_AI-ASSIST');
     const rerunLabel = isSingle ? '重新进行单独诊断' : (isAssist ? '重新进行AI辅助诊断' : '重新练习');
     
-    modalCard.innerHTML = `
+    document.getElementById('resultModalContent').innerHTML = `
         <h2 style="color:#1e293b">🎯 教学评估报告</h2>
         <p style="font-size:13px; color:#64748b; margin:5px 0;">${name}</p>
         
@@ -556,12 +553,14 @@ function showBasicReport(id, name, data) {
         <div style="margin:20px 0; padding:15px; background:#fef3c7; border-radius:8px; font-size:13px; color:#92400e;">
             ⚠️ AI深度分析报告暂未生成，请稍后再查看
         </div>
-        
-        <div style="display:flex; gap:10px;">
-            <button class="btn btn-view" style="flex:1" onclick="closeModal()">关闭</button>
-            <button class="btn btn-start" style="flex:1" onclick="rerunTask('${id}', '${name}')">${rerunLabel}</button>
-        </div>
     `;
+    
+    const rerunBtn = document.getElementById('btn-re-run');
+    rerunBtn.textContent = rerunLabel;
+    rerunBtn.onclick = () => rerunTask(id, name);
+    rerunBtn.style.display = '';
+    document.getElementById('btn-re-run-single').style.display = 'none';
+    document.getElementById('btn-re-run-assist').style.display = 'none';
 }
 
 function showCompleteReport(id, name, data) {
@@ -682,14 +681,14 @@ function showCompleteReport(id, name, data) {
         html += `</div>`;
     }
     
-    html += `
-        <div style="display:flex; gap:10px; margin-top:20px;">
-            <button class="btn btn-view" style="flex:1" onclick="closeModal()">关闭</button>
-            <button class="btn btn-start" style="flex:1" onclick="rerunTask('${id}', '${name}')">重新练习</button>
-        </div>
-    `;
+    document.getElementById('resultModalContent').innerHTML = html;
     
-    modalCard.innerHTML = html;
+    const rerunBtn = document.getElementById('btn-re-run');
+    rerunBtn.textContent = '重新练习';
+    rerunBtn.onclick = () => rerunTask(id, name);
+    rerunBtn.style.display = '';
+    document.getElementById('btn-re-run-single').style.display = 'none';
+    document.getElementById('btn-re-run-assist').style.display = 'none';
 }
 
 function rerunTask(id, name) {
@@ -797,24 +796,49 @@ function showDualStageReport(parentId, name, singleData, assistData) {
         if (radarSingleChart) { radarSingleChart.destroy(); radarSingleChart = null; }
         if (radarAssistChart) { radarAssistChart.destroy(); radarAssistChart = null; }
         
-        const labels = ['准确率', '敏感度', '特异性', '阳性检出', '效率', 'AI提升'];
+        const labels = ['准确率', '敏感度', '特异性', '病种均衡性', '诊断效率', '决策一致性'];
+        
+        // 计算病种均衡性（各病种准确率的标准差归一化）
+        const calcDiseaseBalance = (caseDetails) => {
+            if (!caseDetails || caseDetails.length === 0) return 0.5;
+            const diseaseGroups = {};
+            caseDetails.forEach(c => {
+                const disease = c.ground_truth || 'Unknown';
+                if (!diseaseGroups[disease]) diseaseGroups[disease] = { correct: 0, total: 0 };
+                diseaseGroups[disease].total++;
+                if (c.user_diagnosis === c.ground_truth) diseaseGroups[disease].correct++;
+            });
+            const accuracies = Object.values(diseaseGroups).map(g => g.total > 0 ? g.correct / g.total : 0);
+            if (accuracies.length <= 1) return 1.0;
+            const avg = accuracies.reduce((a, b) => a + b, 0) / accuracies.length;
+            const variance = accuracies.reduce((sum, acc) => sum + Math.pow(acc - avg, 2), 0) / accuracies.length;
+            const stdDev = Math.sqrt(variance);
+            return Math.max(0, 1 - stdDev * 2);
+        };
+        
+        // 计算决策一致性（与AI预测一致的比率）
+        const calcDecisionConsistency = (caseDetails) => {
+            if (!caseDetails || caseDetails.length === 0) return 0.5;
+            const consistent = caseDetails.filter(c => c.user_diagnosis === c.ai_prediction).length;
+            return consistent / caseDetails.length;
+        };
         
         // 计算各维度值（归一化到0-1）
         const singleVals = [
             (s.accuracy || 0),
             (s.sensitivity || 0),
             (s.specificity || 0),
-            Math.min(1, ((s.ai_dependency?.correct_reliance || 0) + (s.ai_dependency?.correct_independence || 0)) / 10),
+            calcDiseaseBalance(s.case_details),
             Math.min(1, s.patientCount && s.totalTime?.seconds ? (s.patientCount / (s.totalTime.seconds / 60)) / 10 : 0),
-            0.5
+            calcDecisionConsistency(s.case_details)
         ];
         const assistVals = [
             (a.accuracy || 0),
             (a.sensitivity || 0),
             (a.specificity || 0),
-            Math.min(1, ((a.ai_dependency?.correct_reliance || 0) + (a.ai_dependency?.correct_independence || 0)) / 10),
+            calcDiseaseBalance(a.case_details),
             Math.min(1, a.patientCount && a.totalTime?.seconds ? (a.patientCount / (a.totalTime.seconds / 60)) / 10 : 0),
-            (a.accuracy || 0) - (s.accuracy || 0) + 0.5
+            calcDecisionConsistency(a.case_details)
         ];
         
         const radarConfig = (ctxId, data, color) => {
@@ -916,16 +940,16 @@ function showDualStageReport(parentId, name, singleData, assistData) {
         html += `</div>`;
     }
     
-    html += `
-        <div style="display:flex; gap:10px; margin-top:20px;">
-            <button class="btn btn-view" style="flex:1" onclick="closeModal()">关闭</button>
-            <button class="btn btn-start" style="flex:1" onclick="rerunTask('${parentId}_SINGLE', '${name}_SINGLE')">重新_SINGLE</button>
-            <button class="btn btn-start" style="flex:1" onclick="rerunTask('${parentId}_AI-ASSIST', '${name}_AI-ASSIST')">重新_AI-ASSIST</button>
-        </div>
-    `;
+    document.getElementById('resultModalContent').innerHTML = html;
     
-    modalCard.innerHTML = html;
+    // For dual-stage, show/hide rerun buttons as needed
+    document.getElementById('btn-re-run').style.display = 'none';
+    document.getElementById('btn-re-run-single').style.display = '';
+    document.getElementById('btn-re-run-assist').style.display = '';
+    document.getElementById('btn-re-run-single').onclick = () => rerunTask(parentId + '_SINGLE', name);
+    document.getElementById('btn-re-run-assist').onclick = () => rerunTask(parentId + '_AI-ASSIST', name);
 }
+
   </script>
 </body>
 </html>
