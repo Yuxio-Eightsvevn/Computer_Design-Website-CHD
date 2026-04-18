@@ -39,6 +39,7 @@
     .thumb .del-single { position:absolute; top:6px; right:6px; background:rgba(0,0,0,0.6); color:white; border-radius:12px; width:24px; height:24px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
     .bottom-actions { display:flex; gap:12px; margin-top:16px; justify-content:flex-end; }
     .alert { padding:10px 12px; border-radius:8px; background:#fff3cd; color:#856404; margin-top:10px; }
+    .rows-container-wrapper { max-height: 360px; overflow-y: auto; border: 1px solid #e6eefc; border-radius: 8px; }
     @media (max-width:960px) { .container { flex-direction:column; } .sidebar { width:100%; } }
   </style>
 </head>
@@ -90,7 +91,9 @@
         </div>
         <div id="dropzone" class="dropzone">将文件或文件夹拖放到此处</div>
         <div id="messages"></div>
-        <div id="rowsContainer" class="rows"></div>
+        <div id="rowsContainerWrapper" class="rows-container-wrapper">
+          <div id="rowsContainer" class="rows"></div>
+        </div>
         <div class="bottom-actions">
           <button id="clearBtn" class="btn secondary" style="background:#94a3b8">清空</button>
           <button id="uploadBtn" class="btn">确认上传</button>
@@ -196,7 +199,11 @@
         if (anySlash) {
           const partsList = fileObjs.map(o => o.rel.split('/').filter(p => p && p !== '.'));
           
-          if (partsList.every(p => p.length >= 3)) { // CASE B1
+          if (partsList.every(p => p.length >= 3)) { // CASE B1: TaskName/patient001/video.mp4
+            // 提取任务名称（第一层目录名）
+            const taskName = partsList[0][0];
+            requestNameInput.value = taskName;
+            
             const groups = {};
             fileObjs.forEach((o, i) => {
               const cName = partsList[i][1];
@@ -210,7 +217,7 @@
               }
               staging.push(row);
             }
-          } else if (partsList.every(p => p.length === 2)) { // CASE B2
+          } else if (partsList.every(p => p.length === 2)) { // CASE B2: patient001/video.mp4
             const groups = {};
             fileObjs.forEach((o, i) => {
               const cName = partsList[i][0];
