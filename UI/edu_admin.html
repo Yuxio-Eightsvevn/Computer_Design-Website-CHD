@@ -121,9 +121,33 @@
     
     @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     @media (max-width: 1000px) { .kanban-container { grid-template-columns: 1fr; } }
+    /* 背景层 - 伪元素，最底层 */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-size: cover;
+      background-position: center;
+      opacity: 0.3;
+      z-index: -2;
+      pointer-events: none;
+    }
+    body.has-bg::before { background-image: var(--bg-image, none); }
+    /* 标题层 - 在背景上，内容下方 */
+    .title-overlay { position: fixed; top: 20px; left: 30px; z-index: -1; pointer-events: none; }
+    .title-overlay h1 { font-size: 28px; color: #1e293b; text-shadow: 2px 2px 4px rgba(255,255,255,0.8); margin: 0; }
+    .title-overlay p { font-size: 14px; color: #64748b; margin: 5px 0 0 0; }
   </style>
 </head>
 <body>
+  <!-- 标题层 -->
+  <div class="title-overlay" id="titleOverlay">
+    <h1 id="bg-title"></h1>
+    <p id="bg-subtitle"></p>
+  </div>
   <div class="container" id="mainApp">
     <div class="sidebar">
       <div class="card" style="margin-top:0">
@@ -360,6 +384,7 @@
     let currentTempId = null;
     let currentTargetTaskId = null;
     let taskPendingDeletion = null; // 记录当前弹窗选中的 ID
+    let currentModalToClose = null; // 记录当前打开的弹窗ID，用于删除后关闭
 
     async function init() {
       fetchTasks();
@@ -771,6 +796,7 @@
     async function openPublishModal(task) {
       currentTargetTaskId = task.submission_id;
       taskPendingDeletion = task.submission_id; // 记录当前ID，用于删除
+      currentModalToClose = 'publishModal'; // 记录当前弹窗，用于删除后关闭
       document.getElementById('p-task-title').textContent = "发布任务: " + task.request_name;
       const listContainer = document.getElementById('userList');
       listContainer.innerHTML = '<p style="text-align:center;width:100%;">正在加载医师列表...</p>';
@@ -812,6 +838,7 @@
     init();
     async function openStatusDetail(taskId, taskStatus) {
         taskPendingDeletion = taskId; // [关键] 记录当前 ID，否则删除按钮无效
+        currentModalToClose = 'statusDetailModal'; // 记录当前弹窗，用于删除后关闭
         const container = document.getElementById('sd-content');
         const footer = document.getElementById('statusDetailFooter');
         container.innerHTML = '<p style="text-align:center; padding:20px;">正在拉取实时进度...</p>';
@@ -1126,12 +1153,23 @@
         if (!taskPendingDeletion) return;
         if (!confirm("🚨 危险操作！\n\n这将从系统中彻底删除原始视频、AI结果及所有人的练习成绩。确认继续？")) return;
 
+        const modalId = currentModalToClose; // 保存当前弹窗ID
+        const taskId = taskPendingDeletion; // 保存当前任务ID
+        
+        // 立即禁用删除按钮，防止重复点击
+        taskPendingDeletion = null;
+        currentModalToClose = null;
+
         try {
-            const r = await fetch(`/api/edu/admin/tasks/${taskPendingDeletion}`, { method: 'DELETE' });
+            const r = await fetch(`/api/edu/admin/tasks/${taskId}`, { method: 'DELETE' });
             if (r.ok) {
-                alert("✅ 任务已彻底清除");
-                document.getElementById('statusDetailModal').style.display = 'none';
+                // 直接操作DOM关闭弹窗
+                const modal = document.getElementById(modalId);
+                if (modal) modal.style.display = 'none';
                 fetchTasks(); // 刷新看板
+            } else {
+                const err = await r.json();
+                alert("删除失败: " + (err.detail || "未知错误"));
             }
         } catch (e) { alert("网络异常，无法删除"); }
     }
@@ -1154,6 +1192,35 @@
     }
 
 
+  </script>
+  <!-- 初始化背景配置 -->
+  <script>
+    (async function initBackground() {
+      try {
+        const r = await fetch('/res/share/background_config.json');
+        const config = await r.json();
+        if (config.enabled) {
+          // 背景图控制
+          if (config.showBackground && config.image) {
+            document.body.style.setProperty('--bg-image', `url('/res/share/${config.image}')`);
+            document.body.classList.add('has-bg');
+          } else {
+            document.body.classList.remove('has-bg');
+          }
+          // 标题控制
+          if (config.showTitle) {
+            document.getElementById('bg-title').textContent = config.title || '';
+            document.getElementById('bg-subtitle').textContent = config.subtitle || '';
+            document.getElementById('titleOverlay').style.display = 'block';
+          } else {
+            document.getElementById('titleOverlay').style.display = 'none';
+          }
+        } else {
+          document.getElementById('titleOverlay').style.display = 'none';
+          document.body.classList.remove('has-bg');
+        }
+      } catch (e) { console.warn('背景配置加载失败:', e); }
+    })();
   </script>
   <!-- 全屏拦截遮罩 -->
   <div id="globalLoading" class="global-loading">

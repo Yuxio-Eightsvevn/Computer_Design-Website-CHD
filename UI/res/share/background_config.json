@@ -1,0 +1,14 @@
+{
+  "enabled": true,
+  "showBackground": true,
+  "showTitle": false,
+  "title": "儿童先心病超声诊断平台",
+  "subtitle": "Intelligent Ultrasound Diagnosis Platform",
+  "image": "BackGround1.jpeg",
+  "style": {
+    "fontSize": "28px",
+    "fontWeight": "bold",
+    "color": "#1e293b",
+    "textShadow": "2px 2px 4px rgba(255,255,255,0.8)"
+  }
+}
