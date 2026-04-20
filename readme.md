@@ -1309,6 +1309,110 @@ def update_user(user_id: int, doctor: str, organization: str,
 
 ---
 
+### 12.14 login.html 登录页面布局重构
+
+**更新内容**:
+
+应用户要求，对登录页面进行了全新布局设计：
+
+#### 新布局结构
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  Header (蓝色, 95%宽, 圆角30px, 固定高度60px)                  │
+│  [header.title]                                             │
+├──────────────────────────────────────────────────────────────┤
+│  TitleField (90%宽, max-width:1440px, 白色背景, 圆角16px)    │
+│  ┌────────────────────────┬───────────────────────────────┐ │
+│  │    左栏(60%): 图片      │  右栏(40%):                    │ │
+│  │   titleField.image     │  • welcomeText (淡色)         │ │
+│  │   (max-height: 390px)  │  • mainTitle (50px粗体)       │ │
+│  │                        │  • subtitle (蓝色)           │ │
+│  │                        │  • description (介绍文本)      │ │
+│  │                        │  • loginButtonText            │ │
+│  └────────────────────────┴───────────────────────────────┘ │
+│                                                                │
+│  Keywords (横向排列, 圆角药片样式)                              │
+├──────────────────────────────────────────────────────────────┤
+│  MainContent (90%宽, max-width:1440px)                       │
+│  ┌──────────────────────────────────────────────────────────┐│
+│  │  轮播图 (100%宽, 高度455px, 圆角16px)                    ││
+│  └──────────────────────────────────────────────────────────┘│
+│  ┌──────────────────────────────────────────────────────────┐│
+│  │  核心功能 (3列白色卡片)                                  ││
+│  └──────────────────────────────────────────────────────────┘│
+└──────────────────────────────────────────────────────────────┘
+```
+
+#### login_config.json 新结构
+
+```json
+{
+  "header": {
+    "title": "CHD-AIDE"
+  },
+  "titleField": {
+    "image": "res/admin/images/pic_01.png",
+    "welcomeText": "欢迎来到CHD-AIDE平台官方网站",
+    "mainTitle": "CHD-AIDE",
+    "subtitle": "推理辅助与教育平台",
+    "description": "CHD-AIDE是一款专注于儿童先天性心脏病诊断...",
+    "loginButtonText": "点击登录"
+  },
+  "keywords": [
+    { "text": "精准诊断" },
+    { "text": "智能辅助" }
+  ],
+  "background": "",
+  "carousel": { "enabled": true },
+  "features": [...]
+}
+```
+
+#### 配置说明
+
+| 字段 | 说明 | 可为空 |
+|------|------|--------|
+| header.title | Header区域显示的标题文字 | 否 |
+| titleField.image | 左侧图片路径 | 可(使用默认图) |
+| titleField.welcomeText | 欢迎文本(淡色) | 否 |
+| titleField.mainTitle | 主标题(深色粗体) | 否 |
+| titleField.subtitle | 副标题(蓝色) | 否 |
+| titleField.description | 介绍文本 | 否 |
+| titleField.loginButtonText | 登录按钮文字 | 否 |
+| keywords | 关键词列表(横向排列) | 可(留空则不显示) |
+| background | 背景图片路径 | 可(留空则不显示背景) |
+| carousel.enabled | 是否显示轮播图 | 可(默认true) |
+| features | 核心功能列表 | 否 |
+
+#### 设计规范
+
+| 属性 | 值 |
+|------|-----|
+| 最大内容宽度 | 1440px (增加20%) |
+| Header高度 | 60px |
+| Header圆角 | 30px |
+| TitleField内边距 | 52px (增加30%) |
+| TitleField圆角 | 16px |
+| TitleField图片最大高度 | 390px (增加30%) |
+| 轮播图高度 | 455px (增加30%) |
+| 欢迎文本字体 | 16px, letter-spacing: 1px |
+| 主标题字体 | 50px, 800 weight, letter-spacing: 4px |
+| 副标题字体 | 20px, letter-spacing: 2px |
+| 介绍文本字体 | 15px, line-height: 2, letter-spacing: 0.5px |
+| 按钮内边距 | 18px 50px |
+| 按钮圆角 | 30px |
+| 按钮字体 | 18px |
+| 关键词药片圆角 | 25px |
+
+**相关文件**:
+| 文件 | 修改内容 |
+|------|----------|
+| login.html | 全新布局结构、CSS样式、JS渲染逻辑 |
+| login_config.json | 重构JSON结构，支持独立配置 |
+
+---
+
 ## 十三、协定的再次确认
 
 作为编程助手，我承诺遵循以下协定：
@@ -1329,4 +1433,4 @@ def update_user(user_id: int, doctor: str, organization: str,
 ---
 
 *文档版本: 2026-04-20*
-*最后更新: 2026-04-20 - 添加UI界面放大改进*
+*最后更新: 2026-04-20 - 添加login.html布局重构 + UI界面放大改进*

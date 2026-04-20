@@ -9,6 +9,67 @@
 
 # claude 留言
 
+## 2026-04-20 11:30 - 修复关键帧字段名不匹配问题
+
+### 🔧 修复内容:
+
+#### 问题发现:
+用户报告：关键帧的高亮总是在中间帧，没有使用metadata.json中的关键帧索引。
+
+#### 根本原因:
+前端代码读取的是`key_frame_index`字段，但后端Python代码生成confidence_scores.json时，保存的字段名是`predicted_key_frame_index`，导致字段名不匹配。
+
+**后端保存的字段**:
+```json
+{
+  "predicted_key_frame_index": 10,
+  "confidence_scores": {...}
+}
+```
+
+**前端原代码**:
+```javascript
+if (metadata.key_frame_index !== undefined && metadata.key_frame_index !== null) {
+    highlightFrame = metadata.key_frame_index;  // 读取不到！
+}
+```
+
+#### 解决方案:
+在前端代码中同时兼容两个字段名：`key_frame_index` 和 `predicted_key_frame_index`
+
+**修复后的代码**:
+```javascript
+if (metadata.key_frame_index !== undefined && metadata.key_frame_index !== null) {
+    highlightFrame = metadata.key_frame_index;
+    console.log(`✅ 从metadata获取关键帧索引: ${highlightFrame}`);
+} else if (metadata.predicted_key_frame_index !== undefined && metadata.predicted_key_frame_index !== null) {
+    highlightFrame = metadata.predicted_key_frame_index;
+    console.log(`✅ 从metadata获取关键帧索引(predicted_key_frame_index): ${highlightFrame}`);
+}
+```
+
+#### 验证:
+- ✅ 同时支持`key_frame_index`字段（标准格式）
+- ✅ 同时支持`predicted_key_frame_index`字段（后端生成的格式）
+- ✅ 如果两个字段都不存在，自动降级到中间帧
+- ✅ 控制台会显示具体的字段来源
+
+#### 字段读取优先级:
+1. `key_frame_index` - 优先读取（标准格式）
+2. `predicted_key_frame_index` - 备选读取（兼容后端格式）
+3. `actualFrameCount / 2` - 默认使用中间帧（降级处理）
+
+#### 使用说明:
+修复后自动生效，无需额外操作：
+1. 刷新浏览器页面
+2. 打开视频弹窗
+3. 系统会自动读取metadata.json中的关键帧索引
+4. 控制台会显示"从metadata获取关键帧索引"
+
+---
+
+# claude 留言
+
 ## 2026-01-18 13:25 - 修复关键帧高亮从metadata.json读取问题
 
 ### 🔧 修复内容:

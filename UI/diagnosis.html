@@ -2186,6 +2186,9 @@
                                 if (metadata.key_frame_index !== undefined && metadata.key_frame_index !== null) {
                                     highlightFrame = metadata.key_frame_index;
                                     console.log(`✅ 从metadata获取关键帧索引: ${highlightFrame}`);
+                                } else if (metadata.predicted_key_frame_index !== undefined && metadata.predicted_key_frame_index !== null) {
+                                    highlightFrame = metadata.predicted_key_frame_index;
+                                    console.log(`✅ 从metadata获取关键帧索引(predicted_key_frame_index): ${highlightFrame}`);
                                 } else {
                                     console.warn('⚠️ metadata中没有key_frame_index字段，使用默认值');
                                 }

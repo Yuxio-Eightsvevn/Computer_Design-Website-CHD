@@ -1,160 +1,190 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>登录 - 儿童先心病智能诊断平台</title>
+    <title>登录 - CHD-AIDE</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="res/admin/css/main.css">
     <style>
-        #header .top-right {
-            display: none;
+        :root {
+            --primary-color: #3a7bd5;
+            --primary-dark: #3069b4;
+            --text-light: #888;
+            --text-dark: #333;
+            --bg-light: #f5f7fa;
+            --max-width: 1440px;
         }
-        #header .click-login {
-            margin-top: 20px;
-            padding: 18px 50px;
-            font-size: 19px;
-            background: #3a7bd5 !important;
-            color: white !important;
+
+        body {
+            background: var(--bg-light);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px 0;
         }
-        #header > .container {
-            border-bottom: none !important;
-            box-shadow: none !important;
-        }
-        #content > article:first-child {
-            border-top: none !important;
-            box-shadow: none !important;
-        }
-        #header h1 {
-            color: #3a7bd5 !important;
-        }
-        #header p {
-            color: #555 !important;
-        }
-        h3#featuresTitle {
-            color: #333 !important;
-        }
-        .feature .box p {
-            color: #555 !important;
-        }
-        #tagline {
-            color: #333 !important;
-        }
-        section.box h3 {
-            color: #3a7bd5 !important;
-        }
-        section.box header {
-            border-bottom: 1px solid #ddd;
-            padding-bottom: 5px;
-            margin-bottom: 5px;
-        }
-        section.box p {
-            color: #444 !important;
-            margin: 0 5px;
-        }
-        .login-modal {
-            display: none;
+
+        /* 背景层 */
+        body::before {
+            content: '';
             position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.5);
-            z-index: 1000;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-size: cover;
+            background-position: center;
+            opacity: 0.3;
+            z-index: -2;
+            pointer-events: none;
+        }
+        body.has-bg::before { background-image: var(--bg-image, none); }
+        body.has-bg { background: #f5f7fa; }
+
+        /* Header */
+        .header {
+            width: 95%;
+            max-width: var(--max-width);
+            height: 60px;
+            background: linear-gradient(135deg, var(--primary-color) 0%, #5a9bd4 100%);
+            border-radius: 30px;
+            display: flex;
+            align-items: center;
+            padding: 0 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 20px rgba(58, 123, 213, 0.3);
+        }
+        .header-title {
+            color: white;
+            font-size: 22px;
+            font-weight: 600;
+            letter-spacing: 1px;
+        }
+
+        /* TitleField */
+        .title-field {
+            width: 90%;
+            max-width: var(--max-width);
+            display: flex;
+            gap: 40px;
+            margin-bottom: 30px;
+            background: white;
+            border-radius: 16px;
+            padding: 52px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+        .title-field-left {
+            flex: 0 0 60%;
+            display: flex;
             align-items: center;
             justify-content: center;
         }
-        .login-modal.show { display: flex; }
-        .login-modal-card {
-            background: white;
-            padding: 40px;
-            border-radius: 8px;
-            width: 360px;
-            max-width: 90%;
-            position: relative;
+        .title-field-left img {
+            max-width: 100%;
+            max-height: 390px;
+            border-radius: 12px;
+            object-fit: cover;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
         }
-        .login-modal-card .close-btn {
-            position: absolute;
-            top: 12px;
-            right: 15px;
-            background: transparent !important;
-            border: none !important;
-            box-shadow: none !important;
-            -webkit-box-shadow: none !important;
-            font-size: 14px;
-            cursor: pointer;
-            color: #333 !important;
-            padding: 5px 10px;
-            text-shadow: none !important;
-            outline: none !important;
-            display: inline-block;
+        .title-field-right {
+            flex: 0 0 40%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
         }
-        .login-modal-card .close-btn:visited,
-        .login-modal-card .close-btn:focus,
-        .login-modal-card .close-btn:active {
-            background: transparent !important;
-            border: none !important;
-            box-shadow: none !important;
-            color: #333 !important;
+        .welcome-text {
+            color: var(--text-light);
+            font-size: 16px;
+            margin-bottom: 20px;
+            letter-spacing: 1px;
         }
-        .login-modal-card .close-btn:hover { color: #333; }
-        .login-modal-card h2 {
+        .main-title {
+            color: var(--text-dark);
+            font-size: 50px;
+            font-weight: 800;
+            margin: 0 0 8px 0;
+            letter-spacing: 4px;
+        }
+        .subtitle {
+            color: var(--primary-color);
+            font-size: 20px;
+            font-weight: 500;
             margin-bottom: 25px;
-            text-align: center;
-            font-size: 22px;
+            letter-spacing: 2px;
         }
-        .login-modal-card .form-group {
-            margin-bottom: 18px;
+        .description-text {
+            color: var(--text-light);
+            font-size: 15px;
+            line-height: 2;
+            margin-bottom: 30px;
+            letter-spacing: 0.5px;
         }
-        .login-modal-card .form-group label {
-            display: block;
-            margin-bottom: 6px;
-            font-size: 14px;
-        }
-        .login-modal-card .form-group input {
-            width: 100%;
-            padding: 10px 12px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 14px;
-        }
-        .login-modal-card .form-group input:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-        .login-modal-card .login-btn {
-            width: 100%;
-            padding: 14px 24px;
-            background: #3a7bd5;
+        .login-btn-title {
+            padding: 18px 50px;
+            background: var(--primary-color);
             color: white;
             border: none;
-            border-radius: 4px;
-            font-size: 16px;
+            border-radius: 30px;
+            font-size: 18px;
+            font-weight: 600;
             cursor: pointer;
-            margin-top: 10px;
+            align-self: center;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(58, 123, 213, 0.3);
         }
-        .login-modal-card .login-btn:hover { background: #3069b4; }
-        .login-modal-card .login-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-        .login-modal-card .error-msg {
-            background: #fdf0f0;
-            color: #c00;
-            padding: 10px;
-            border-radius: 4px;
-            margin-bottom: 15px;
-            font-size: 13px;
-            display: none;
+        .login-btn-title:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(58, 123, 213, 0.4);
         }
-        .login-modal-card .error-msg.show { display: block; }
 
-        /* 轮播图样式 */
+        /* Keywords */
+        .keywords-section {
+            width: 90%;
+            max-width: var(--max-width);
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-bottom: 40px;
+            flex-wrap: wrap;
+        }
+        .keyword-item {
+            padding: 12px 25px;
+            background: white;
+            border-radius: 25px;
+            font-size: 15px;
+            color: var(--primary-color);
+            font-weight: 500;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+            border: 1px solid #e8eef5;
+            transition: all 0.3s ease;
+        }
+        .keyword-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(58, 123, 213, 0.2);
+            border-color: var(--primary-color);
+        }
+
+        /* MainContent */
+        .main-content {
+            width: 90%;
+            max-width: var(--max-width);
+        }
+
+        /* 轮播图 */
         .carousel-container {
             width: 100%;
-            max-width: 800px;
-            margin: 0 auto 30px;
+            margin-bottom: 30px;
         }
         .carousel-viewport {
             position: relative;
             width: 100%;
-            height: 400px;
+            height: 455px;
             perspective: 1000px;
             overflow: hidden;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
         }
         .carousel-stack {
             position: relative;
@@ -167,7 +197,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            border-radius: 8px;
+            border-radius: 16px;
             overflow: hidden;
             transition: transform 0.6s ease, opacity 0.6s ease;
             cursor: pointer;
@@ -209,59 +239,175 @@
             transition: all 0.3s ease;
         }
         .carousel-dot.active {
-            background: #333;
+            background: var(--primary-color);
             width: 24px;
         }
         .carousel-dot:hover {
-            background: #666;
+            background: var(--primary-color);
         }
+
+        /* 核心功能 */
+        .features-title {
+            color: var(--text-dark);
+            font-size: 24px;
+            font-weight: 600;
+            text-align: center;
+            margin-bottom: 25px;
+        }
+        .features-row {
+            display: flex;
+            gap: 20px;
+        }
+        .feature-card {
+            flex: 1;
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+            text-align: center;
+        }
+        .feature-card h3 {
+            color: var(--primary-color);
+            font-size: 18px;
+            margin-bottom: 12px;
+        }
+        .feature-card p {
+            color: var(--text-light);
+            font-size: 14px;
+            line-height: 1.6;
+            margin: 0;
+        }
+
+        /* 登录弹窗 */
+        .login-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .login-modal.show { display: flex; }
+        .login-modal-card {
+            background: white;
+            padding: 40px;
+            border-radius: 16px;
+            width: 380px;
+            max-width: 90%;
+            position: relative;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .login-modal-card .close-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: transparent;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: #999;
+            padding: 5px 10px;
+            transition: color 0.3s;
+        }
+        .login-modal-card .close-btn:hover { color: #333; }
+        .login-modal-card h2 {
+            margin-bottom: 25px;
+            text-align: center;
+            font-size: 24px;
+            color: var(--text-dark);
+        }
+        .login-modal-card .form-group {
+            margin-bottom: 18px;
+        }
+        .login-modal-card .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: var(--text-dark);
+        }
+        .login-modal-card .form-group input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 15px;
+            transition: border-color 0.3s;
+        }
+        .login-modal-card .form-group input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+        .login-modal-card .login-btn {
+            width: 100%;
+            padding: 14px 24px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: background 0.3s;
+        }
+        .login-modal-card .login-btn:hover { background: var(--primary-dark); }
+        .login-modal-card .login-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .login-modal-card .error-msg {
+            background: #fdf0f0;
+            color: #c00;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-size: 14px;
+            display: none;
+            text-align: center;
+        }
+        .login-modal-card .error-msg.show { display: block; }
     </style>
 </head>
 <body class="no-sidebar is-preload">
-    <div id="page-wrapper">
+    <!-- Header -->
+    <header class="header">
+        <span class="header-title" id="headerTitle"></span>
+    </header>
 
-        <!-- Header -->
-        <section id="header">
-            <div class="container" style="position: relative;">
-                <h1 id="logo"></h1>
-                <p id="subtitle"></p>
-                <button class="button click-login" id="btnBelow" onclick="openLoginModal()"></button>
-                <div class="top-right">
-                    <a href="#" class="button" id="btnTopRight" onclick="openLoginModal()"></a>
-                </div>
+    <!-- TitleField -->
+    <section class="title-field">
+        <div class="title-field-left">
+            <img id="titleImage" src="res/admin/images/pic_01.png" alt="平台图片">
+        </div>
+        <div class="title-field-right">
+            <p class="welcome-text" id="welcomeText"></p>
+            <h1 class="main-title" id="mainTitle"></h1>
+            <p class="subtitle" id="subtitle"></p>
+            <p class="description-text" id="descriptionText"></p>
+            <button class="login-btn-title" id="loginBtnTitle" onclick="openLoginModal()"></button>
+        </div>
+    </section>
+
+    <!-- Keywords -->
+    <section class="keywords-section" id="keywordsSection"></section>
+
+    <!-- MainContent -->
+    <main class="main-content">
+        <!-- 轮播图 -->
+        <div class="carousel-container">
+            <div class="carousel-viewport">
+                <div class="carousel-stack" id="carouselStack"></div>
             </div>
-        </section>
+            <div class="carousel-dots" id="carouselDots"></div>
+        </div>
 
-        <!-- Main -->
-        <section id="main">
-            <div class="container">
-                <div id="content">
-                    <article class="box post">
-                        <header>
-                            <h2 id="tagline" style="font-size:24px;"></h2>
-                        </header>
-
-                        <!-- 轮播图 -->
-                        <div class="carousel-container">
-                            <div class="carousel-viewport">
-                                <div class="carousel-stack" id="carouselStack"></div>
-                            </div>
-                            <div class="carousel-dots" id="carouselDots"></div>
-                        </div>
-
-                        <h3 id="featuresTitle">核心功能</h3>
-                        <div class="row" id="featuresRow"></div>
-                    </article>
-                </div>
-            </div>
-        </section>
-
-    </div>
+        <!-- 核心功能 -->
+        <h2 class="features-title" id="featuresTitle">核心功能</h2>
+        <div class="features-row" id="featuresRow"></div>
+    </main>
 
     <!-- Login Modal -->
     <div class="login-modal" id="loginModal">
         <div class="login-modal-card">
-            <span class="close-btn" onclick="closeLoginModal()">关闭</span>
+            <span class="close-btn" onclick="closeLoginModal()">&times;</span>
             <h2>登录</h2>
             <div class="error-msg" id="loginError"></div>
             <div class="form-group">
@@ -292,6 +438,7 @@
                 var resp = await fetch('UI/login_config.json');
                 config = await resp.json();
                 renderContent();
+                applyBackground();
             } catch (e) {
                 console.error('加载配置失败:', e);
             }
@@ -305,6 +452,69 @@
                 startAutoPlay();
             } catch (e) {
                 console.error('加载轮播图片失败:', e);
+            }
+        }
+
+        function applyBackground() {
+            if (config.background && config.background.trim() !== '') {
+                document.body.classList.add('has-bg');
+                document.body.style.setProperty('--bg-image', 'url(' + config.background + ')');
+            } else {
+                document.body.classList.remove('has-bg');
+            }
+        }
+
+        function renderContent() {
+            // Header
+            if (config.header && config.header.title) {
+                document.getElementById('headerTitle').textContent = config.header.title;
+            }
+
+            // TitleField
+            if (config.titleField) {
+                var tf = config.titleField;
+                if (tf.image) {
+                    document.getElementById('titleImage').src = tf.image;
+                }
+                if (tf.welcomeText) {
+                    document.getElementById('welcomeText').textContent = tf.welcomeText;
+                }
+                if (tf.mainTitle) {
+                    document.getElementById('mainTitle').textContent = tf.mainTitle;
+                }
+                if (tf.subtitle) {
+                    document.getElementById('subtitle').textContent = tf.subtitle;
+                }
+                if (tf.description) {
+                    document.getElementById('descriptionText').textContent = tf.description;
+                }
+                if (tf.loginButtonText) {
+                    document.getElementById('loginBtnTitle').textContent = tf.loginButtonText;
+                }
+            }
+
+            // Keywords
+            var keywordsSection = document.getElementById('keywordsSection');
+            if (config.keywords && keywordsSection) {
+                keywordsSection.innerHTML = config.keywords.map(function(k) {
+                    return '<div class="keyword-item">' + k.text + '</div>';
+                }).join('');
+            }
+
+            // Features
+            var featuresRow = document.getElementById('featuresRow');
+            if (config.features && featuresRow) {
+                featuresRow.innerHTML = config.features.map(function(f) {
+                    return '<div class="feature-card">' +
+                        '<h3>' + f.title + '</h3>' +
+                        '<p>' + f.description + '</p>' +
+                    '</div>';
+                }).join('');
+            }
+
+            // Document title
+            if (config.header && config.header.title) {
+                document.title = '登录 - ' + config.header.title;
             }
         }
 
@@ -373,32 +583,6 @@
         function startAutoPlay() {
             if (carouselInterval) clearInterval(carouselInterval);
             carouselInterval = setInterval(nextSlide, 5000);
-        }
-
-        function renderContent() {
-            if (config.platform) {
-                document.title = '登录 - ' + config.platform.name;
-                document.getElementById('logo').textContent = config.platform.name;
-                document.getElementById('subtitle').textContent = config.platform.subtitle;
-                document.getElementById('tagline').innerHTML = config.platform.tagline + '<br />' + (config.platform.tagline2 || '');
-            }
-
-            if (config.buttons) {
-                document.getElementById('btnTopRight').textContent = config.buttons.topRight || '医师入口';
-                document.getElementById('btnBelow').textContent = config.buttons.titleBelow || '点击登录';
-            }
-
-            var featuresRow = document.getElementById('featuresRow');
-            if (config.features && featuresRow) {
-                featuresRow.innerHTML = config.features.map(function(f) {
-                    return '<div class="col-4 col-12-small">' +
-                        '<section class="box">' +
-                            '<header><h3>' + f.title + '</h3></header>' +
-                            '<p>' + f.description + '</p>' +
-                        '</section>' +
-                    '</div>';
-                }).join('');
-            }
         }
 
         function openLoginModal() {
