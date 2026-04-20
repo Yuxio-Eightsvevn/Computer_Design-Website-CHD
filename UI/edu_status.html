@@ -11,13 +11,13 @@
     .container { max-width: 1200px; margin: 30px auto; padding: 0 20px; display: flex; gap: 16px; align-items: flex-start; }
     .sidebar { width: 240px; flex-shrink: 0; }
     .main { flex: 1; }
-    .navbar { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 15px 25px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; }
+    .navbar { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 20px 30px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; }
     .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); margin-top: 20px; }
-    .task-card { background: white; border-radius: 10px; padding: 18px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #e2e8f0; transition: all 0.2s; }
+    .task-card { background: white; border-radius: 10px; padding: 24px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #e2e8f0; transition: all 0.2s; }
     .task-card:hover { border-color: #10b981; transform: translateX(5px); }
     .task-card.completed { border-left: 5px solid #10b981; }
     .task-card.pending { border-left: 5px solid #f59e0b; }
-    .btn { padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; font-size: 13px; }
+    .btn { padding: 12px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; font-size: 16px; }
     .btn-start { background: #10b981; color: white; }
     .btn-view { background: #f1f5f9; color: #475569; }
     .score-badge { font-size: 20px; font-weight: 800; color: #10b981; }
@@ -27,7 +27,7 @@
     .metric-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin: 20px 0; }
     .metric-item { background: #f8fafc; padding: 15px; border-radius: 10px; }
     .metric-val { font-size: 22px; font-weight: 700; color: #1e293b; }
-    .metric-label { font-size: 12px; color: #64748b; margin-top: 4px; }
+    .metric-label { font-size: 14px; color: #64748b; margin-top: 4px; }
     .modal-content-scroll { max-height: 80vh; overflow-y: auto; padding-right: 10px; }
     /* 背景层 - 伪元素，最底层 */
     body::before {
@@ -61,10 +61,10 @@
         <div class="card" style="margin-top:0">
             <div style="display:flex;align-items:center;gap:10px;">
               <div id="avatar" style="width:48px;height:48px;border-radius:24px;background:#ecfdf5;display:flex;align-items:center;justify-content:center;color:#10b981; font-weight:700;">U</div>
-              <div><div id="u-name" style="font-weight:700">加载中...</div><div id="currentUserOrg" style="font-size:12px;color:#666">...</div></div>
+              <div><div id="u-name" style="font-weight:700">加载中...</div><div id="currentUserOrg" style="font-size:14px;color:#666">...</div></div>
             </div>
             <hr style="margin:12px 0;border:none;border-top:1px solid #f1f5f9;">
-            <p style="font-size:12px; color:#64748b; line-height:1.6">点击“开始判读”进行练习。完成后可查收详细评估报告，包含准确率、敏感度等指标。</p>
+            <p style="font-size:14px; color:#64748b; line-height:1.6">点击“开始判读”进行练习。完成后可查收详细评估报告，包含准确率、敏感度等指标。</p>
         </div>
     </div>
     <div class="main">
@@ -197,14 +197,14 @@ async function fetchEduTasks() {
                     
                     div.innerHTML = `
                         <div>
-                            <div style="font-weight:700;">${t.request_name}</div>
-                            <div style="font-size:12px; color:#64748b; margin-top:4px;">
+                            <div style="font-size:16px; font-weight:700;">${t.request_name}</div>
+                            <div style="font-size:15px; color:#64748b; margin-top:4px;">
                                 病例: ${t.request_case_cnt} | 视频: ${t.request_video_cnt} | 
                                 ${bothDone ? '✅ 已完成(双阶段)' : (singleDone || assistDone ? '🔄 进行中' : '⏳ 待开始')}
                             </div>
                         </div>
                         <div style="display:flex; flex-direction:column; gap:8px; align-items:center;">
-                            <button class="btn ${singleDone ? 'btn-view' : 'btn-start'}" style="width:120px;" onclick="handleTask('${t.submission_id}_SINGLE', '${t.request_name}_SINGLE', ${singleDone}, 'single', '${t.submission_id}')">
+                            <button class="btn ${singleDone ? 'btn-view' : 'btn-start'}" style="width:140px;" onclick="handleTask('${t.submission_id}_SINGLE', '${t.request_name}_SINGLE', ${singleDone}, 'single', '${t.submission_id}')">
                                 ${singleDone ? '✅ 已完成' : '单独判读'}
                             </button>
                             <button class="btn ${assistDone ? 'btn-view' : 'btn-start'}" style="width:120px; ${!singleDone ? 'opacity:0.5;cursor:not-allowed;' : ''}" ${!singleDone ? 'disabled' : ''} onclick="${!singleDone ? '' : `handleTask('${t.submission_id}_AI-ASSIST', '${t.request_name}_AI-ASSIST', ${assistDone}, 'assist', '${t.submission_id}')`}">
@@ -216,8 +216,8 @@ async function fetchEduTasks() {
                 } else {
                     // 普通任务显示
                     div.innerHTML = `
-                        <div><div style="font-weight:700;">${t.request_name}</div>
-                            <div style="font-size:12px; color:#64748b; margin-top:4px;">
+                        <div><div style="font-size:16px; font-weight:700;">${t.request_name}</div>
+                            <div style="font-size:15px; color:#64748b; margin-top:4px;">
                                 病例: ${t.request_case_cnt} | 
                                 视频: ${t.request_video_cnt} | 
                                 ${t.is_completed ? '✅ 已评估' : '⏳ 待判读'}
@@ -626,7 +626,7 @@ function showCompleteReport(id, name, data) {
             html += `
                 <div style="margin-bottom:15px; padding:12px; background:#f8fafc; border-radius:8px; border-left:4px solid ${aiCorrect && userCorrect ? '#10b981' : (aiCorrect ? '#f59e0b' : '#ef4444')};">
                     <div style="font-weight:600; margin-bottom:5px;">${c.video_name || '病例'}</div>
-                    <div style="font-size:12px; line-height:1.6;">
+                    <div style="font-size:14px; line-height:1.6;">
                         <div>👤 您的诊断: <strong>${c.user_diagnosis || '-'}</strong> ${userCorrect ? '✅' : '❌'}</div>
                         <div>🤖 AI诊断: <strong>${c.ai_prediction || '-'}</strong> ${aiCorrect ? '✅' : '❌'}</div>
                         <div>📋 正确答案: <strong>${c.ground_truth || '-'}</strong></div>
@@ -650,25 +650,25 @@ function showCompleteReport(id, name, data) {
                 <div style="display:flex; gap:10px; justify-content:space-between;">
                     <div style="flex:1; padding:12px; background:#ecfdf5; border-radius:8px; text-align:center;">
                         <div style="font-size:20px; margin-bottom:5px;">✅</div>
-                        <div style="font-size:12px; color:#065f46; font-weight:600;">正确依赖</div>
+                        <div style="font-size:14px; color:#065f46; font-weight:600;">正确依赖</div>
                         <div style="font-size:18px; font-weight:700; color:#059669;">${data.ai_dependency.correct_reliance || 0}</div>
                         <div style="font-size:10px; color:#065f46;">AI正确+您正确</div>
                     </div>
                     <div style="flex:1; padding:12px; background:#fffbeb; border-radius:8px; text-align:center;">
                         <div style="font-size:20px; margin-bottom:5px;">⚠️</div>
-                        <div style="font-size:12px; color:#92400e; font-weight:600;">依赖不足</div>
+                        <div style="font-size:14px; color:#92400e; font-weight:600;">依赖不足</div>
                         <div style="font-size:18px; font-weight:700; color:#d97706;">${data.ai_dependency.insufficient_reliance || 0}</div>
                         <div style="font-size:10px; color:#92400e;">AI正确+您错误</div>
                     </div>
                     <div style="flex:1; padding:12px; background:#eff6ff; border-radius:8px; text-align:center;">
                         <div style="font-size:20px; margin-bottom:5px;">💪</div>
-                        <div style="font-size:12px; color:#1e40af; font-weight:600;">正确独立</div>
+                        <div style="font-size:14px; color:#1e40af; font-weight:600;">正确独立</div>
                         <div style="font-size:18px; font-weight:700; color:#2563eb;">${data.ai_dependency.correct_independence || 0}</div>
                         <div style="font-size:10px; color:#1e40af;">AI错误+您正确</div>
                     </div>
                     <div style="flex:1; padding:12px; background:#fef2f2; border-radius:8px; text-align:center;">
                         <div style="font-size:20px; margin-bottom:5px;">❌</div>
-                        <div style="font-size:12px; color:#991b1b; font-weight:600;">过度依赖</div>
+                        <div style="font-size:14px; color:#991b1b; font-weight:600;">过度依赖</div>
                         <div style="font-size:18px; font-weight:700; color:#dc2626;">${data.ai_dependency.over_reliance || 0}</div>
                         <div style="font-size:10px; color:#991b1b;">AI错误+您错误</div>
                     </div>
@@ -695,7 +695,7 @@ function showCompleteReport(id, name, data) {
             html += `
                 <div style="margin-top:10px;">
                     <strong style="font-size:13px;">💡 改进建议</strong>
-                    <ul style="margin:5px 0; padding-left:20px; font-size:12px; text-align:left; list-style-type:disc;">
+                    <ul style="margin:5px 0; padding-left:20px; font-size:14px; text-align:left; list-style-type:disc;">
                         ${analysis.improvement_suggestions.map(s => `<li style="margin:3px 0;">${s}</li>`).join('')}
                     </ul>
                 </div>
@@ -751,7 +751,7 @@ function showDualStageReport(parentId, name, singleData, assistData) {
         <h2 style="color:#1e293b">📊 双阶段诊断对比报告</h2>
         <p style="color:#64748b; margin:10px 0;">${name}</p>
         
-        <div style="display:flex; gap:10px; margin:15px 0; font-size:12px;">
+        <div style="display:flex; gap:10px; margin:15px 0; font-size:14px;">
             <div style="flex:1; padding:10px; background:#f0f9ff; border-radius:8px; text-align:center;">
                 <div style="font-weight:700; color:#1e293b;">_SINGLE (单独判读)</div>
                 <div style="font-size:24px; font-weight:700; color:#667eea;">${((s.accuracy || 0)*100).toFixed(1)}%</div>
@@ -771,7 +771,7 @@ function showDualStageReport(parentId, name, singleData, assistData) {
         
         <div style="text-align:left; margin-top:15px;">
             <h3 style="font-size:14px; color:#1e293b; margin-bottom:10px;">📈 性能对比</h3>
-            <table style="width:100%; font-size:12px; border-collapse:collapse;">
+            <table style="width:100%; font-size:14px; border-collapse:collapse;">
                 <tr style="background:#f8fafc;">
                     <th style="padding:8px; text-align:left; border:1px solid #e2e8f0;">指标</th>
                     <th style="padding:8px; text-align:center; border:1px solid #e2e8f0;">_SINGLE</th>
@@ -955,7 +955,7 @@ function showDualStageReport(parentId, name, singleData, assistData) {
             html += `
                 <div style="margin-top:10px;">
                     <strong style="font-size:13px;">💡 改进建议</strong>
-                    <ul style="margin:5px 0; padding-left:20px; font-size:12px; text-align:left; list-style-type:disc;">
+                    <ul style="margin:5px 0; padding-left:20px; font-size:14px; text-align:left; list-style-type:disc;">
                         ${analysis.improvement_suggestions.map(x => `<li style="margin:3px 0;">${x}</li>`).join('')}
                     </ul>
                 </div>

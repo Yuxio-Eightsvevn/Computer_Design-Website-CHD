@@ -317,12 +317,12 @@
         }
 
         .option-btn {
-            padding: 12px 16px;
+            padding: 16px 24px;
             border: 2px solid #e9ecef;
             background: white;
             border-radius: 8px;
             cursor: pointer;
-            font-size: 14px;
+            font-size: 16px;
             font-weight: 500;
             color: #495057;
             transition: all 0.3s ease;
@@ -545,7 +545,7 @@
         }
 
         .confidence-label {
-            font-size: 12px;
+            font-size: 18px;
             font-weight: 600;
             color: #2d3748;
             min-width: 55px;
@@ -554,14 +554,14 @@
 
         .confidence-bar {
             flex: 1;
-            height: 8px;
+            height: 18px;
             background: #e9ecef;
             border-radius: 4px;
             overflow: hidden;
         }
 
         .confidence-value {
-            font-size: 11px;
+            font-size: 14px;
             font-weight: 700;
             color: #667eea;
             min-width: 40px;
@@ -1114,21 +1114,21 @@
                     <span class="timer-text" id="timerText">00:00</span>
                 </div>
 
-                <!-- 模态切换 -->
-                <div class="diagnosis-group">
-                    <div class="group-label">诊断模态:</div>
-                    <div class="diagnosis-options" style="grid-template-columns: repeat(3, 1fr);">
-                        <button class="option-btn active" onclick="selectOption(this, 'modality')">普通</button>
-                        <button class="option-btn" onclick="selectOption(this, 'modality')">热力图</button>
-                        <button class="option-btn" onclick="selectOption(this, 'modality')">模型识别框</button>
+                    <!-- 模态切换 -->
+                    <div class="diagnosis-group">
+                        <div class="group-label">诊断模态:</div>
+                        <div class="diagnosis-options" style="grid-template-columns: repeat(3, 1fr);">
+                            <button class="option-btn active" onclick="selectOption(this, 'modality')">原视频</button>
+                            <button class="option-btn" onclick="selectOption(this, 'modality')">热力图</button>
+                            <button class="option-btn" onclick="selectOption(this, 'modality')">病灶定位框</button>
+                        </div>
                     </div>
-                </div>
 
                 <!-- 模型预测置信度 -->
                 <div class="model-confidence-bars" id="modelConfidence">
                     <div class="group-label" style="font-size: 13px; margin-bottom: 2px;">模型预测置信度</div>
                     <div class="confidence-item">
-                        <span class="confidence-label">Normal</span>
+                        <span class="confidence-label">正常</span>
                         <div class="confidence-bar">
                             <div class="confidence-fill" id="fill-normal" style="width: 0%; background: #10b981;"></div>
                         </div>
@@ -1161,7 +1161,7 @@
                 <div class="diagnosis-group">
                     <div class="group-label">临床判断:</div>
                     <div class="diagnosis-options four-cols">
-                        <button class="option-btn active" onclick="selectOption(this, 'diagnosis')">Normal</button>
+                        <button class="option-btn active" onclick="selectOption(this, 'diagnosis')">正常</button>
                         <button class="option-btn" onclick="selectOption(this, 'diagnosis')">VSD</button>
                         <button class="option-btn" onclick="selectOption(this, 'diagnosis')">ASD</button>
                         <button class="option-btn" onclick="selectOption(this, 'diagnosis')">PDA</button>

@@ -1253,6 +1253,62 @@ def update_user(user_id: int, doctor: str, organization: str,
 
 ---
 
+### 12.13 UI界面放大改进
+
+**更新内容**:
+
+应用户要求，对多个页面的UI元素进行了放大处理，提升视觉效果和可操作性：
+
+#### A. flow.html
+| 元素 | 修改前 | 修改后 |
+|------|--------|--------|
+| 卡片宽度 | 900px | 1100px |
+| 卡片内边距 | 28px | 36px |
+| 头像尺寸 | 72px | 80px |
+| 头像字体 | 28px | 32px |
+| 欢迎文字 | 20px | 26px |
+| 元信息文字 | 14px | 16px |
+| 按钮内边距 | 12px 18px | 16px 24px |
+| 按钮字体 | 14px | 16px |
+
+#### B. diagnosis.html
+| 元素 | 修改前 | 修改后 |
+|------|--------|--------|
+| 置信度标签 | Normal | 正常 |
+| 临床判断按钮 | Normal | 正常 |
+| .option-btn 内边距 | 12px 16px | 16px 24px |
+| .option-btn 字体 | 14px | 16px |
+
+#### C. edu_status.html
+| 元素 | 修改前 | 修改后 |
+|------|--------|--------|
+| 导航栏内边距 | 15px 25px | 20px 30px |
+| 任务卡片内边距 | 18px | 24px |
+| 按钮内边距 | 8px 16px | 12px 20px |
+| 按钮字体 | 13px | 16px |
+| 侧边栏文字 | 12px | 14px |
+| 任务名称字体 | 默认(16px) | 16px (明确) |
+| 任务元信息 | 14px | 15px |
+| 按钮宽度 | 120px | 140px |
+| 指标标签 | 12px | 14px |
+
+#### D. 通用UI改进
+- 所有按钮添加悬停效果：`filter: brightness(1.1)` + `transform: translateY(-1px)`
+- Git合并冲突修复：清除所有HTML文件中的 `<<<<<<< HEAD` 等冲突标记
+
+**相关文件**:
+| 文件 | 修改内容 |
+|------|----------|
+| flow.html | 卡片、按钮、字体尺寸全面放大 |
+| diagnosis.html | 置信度标签、临床判断按钮、option-btn样式 |
+| edu_status.html | 导航栏、任务卡片、按钮、侧边栏、指标标签 |
+| admin.html | Git冲突修复 |
+| edu_admin.html | Git冲突修复 |
+| task_status.html | Git冲突修复 |
+| dashboard.html | Git冲突修复 |
+
+---
+
 ## 十三、协定的再次确认
 
 作为编程助手，我承诺遵循以下协定：
@@ -1272,5 +1328,5 @@ def update_user(user_id: int, doctor: str, organization: str,
 
 ---
 
-*文档版本: 2026-04-06*
-*最后更新: 2026-04-06 - 添加AI分析检测与双阶段报告修复*
+*文档版本: 2026-04-20*
+*最后更新: 2026-04-20 - 添加UI界面放大改进*
