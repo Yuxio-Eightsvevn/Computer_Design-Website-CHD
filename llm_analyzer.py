@@ -255,6 +255,60 @@ class LLMAnalyzer:
 """
             return prompt
         
+        # 二阶段对比分析
+        if stage == "assist" and isinstance(stats, dict) and "single" in stats and "assist" in stats:
+            single = stats.get("single", {})
+            assist = stats.get("assist", {})
+            
+            prompt = f"""
+{background}
+
+{units_explanation}
+
+【二阶段医学诊断练习对比分析】
+
+本次分析为二阶段对比分析，包含：
+1. 第一阶段（单独判读）：学员仅凭原始视频进行诊断，不使用AI辅助
+2. 第二阶段（AI辅助判读）：学员使用AI热力图、边界框等辅助工具进行诊断
+
+【第一阶段 - 单独判读 基础指标】
+- 准确率: {single.get('accuracy', 0)*100:.1f}%
+- 敏感度: {single.get('sensitivity', 0)*100:.1f}%
+- 特异性: {single.get('specificity', 0)*100:.1f}%
+- 总用时: {single.get('formatted_duration', '未知')}
+
+【第二阶段 - AI辅助判读 基础指标】
+- 准确率: {assist.get('accuracy', 0)*100:.1f}%
+- 敏感度: {assist.get('sensitivity', 0)*100:.1f}%
+- 特异性: {assist.get('specificity', 0)*100:.1f}%
+- 总用时: {assist.get('formatted_duration', '未知')}
+
+【第一阶段 vs 第二阶段 对比】
+准确率差异: {(assist.get('accuracy', 0) - single.get('accuracy', 0))*100:+.1f}%
+敏感度差异: {(assist.get('sensitivity', 0) - single.get('sensitivity', 0))*100:+.1f}%
+特异性差异: {(assist.get('specificity', 0) - single.get('specificity', 0))*100:+.1f}%
+
+【第二阶段 AI依赖性分析】
+{json.dumps(assist.get('ai_dependency', {}), ensure_ascii=False, indent=2)}
+
+请从以下几个方面给出评价：
+1. 整体表现评价 - 综合两个阶段的准确率、敏感度、特异性等指标
+2. AI辅助效果分析 - 分析AI辅助对诊断准确率的影响
+3. 诊断能力分析 - 分析学员在不同病种上的表现变化
+4. 改进建议 - 给出具体、可操作的改进建议（3-5条）
+
+请以JSON格式返回评价结果，包含以下字段：
+{{
+    "overall_evaluation": "整体评价文字",
+    "diagnosis_ability": "诊断能力分析文字",
+    "ai_tool_usage": "AI工具使用分析文字",
+    "improvement_suggestions": ["建议1", "建议2", "建议3"],
+    "strength_points": ["优势1", "优势2"],
+    "weakness_points": ["不足1", "不足2"]
+}}
+"""
+            return prompt
+        
         # 单阶段分析（原有逻辑）
         # 构建完整提示词
         prompt = f"""

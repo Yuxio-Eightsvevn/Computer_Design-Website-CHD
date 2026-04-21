@@ -613,11 +613,11 @@
         }
 
         .action-btn {
-            padding: 8px 12px;
+            padding: 12px 16px;
             border: none;
             border-radius: 8px;
             cursor: pointer;
-            font-size: 12px;
+            font-size: 14px;
             font-weight: 600;
             transition: all 0.3s ease;
             width: 100%;
@@ -640,11 +640,11 @@
         .btn-submit-green {
             background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
             color: white;
-            padding: 10px 16px;
+            padding: 14px 20px;
             border: none;
             border-radius: 8px;
             cursor: pointer;
-            font-size: 13px;
+            font-size: 15px;
             font-weight: 600;
             transition: all 0.3s ease;
             width: 100%;
@@ -1842,8 +1842,9 @@
             progressPercentage.textContent = `${percentage}%`;
             progressFill.style.width = `${percentage}%`;
             
-            // 如果完成全部诊断，显示提交按钮
-            if (completedCount === patients.length && patients.length > 0) {
+            // 如果完成全部诊断且所有记录都有 severity，显示提交按钮
+            const allRecordsComplete = Object.values(diagnosisRecords).every(r => r.diagnosis && r.severity);
+            if (completedCount === patients.length && patients.length > 0 && allRecordsComplete) {
                 submitBtn.style.display = 'block';
             } else {
                 submitBtn.style.display = 'none';
@@ -1852,8 +1853,8 @@
 
         // 加载模型置信度（从第一个视频的metadata）
         async function loadModelConfidence(patient) {
-            // 教育模式-单独判读/复核判读：不显示置信度
-            if (currentMode === 'edu' && (eduSubMode === 'single' || eduSubMode === 'review')) {
+            // 教育模式：所有阶段都不显示模型置信度（避免影响医师独立判断）
+            if (currentMode === 'edu') {
                 const confidenceContainer = document.getElementById('modelConfidence');
                 if (confidenceContainer) {
                     confidenceContainer.style.display = 'none';
@@ -1861,7 +1862,7 @@
                 return;
             }
 
-            // 其他模式显示置信度
+            // 判读模式显示置信度
             const confidenceContainer = document.getElementById('modelConfidence');
             if (confidenceContainer) {
                 confidenceContainer.style.display = 'block';

@@ -85,6 +85,7 @@
               <button class="btn btn-start" style="flex:1" id="btn-re-run">重新练习</button>
               <button class="btn btn-start" style="flex:1; display:none;" id="btn-re-run-single">重新进行单独判读</button>
               <button class="btn btn-start" style="flex:1; display:none;" id="btn-re-run-assist">重新进行AI辅助判读</button>
+              <button class="btn btn-start" style="flex:1; display:none;" id="btn-re-run-review">重新进行复核判读</button>
           </div>
       </div>
   </div>
@@ -315,9 +316,10 @@ async function openResultModal(id, name, eduSubMode, parentId) {
         const isDualSub = id.endsWith('_SINGLE') || id.endsWith('_AI-ASSIST') || id.endsWith('_REVIEW');
         const taskParentId = parentId || (isDualSub ? id.replace(/_SINGLE|_AI-ASSIST|_REVIEW$/, '') : id);
         
-        // 尝试获取两个子任务的数据
+        // 尝试获取三个子任务的数据
         let singleData = null;
         let assistData = null;
+        let reviewData = null;
         
         try {
             const rSingle = await fetch(`/api/edu/user/result/${encodeURIComponent(currentUser.username)}/${taskParentId}_SINGLE`);
@@ -329,11 +331,23 @@ async function openResultModal(id, name, eduSubMode, parentId) {
             if (rAssist.ok) assistData = await rAssist.json();
         } catch (e) { }
         
+        try {
+            const rReview = await fetch(`/api/edu/user/result/${encodeURIComponent(currentUser.username)}/${taskParentId}_REVIEW`);
+            if (rReview.ok) reviewData = await rReview.json();
+        } catch (e) { }
+        
+        // 判断是否为三阶段任务（需要三个阶段的数据都有实际内容）
+        const hasStageData = (data) => data && data.accuracy !== undefined && data.accuracy !== null;
+        const isTripleStage = hasStageData(singleData) && hasStageData(assistData) && hasStageData(reviewData);
         // 判断是否为双阶段任务的子任务
         const isDualSubTask = eduSubMode && (eduSubMode === 'single' || eduSubMode === 'assist' || eduSubMode === 'review');
         const isDual = isDualSubTask || (singleData && assistData);
         
-        if (isDual && singleData && assistData) {
+        if (isTripleStage) {
+            // 三阶段任务：显示三阶段对比报告
+            showTripleStageReport(taskParentId, name, singleData, assistData, reviewData);
+            return;
+        } else if (isDual && singleData && assistData) {
             // 双阶段任务：显示对比报告
             // 优先检查 status（合并后的字段）
             const singleStatus = singleData.status || singleData.llm_analysis_status;
@@ -1004,12 +1018,235 @@ function showDualStageReport(parentId, name, singleData, assistData) {
     document.getElementById('btn-re-run').style.display = 'none';
     document.getElementById('btn-re-run-single').style.display = '';
     document.getElementById('btn-re-run-assist').style.display = '';
+    document.getElementById('btn-re-run-review').style.display = 'none';
     document.getElementById('btn-re-run-single').onclick = () => rerunTask(parentId + '_SINGLE', name);
     document.getElementById('btn-re-run-assist').onclick = () => rerunTask(parentId + '_AI-ASSIST', name);
 }
 
-  // 初始化背景配置
-  (async function initBackground() {
+// 三阶段对比报告函数
+function showTripleStageReport(parentId, name, singleData, assistData, reviewData) {
+    const modal = document.getElementById('resultModal');
+    const modalCard = modal.querySelector('.modal-card');
+    
+    const s = singleData || {};
+    const a = assistData || {};
+    const r = reviewData || {};
+    
+    // 计算性能差异
+    const accDiff = ((r.accuracy || 0) - (s.accuracy || 0)) * 100;
+    const sensDiff = ((r.sensitivity || 0) - (s.sensitivity || 0)) * 100;
+    const specDiff = ((r.specificity || 0) - (s.specificity || 0)) * 100;
+    const assistAccDiff = ((a.accuracy || 0) - (s.accuracy || 0)) * 100;
+    
+    let html = `
+        <h2 style="color:#1e293b">📊 三阶段诊断对比报告</h2>
+        <p style="color:#64748b; margin:8px 0;">${name}</p>
+        
+        <div style="display:flex; gap:10px; margin:8px 0;">
+            <div style="flex:1; padding:12px; border:1px solid #e2e8f0; border-radius:8px;">
+                <h4 style="font-size:13px; color:#1e293b; margin-bottom:10px; text-align:center;">📈 准确率总体对比</h4>
+                <div style="display:flex; gap:8px; margin-bottom:10px;">
+                    <div style="flex:1; padding:8px; background:#f0f9ff; border-radius:6px; text-align:center;">
+                        <div style="font-size:10px; color:#64748b;">单独诊断</div>
+                        <div style="font-size:16px; font-weight:700; color:#667eea;">${((s.accuracy || 0)*100).toFixed(1)}%</div>
+                    </div>
+                    <div style="flex:1; padding:8px; background:#ecfdf5; border-radius:6px; text-align:center;">
+                        <div style="font-size:10px; color:#64748b;">AI辅助诊断</div>
+                        <div style="font-size:16px; font-weight:700; color:#10b981;">${((a.accuracy || 0)*100).toFixed(1)}%</div>
+                    </div>
+                    <div style="flex:1; padding:8px; background:#fef3c7; border-radius:6px; text-align:center;">
+                        <div style="font-size:10px; color:#64748b;">复核诊断</div>
+                        <div style="font-size:16px; font-weight:700; color:#f59e0b;">${((r.accuracy || 0)*100).toFixed(1)}%</div>
+                    </div>
+                </div>
+                <div style="display:flex; gap:8px;">
+                    <div style="flex:1; padding:8px; background:#ecfdf5; border-radius:6px; text-align:center;">
+                        <div style="font-size:10px; color:#64748b;">AI辅助对比单独</div>
+                        <div style="font-size:14px; font-weight:700; color:${assistAccDiff > 0 ? '#10b981' : (assistAccDiff < 0 ? '#ef4444' : '#64748b')};">${assistAccDiff > 0 ? '+' : ''}${assistAccDiff.toFixed(1)}%</div>
+                    </div>
+                    <div style="flex:1; padding:8px; background:#fef3c7; border-radius:6px; text-align:center;">
+                        <div style="font-size:10px; color:#64748b;">复核对比单独</div>
+                        <div style="font-size:14px; font-weight:700; color:${accDiff > 0 ? '#10b981' : (accDiff < 0 ? '#ef4444' : '#64748b')};">${accDiff > 0 ? '+' : ''}${accDiff.toFixed(1)}%</div>
+                    </div>
+                </div>
+            </div>
+            <div style="flex:1; padding:12px; border:1px solid #e2e8f0; border-radius:8px;">
+                <h4 style="font-size:13px; color:#1e293b; margin-bottom:10px; text-align:center;">🤖 AI工具依赖情况</h4>
+                <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:6px;">
+                    <div style="padding:8px; background:#ecfdf5; border-radius:6px; text-align:center;">
+                        <div style="font-size:11px; color:#065f46; font-weight:600;">✅ 正确依赖</div>
+                        <div style="font-size:15px; font-weight:700; color:#059669;">${a.ai_dependency?.correct_reliance || 0}</div>
+                        <div style="font-size:9px; color:#065f46;">AI正确+您正确</div>
+                    </div>
+                    <div style="padding:8px; background:#fffbeb; border-radius:6px; text-align:center;">
+                        <div style="font-size:11px; color:#92400e; font-weight:600;">⚠️ 依赖不足</div>
+                        <div style="font-size:15px; font-weight:700; color:#d97706;">${a.ai_dependency?.insufficient_reliance || 0}</div>
+                        <div style="font-size:9px; color:#92400e;">AI正确+您错误</div>
+                    </div>
+                    <div style="padding:8px; background:#eff6ff; border-radius:6px; text-align:center;">
+                        <div style="font-size:11px; color:#1e40af; font-weight:600;">💪 正确独立</div>
+                        <div style="font-size:15px; font-weight:700; color:#2563eb;">${a.ai_dependency?.correct_independence || 0}</div>
+                        <div style="font-size:9px; color:#1e40af;">AI错误+您正确</div>
+                    </div>
+                    <div style="padding:8px; background:#fef2f2; border-radius:6px; text-align:center;">
+                        <div style="font-size:11px; color:#991b1b; font-weight:600;">❌ 过度依赖</div>
+                        <div style="font-size:15px; font-weight:700; color:#dc2626;">${a.ai_dependency?.over_reliance || 0}</div>
+                        <div style="font-size:9px; color:#991b1b;">AI错误+您错误</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div style="display:flex; gap:10px; margin-top:10px; border:1px solid #cbd5e1; border-radius:8px; overflow:hidden;">
+            <div style="flex:1; padding:10px; border-right:1px solid #cbd5e1;">
+                <h3 style="font-size:13px; color:#1e293b; margin-bottom:6px;">📈 性能对比</h3>
+                <table style="width:100%; font-size:12px; border-collapse:collapse;">
+                    <tr style="background:#f8fafc;">
+                        <th style="padding:5px; text-align:left; border:1px solid #e2e8f0;">指标</th>
+                        <th style="padding:5px; text-align:center; border:1px solid #e2e8f0;">单独</th>
+                        <th style="padding:5px; text-align:center; border:1px solid #e2e8f0;">AI辅助</th>
+                        <th style="padding:5px; text-align:center; border:1px solid #e2e8f0;">复核</th>
+                        <th style="padding:5px; text-align:center; border:1px solid #e2e8f0;">复核提升</th>
+                    </tr>
+                    <tr>
+                        <td style="padding:5px; border:1px solid #e2e8f0;">准确率</td>
+                        <td style="padding:5px; text-align:center; border:1px solid #e2e8f0;">${((s.accuracy || 0)*100).toFixed(1)}%</td>
+                        <td style="padding:5px; text-align:center; border:1px solid #e2e8f0;">${((a.accuracy || 0)*100).toFixed(1)}%</td>
+                        <td style="padding:5px; text-align:center; border:1px solid #e2e8f0;">${((r.accuracy || 0)*100).toFixed(1)}%</td>
+                        <td style="padding:5px; text-align:center; border:1px solid #e2e8f0; color:${accDiff > 0 ? '#10b981' : (accDiff < 0 ? '#ef4444' : '#64748b')};">${accDiff > 0 ? '+' : ''}${accDiff.toFixed(1)}%</td>
+                    </tr>
+                    <tr style="background:#f8fafc;">
+                        <td style="padding:5px; border:1px solid #e2e8f0;">敏感度</td>
+                        <td style="padding:5px; text-align:center; border:1px solid #e2e8f0;">${((s.sensitivity || 0)*100).toFixed(1)}%</td>
+                        <td style="padding:5px; text-align:center; border:1px solid #e2e8f0;">${((a.sensitivity || 0)*100).toFixed(1)}%</td>
+                        <td style="padding:5px; text-align:center; border:1px solid #e2e8f0;">${((r.sensitivity || 0)*100).toFixed(1)}%</td>
+                        <td style="padding:5px; text-align:center; border:1px solid #e2e8f0; color:${sensDiff > 0 ? '#10b981' : (sensDiff < 0 ? '#ef4444' : '#64748b')};">${sensDiff > 0 ? '+' : ''}${sensDiff.toFixed(1)}%</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:5px; border:1px solid #e2e8f0;">特异性</td>
+                        <td style="padding:5px; text-align:center; border:1px solid #e2e8f0;">${((s.specificity || 0)*100).toFixed(1)}%</td>
+                        <td style="padding:5px; text-align:center; border:1px solid #e2e8f0;">${((a.specificity || 0)*100).toFixed(1)}%</td>
+                        <td style="padding:5px; text-align:center; border:1px solid #e2e8f0;">${((r.specificity || 0)*100).toFixed(1)}%</td>
+                        <td style="padding:5px; text-align:center; border:1px solid #e2e8f0; color:${specDiff > 0 ? '#10b981' : (specDiff < 0 ? '#ef4444' : '#64748b')};">${specDiff > 0 ? '+' : ''}${specDiff.toFixed(1)}%</td>
+                    </tr>
+                </table>
+            </div>
+            <div style="flex:1; padding:10px;">
+                <h3 style="font-size:13px; color:#1e293b; margin-bottom:6px;">🎯 三阶段六维图对比</h3>
+                <div style="display:flex; gap:50px; justify-content:center;">
+                    <div style="text-align:center;">
+                        <div style="font-size:10px; color:#667eea;">单独</div>
+                        <canvas id="radarSingle" width="130" height="130"></canvas>
+                    </div>
+                    <div style="text-align:center;">
+                        <div style="font-size:10px; color:#10b981;">AI辅助</div>
+                        <canvas id="radarAssist" width="130" height="130"></canvas>
+                    </div>
+                    <div style="text-align:center;">
+                        <div style="font-size:10px; color:#f59e0b;">复核</div>
+                        <canvas id="radarReview" width="130" height="130"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // 显示AI分析
+    const tripleAnalysis = r.triple_analysis;
+    if (tripleAnalysis && tripleAnalysis.report) {
+        const analysis = tripleAnalysis.report.analysis || tripleAnalysis.report;
+        html += `
+            <div style="margin-top:15px; padding:15px; background:#f0f9ff; border-radius:8px; border-left:3px solid #667eea;">
+                <h3 style="font-size:14px; margin-bottom:10px;">🤖 AI专家评价</h3>
+                <div style="display:flex; gap:15px;">
+                    <div style="flex:1;">
+                        <p style="margin-bottom:8px;"><strong>整体评价：</strong>${analysis.overall_evaluation || '暂无'}</p>
+                        <p style="margin-bottom:8px;"><strong>诊断能力分析：</strong>${analysis.diagnosis_ability || '暂无'}</p>
+                        <p style="margin-bottom:8px;"><strong>一阶段vs三阶段：</strong>复核使准确率${accDiff > 0 ? '提升' : (accDiff < 0 ? '下降' : '持平')}${Math.abs(accDiff).toFixed(1)}%</p>
+                    </div>
+                    <div style="flex:1; border-left:2px solid #cbd5e1; padding-left:15px;">
+                        <strong>💡 改进建议</strong>
+                        <ul style="margin:5px 0; padding-left:20px; font-size:13px; line-height:1.6;">
+            `;
+        if (analysis.improvement_suggestions && analysis.improvement_suggestions.length > 0) {
+            html += analysis.improvement_suggestions.map(x => `<li style="margin:3px 0;">${x}</li>`).join('');
+        }
+        html += `
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    document.getElementById('resultModalContent').innerHTML = html;
+    
+    // 渲染雷达图
+    setTimeout(() => {
+        if (radarSingleChart) { radarSingleChart.destroy(); radarSingleChart = null; }
+        if (radarAssistChart) { radarAssistChart.destroy(); radarAssistChart = null; }
+        if (window.radarReviewChart) { window.radarReviewChart.destroy(); window.radarReviewChart = null; }
+        
+        const labels = ['准确率', '敏感度', '特异性', '病种均衡性', '诊断效率', '决策一致性'];
+        
+        const calcDiseaseBalance = (caseDetails) => {
+            if (!caseDetails || caseDetails.length === 0) return 0.5;
+            const diseaseGroups = {};
+            caseDetails.forEach(c => {
+                const disease = c.ground_truth || 'Unknown';
+                if (!diseaseGroups[disease]) diseaseGroups[disease] = { correct: 0, total: 0 };
+                diseaseGroups[disease].total++;
+                if (c.user_diagnosis === c.ground_truth) diseaseGroups[disease].correct++;
+            });
+            const accuracies = Object.values(diseaseGroups).map(g => g.total > 0 ? g.correct / g.total : 0);
+            if (accuracies.length <= 1) return 1.0;
+            const avg = accuracies.reduce((a, b) => a + b, 0) / accuracies.length;
+            const variance = accuracies.reduce((sum, acc) => sum + Math.pow(acc - avg, 2), 0) / accuracies.length;
+            return Math.max(0, 1 - Math.sqrt(variance) * 2);
+        };
+        
+        const calcDecisionConsistency = (caseDetails) => {
+            if (!caseDetails || caseDetails.length === 0) return 0.5;
+            const consistent = caseDetails.filter(c => c.user_diagnosis === c.ai_prediction).length;
+            return consistent / caseDetails.length;
+        };
+        
+        const getVals = (data) => [
+            (data.accuracy || 0),
+            (data.sensitivity || 0),
+            (data.specificity || 0),
+            calcDiseaseBalance(data.case_details),
+            Math.min(1, data.patientCount && data.totalTime?.seconds ? (data.patientCount / (data.totalTime.seconds / 60)) / 10 : 0),
+            calcDecisionConsistency(data.case_details)
+        ];
+        
+        const radarConfig = (ctxId, data, color) => {
+            return new Chart(document.getElementById(ctxId), {
+                type: 'radar',
+                data: {
+                    labels: labels,
+                    datasets: [{ data: data, backgroundColor: color + '40', borderColor: color, borderWidth: 2, pointBackgroundColor: color, pointRadius: 3 }]
+                },
+                options: { responsive: true, scales: { r: { beginAtZero: true, max: 1, ticks: { stepSize: 0.2, display: false }, grid: { color: '#e2e8f0' }, angleLines: { color: '#e2e8f0' }, pointLabels: { font: { size: 8 }, color: '#475569' } } }, plugins: { legend: { display: false } } }
+            });
+        };
+        
+        radarSingleChart = radarConfig('radarSingle', getVals(s), '#667eea');
+        radarAssistChart = radarConfig('radarAssist', getVals(a), '#10b981');
+        window.radarReviewChart = radarConfig('radarReview', getVals(r), '#f59e0b');
+    }, 100);
+    
+    // 显示三阶段重新练习按钮
+    document.getElementById('btn-re-run').style.display = 'none';
+    document.getElementById('btn-re-run-single').style.display = '';
+    document.getElementById('btn-re-run-assist').style.display = '';
+    document.getElementById('btn-re-run-review').style.display = '';
+    document.getElementById('btn-re-run-single').onclick = () => rerunTask(parentId + '_SINGLE', name);
+    document.getElementById('btn-re-run-assist').onclick = () => rerunTask(parentId + '_AI-ASSIST', name);
+    document.getElementById('btn-re-run-review').onclick = () => rerunTask(parentId + '_REVIEW', name);
+}
+
+(async function initBackground() {
     try {
       const r = await fetch('/res/share/background_config.json');
       const config = await r.json();

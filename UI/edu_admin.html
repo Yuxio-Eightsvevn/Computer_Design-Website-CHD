@@ -366,11 +366,8 @@
       <h3 id="p-task-title">发布任务</h3>
       <div style="margin: 15px 0;">
         <span style="font-size:13px; font-weight:600;">发布模式：</span>
-        <select id="publishModeSelect" style="margin-left:10px; padding:5px 10px; border-radius:6px; border:1px solid #cbd5e1;">
-          <option value="single">单阶段模式</option>
-          <option value="dual" selected>双阶段模式（单独判读 + AI辅助）</option>
-          <option value="triple">三阶段模式（单独 + AI辅助 + 复核）</option>
-        </select>
+        <span style="margin-left:10px; padding:5px 10px; background:#fef3c7; border:1px solid #f59e0b; border-radius:6px; color:#92400e; font-weight:600;">三阶段模式（单独 + AI辅助 + 复核）</span>
+        <input type="hidden" id="publishModeSelect" value="triple">
       </div>
       <p style="font-size:12px; color:#64748b; margin-top:5px;">请选择允许参与判读的医师：</p>
       <div class="user-grid" id="userList"></div>
@@ -929,9 +926,10 @@
         modal.style.display = 'flex';
         
         try {
-            // 尝试获取双阶段数据
+            // 尝试获取三阶段数据
             let singleData = null;
             let assistData = null;
+            let reviewData = null;
             
             try {
                 const rSingle = await fetch(`/api/edu/user/result/${username}/${taskId}_SINGLE`);
@@ -943,7 +941,15 @@
                 if (rAssist.ok) assistData = await rAssist.json();
             } catch (e) {}
             
-            if (singleData && assistData) {
+            try {
+                const rReview = await fetch(`/api/edu/user/result/${username}/${taskId}_REVIEW`);
+                if (rReview.ok) reviewData = await rReview.json();
+            } catch (e) {}
+            
+            if (singleData && assistData && reviewData) {
+                // 三阶段报告
+                showTripleStageReport(modalCard, username, taskName, singleData, assistData, reviewData);
+            } else if (singleData && assistData) {
                 // 双阶段报告
                 showDualStageReport(modalCard, username, taskName, singleData, assistData);
             } else {
@@ -1049,6 +1055,124 @@
                         <p style="margin-bottom:8px;"><strong>整体评价：</strong>${analysis.overall_evaluation || '暂无'}</p>
                         <p style="margin-bottom:8px;"><strong>诊断能力：</strong>${analysis.diagnosis_ability || '暂无'}</p>
                         <p style="margin-bottom:8px;"><strong>AI工具使用：</strong>${analysis.ai_tool_usage || '暂无'}</p>
+                    </div>
+                </div>
+            `;
+        }
+        
+        html += `
+            <div style="margin-top:20px; text-align:center;">
+                <button class="btn btn-secondary" onclick="closeModal('reportModal')">关闭</button>
+            </div>
+        `;
+        
+        modalCard.innerHTML = html;
+    }
+
+    function showTripleStageReport(modalCard, username, taskName, singleData, assistData, reviewData) {
+        const s = singleData || {};
+        const a = assistData || {};
+        const r = reviewData || {};
+        
+        // 计算性能差异
+        const accDiff = ((r.accuracy || 0) - (s.accuracy || 0)) * 100;
+        const assistAccDiff = ((a.accuracy || 0) - (s.accuracy || 0)) * 100;
+        
+        let html = `
+            <h2 style="color:#1e293b">🎯 三阶段教学评估报告</h2>
+            <p style="font-size:13px; color:#64748b; margin:5px 0;">${taskName} - ${username}</p>
+            
+            <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; margin:15px 0;">
+                <div style="padding:12px; background:#f0f9ff; border-radius:8px; text-align:center;">
+                    <h4 style="font-size:13px; color:#667eea; margin-bottom:8px;">单独判读</h4>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+                        <div>
+                            <div style="font-size:10px; color:#64748b;">准确率</div>
+                            <div style="font-size:15px; font-weight:700; color:#667eea;">${((s.accuracy || 0)*100).toFixed(1)}%</div>
+                        </div>
+                        <div>
+                            <div style="font-size:10px; color:#64748b;">敏感度</div>
+                            <div style="font-size:15px; font-weight:700; color:#667eea;">${((s.sensitivity || 0)*100).toFixed(1)}%</div>
+                        </div>
+                    </div>
+                    <div style="margin-top:6px;">
+                        <div style="font-size:10px; color:#64748b;">特异性</div>
+                        <div style="font-size:15px; font-weight:700; color:#667eea;">${((s.specificity || 0)*100).toFixed(1)}%</div>
+                    </div>
+                </div>
+                <div style="padding:12px; background:#ecfdf5; border-radius:8px; text-align:center;">
+                    <h4 style="font-size:13px; color:#10b981; margin-bottom:8px;">AI辅助判读</h4>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+                        <div>
+                            <div style="font-size:10px; color:#64748b;">准确率</div>
+                            <div style="font-size:15px; font-weight:700; color:#10b981;">${((a.accuracy || 0)*100).toFixed(1)}%</div>
+                        </div>
+                        <div>
+                            <div style="font-size:10px; color:#64748b;">敏感度</div>
+                            <div style="font-size:15px; font-weight:700; color:#10b981;">${((a.sensitivity || 0)*100).toFixed(1)}%</div>
+                        </div>
+                    </div>
+                    <div style="margin-top:6px;">
+                        <div style="font-size:10px; color:#64748b;">特异性</div>
+                        <div style="font-size:15px; font-weight:700; color:#10b981;">${((a.specificity || 0)*100).toFixed(1)}%</div>
+                    </div>
+                </div>
+                <div style="padding:12px; background:#fef3c7; border-radius:8px; text-align:center;">
+                    <h4 style="font-size:13px; color:#f59e0b; margin-bottom:8px;">复核判读</h4>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+                        <div>
+                            <div style="font-size:10px; color:#64748b;">准确率</div>
+                            <div style="font-size:15px; font-weight:700; color:#f59e0b;">${((r.accuracy || 0)*100).toFixed(1)}%</div>
+                        </div>
+                        <div>
+                            <div style="font-size:10px; color:#64748b;">敏感度</div>
+                            <div style="font-size:15px; font-weight:700; color:#f59e0b;">${((r.sensitivity || 0)*100).toFixed(1)}%</div>
+                        </div>
+                    </div>
+                    <div style="margin-top:6px;">
+                        <div style="font-size:10px; color:#64748b;">特异性</div>
+                        <div style="font-size:15px; font-weight:700; color:#f59e0b;">${((r.specificity || 0)*100).toFixed(1)}%</div>
+                    </div>
+                </div>
+                <div style="padding:12px; border:1px solid #e2e8f0; border-radius:8px; text-align:center;">
+                    <h4 style="font-size:13px; color:#1e293b; margin-bottom:8px;">教育效果对比</h4>
+                    <div style="display:flex; flex-direction:column; gap:8px; height:calc(100% - 30px); justify-content:center;">
+                        <div style="padding:8px; background:#ecfdf5; border-radius:6px;">
+                            <div style="font-size:10px; color:#64748b;">AI辅助提升</div>
+                            <div style="font-size:14px; font-weight:700; color:${assistAccDiff > 0 ? '#10b981' : '#64748b'};">${assistAccDiff > 0 ? '+' : ''}${assistAccDiff.toFixed(1)}%</div>
+                        </div>
+                        <div style="padding:8px; background:#fef3c7; border-radius:6px;">
+                            <div style="font-size:10px; color:#64748b;">复核提升</div>
+                            <div style="font-size:14px; font-weight:700; color:${accDiff > 0 ? '#10b981' : (accDiff < 0 ? '#ef4444' : '#64748b')};">${accDiff > 0 ? '+' : ''}${accDiff.toFixed(1)}%</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // 显示AI分析报告
+        const tripleAnalysis = r.triple_analysis;
+        if (tripleAnalysis && tripleAnalysis.report) {
+            const analysis = tripleAnalysis.report.analysis || tripleAnalysis.report;
+            html += `
+                <div style="margin-top:15px; padding:15px; background:#f0f9ff; border-radius:8px; border-left:3px solid #667eea;">
+                    <h3 style="font-size:14px; margin-bottom:10px;">🤖 AI专家评价</h3>
+                    <div style="display:flex; gap:15px;">
+                        <div style="flex:1;">
+                            <p style="margin-bottom:8px;"><strong>整体评价：</strong>${analysis.overall_evaluation || '暂无'}</p>
+                            <p style="margin-bottom:8px;"><strong>诊断能力分析：</strong>${analysis.diagnosis_ability || '暂无'}</p>
+                            <p style="margin-bottom:8px;"><strong>一阶段vs三阶段：</strong>复核使准确率${accDiff > 0 ? '提升' : (accDiff < 0 ? '下降' : '持平')}${Math.abs(accDiff).toFixed(1)}%</p>
+                        </div>
+                        <div style="flex:1; border-left:2px solid #cbd5e1; padding-left:15px;">
+                            <strong>💡 改进建议</strong>
+                            <ul style="margin:5px 0; padding-left:20px; font-size:13px; line-height:1.6;">
+            `;
+            if (analysis.improvement_suggestions && analysis.improvement_suggestions.length > 0) {
+                html += analysis.improvement_suggestions.map(x => `<li style="margin:3px 0;">${x}</li>`).join('');
+            }
+            html += `
+                            </ul>
+                        </div>
                     </div>
                 </div>
             `;

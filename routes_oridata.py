@@ -1022,6 +1022,9 @@ async def get_user_edu_result(username: str, submission_id: str):
             # 合并llm_analysis数据
             if "llm_analysis" in task_data and stage in task_data["llm_analysis"]:
                 result.update(task_data["llm_analysis"][stage])
+            # 三阶段任务：同时返回 llm_analysis.triple（三阶段综合分析）
+            if stage == "review" and "llm_analysis" in task_data and "triple" in task_data["llm_analysis"]:
+                result["triple_analysis"] = task_data["llm_analysis"]["triple"]
             result["stage"] = stage
             return result
         else:
@@ -1166,6 +1169,8 @@ async def delete_edu_task(submission_id: str):
                         del user_data[f"{submission_id}_SINGLE"]
                     if f"{submission_id}_AI-ASSIST" in user_data:
                         del user_data[f"{submission_id}_AI-ASSIST"]
+                    if f"{submission_id}_REVIEW" in user_data:
+                        del user_data[f"{submission_id}_REVIEW"]
                     with open(result_file, "w", encoding="utf-8") as f:
                         json.dump(user_data, f, ensure_ascii=False, indent=2)
                     print(f"🗑️ 已清理用户 {username} 的任务成绩")

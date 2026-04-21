@@ -852,8 +852,8 @@ async def submit_diagnosis_json(request: DiagnosisSubmitJsonRequest):
         
         # --- 情况 A：教育模式 (Assessment) ---
         if request.mode == "edu":
-            # 提取原始任务ID（去除双阶段后缀）
-            original_task_folder = re.sub(r'_SINGLE|_AI-ASSIST$', '', request.taskFolder)
+            # 提取原始任务ID（去除多阶段后缀）
+            original_task_folder = re.sub(r'_SINGLE|_AI-ASSIST|_REVIEW$', '', request.taskFolder)
             
             # 1. 定位标准答案
             gt_path = Path(DATA_BATCH_STORAGE) / "SYSTEM" / "edu_data" / original_task_folder / "epoch_data.json"
@@ -1046,10 +1046,11 @@ async def submit_diagnosis_json(request: DiagnosisSubmitJsonRequest):
             stats['completed_at'] = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
             user_data[parent_id]["stages"][request.eduSubMode] = stats
             
-            # 检查是否为三阶段任务且三阶段都完成
+            # 检查是否为三阶段任务
             is_triple = request.eduSubMode == "review"
             stages = user_data[parent_id].get("stages", {})
-            all_stages_done = "single" in stages and "assist" in stages and "review" in stages
+            dual_done = "single" in stages and "assist" in stages
+            triple_done = "single" in stages and "assist" in stages and "review" in stages
             
             with open(user_res_path, "w", encoding="utf-8") as f:
                 json.dump(user_data, f, ensure_ascii=False, indent=2)
@@ -1057,7 +1058,7 @@ async def submit_diagnosis_json(request: DiagnosisSubmitJsonRequest):
             print(f"📊 教育模式评分完成: {request.username} - 模式: {request.eduSubMode} - 得分: {stats['accuracy']*100}%")
             
             # 三阶段都完成时，触发综合分析（取第一和第三阶段对比）
-            if is_triple and all_stages_done:
+            if is_triple and triple_done:
                 print(f"🔔 三阶段全部完成，准备触发AI综合分析")
                 asyncio.create_task(analyze_with_llm(
                     request.username, 
@@ -1066,9 +1067,21 @@ async def submit_diagnosis_json(request: DiagnosisSubmitJsonRequest):
                     {"single": stages["single"], "assist": stages["assist"], "review": stages["review"]}
                 ))
                 print(f"🔔 已创建三阶段综合分析任务")
+            elif not is_triple and dual_done:
+                # 二阶段任务：两阶段都完成时，触发双阶段对比分析
+                print(f"🔔 二阶段全部完成，准备触发AI对比分析")
+                asyncio.create_task(analyze_with_llm(
+                    request.username, 
+                    parent_id, 
+                    "assist",  # 使用 assist 作为 stage 参数，触发二阶段对比分析
+                    {"single": stages["single"], "assist": stages["assist"]}
+                ))
+                print(f"🔔 已创建二阶段对比分析任务")
             else:
-                # 非三阶段或未全部完成，不触发单独分析
-                print(f"🔔 当前阶段: {request.eduSubMode}，三阶段完成状态: {all_stages_done}，跳过LLM分析")
+                if is_triple:
+                    print(f"🔔 当前为三阶段任务，还需完成: single={('single' in stages)}, assist={('assist' in stages)}, review={('review' in stages)}，跳过LLM分析")
+                else:
+                    print(f"🔔 当前为二阶段任务，还需完成: single={('single' in stages)}, assist={('assist' in stages)}，跳过LLM分析")
             
             return {"message": "评估完成，AI分析报告生成中", "stats": stats}
 

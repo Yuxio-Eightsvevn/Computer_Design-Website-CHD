@@ -2104,5 +2104,87 @@ if is_triple and all_stages_done:
 
 ---
 
-*文档版本: 2026-04-21*
-*最后更新: 2026-04-21 - 三阶段教育系统实现*
+### 12.20 三阶段报告UI优化与置信度隐藏 (2026-04-21)
+
+**更新内容**：
+
+#### 1. 三阶段雷达图间距调整 (edu_status.html)
+
+增大三个雷达图之间的间距，防止重叠：
+
+| 属性 | 修改前 | 修改后 |
+|------|--------|--------|
+| gap | 25px | 50px |
+| canvas尺寸 | 110x110 | 130x130 |
+
+#### 2. 教育模式置信度隐藏 (diagnosis.html)
+
+**修改原因**：在AI辅助判读阶段，医师不应依赖模型置信度进行诊断，应独立思考后再参考AI结果。
+
+**修改内容**：
+- 教育模式下所有阶段（single/assist/review）均隐藏模型置信度
+- 仅在判读模式（非教育模式）下显示置信度
+
+**代码位置**：`diagnosis.html:1856-1862`
+
+```javascript
+// 修改前：仅 single 和 review 隐藏置信度
+if (currentMode === 'edu' && (eduSubMode === 'single' || eduSubMode === 'review'))
+
+// 修改后：所有教育阶段都隐藏置信度
+if (currentMode === 'edu')
+```
+
+---
+
+### 12.21 三阶段报告重新练习按钮修复 (2026-04-21)
+
+**问题**：在 edu_status 的三阶段报告界面中，没有重新进入三个阶段判读的按钮。
+
+**修复内容**：
+
+#### 1. 添加复核判读按钮 (edu_status.html:88)
+
+新增 `btn-re-run-review` 按钮：
+
+```html
+<button class="btn btn-start" style="flex:1; display:none;" id="btn-re-run-review">重新进行复核判读</button>
+```
+
+#### 2. 修改 showTripleStageReport 函数 (edu_status.html:1248-1255)
+
+**修改前**：隐藏所有重新练习按钮
+
+**修改后**：显示三个阶段对应的重新练习按钮
+
+```javascript
+// 显示三阶段重新练习按钮
+document.getElementById('btn-re-run').style.display = 'none';
+document.getElementById('btn-re-run-single').style.display = '';
+document.getElementById('btn-re-run-assist').style.display = '';
+document.getElementById('btn-re-run-review').style.display = '';
+document.getElementById('btn-re-run-single').onclick = () => rerunTask(parentId + '_SINGLE', name);
+document.getElementById('btn-re-run-assist').onclick = () => rerunTask(parentId + '_AI-ASSIST', name);
+document.getElementById('btn-re-run-review').onclick = () => rerunTask(parentId + '_REVIEW', name);
+```
+
+---
+
+### 12.22 二阶段/三阶段日志区分修复 (2026-04-22)
+
+**问题**：二阶段任务中，日志错误地显示"三阶段完成状态: False"，导致用户困惑。
+
+**修复内容** (main.py:1071)：
+
+```python
+# 修改前
+print(f"🔔 当前阶段: {request.eduSubMode}，三阶段完成状态: {all_stages_done}，跳过LLM分析")
+
+# 修改后
+print(f"🔔 当前阶段: {request.eduSubMode}，跳过LLM分析（仅在三阶段全部完成后触发综合分析）")
+```
+
+---
+
+*文档版本: 2026-04-22*
+*最后更新: 2026-04-22 - 二阶段/三阶段日志区分修复*
