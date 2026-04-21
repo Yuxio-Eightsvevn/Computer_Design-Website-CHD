@@ -6,7 +6,7 @@
     "image": "res/login/images/pic_01.png",
     "welcomeText": "欢迎来到CHD-AIDE平台官方网站",
     "mainTitle": "CHD-AIDE",
-    "subtitle": "推理辅助与教育平台",
+    "subtitle": "辅助诊断与教育平台",
     "description": "CHD-AIDE是一款专注于儿童先天性心脏病诊断的AI辅助平台。通过深度学习模型，我们为医师提供精准的诊断建议、热力图可视化和边界框定位，帮助您更高效地进行先心病筛查与诊断。同时，平台提供教学训练模式，支持医师在模拟环境中提升诊断技能。",
     "loginButtonText": "点击登录"
   },
