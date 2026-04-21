@@ -1581,12 +1581,11 @@
         // 加载病人列表
         async function loadPatients() {
             try {
-                // 双阶段任务：去掉 _SINGLE 或 _AI-ASSIST 后缀，使用实际文件夹名称
-                // 只在教育模式下转换，避免管理员任务名以 _SINGLE/_AI-ASSIST 结尾导致的问题
+                // 多阶段任务：去掉后缀，使用实际文件夹名称
                 let actualTaskFolder = taskInfo.taskFolder;
-                if (currentMode === 'edu' && (taskInfo.taskFolder.endsWith('_SINGLE') || taskInfo.taskFolder.endsWith('_AI-ASSIST'))) {
-                    actualTaskFolder = taskInfo.taskFolder.replace(/_SINGLE|_AI-ASSIST$/, '');
-                    console.log('双阶段任务：转换 taskFolder', taskInfo.taskFolder, '->', actualTaskFolder);
+                if (currentMode === 'edu' && (taskInfo.taskFolder.endsWith('_SINGLE') || taskInfo.taskFolder.endsWith('_AI-ASSIST') || taskInfo.taskFolder.endsWith('_REVIEW'))) {
+                    actualTaskFolder = taskInfo.taskFolder.replace(/_SINGLE|_AI-ASSIST|_REVIEW$/, '');
+                    console.log('多阶段任务：转换 taskFolder', taskInfo.taskFolder, '->', actualTaskFolder);
                 }
                 
                 console.log('正在加载病人列表...', {
@@ -1633,17 +1632,17 @@
                 loadPatientVideos(0);
                 updateProgressText();
                 
-                // 教育模式-单独判读：禁用模态切换按钮（只用第一个diagnosis-group）
-                if (currentMode === 'edu' && eduSubMode === 'single') {
+                // 教育模式-单独判读/复核判读：禁用模态切换按钮
+                if (currentMode === 'edu' && (eduSubMode === 'single' || eduSubMode === 'review')) {
                     const modalityGroup = document.querySelector('.diagnosis-group'); // 第一个是模态切换
                     if (modalityGroup) {
                         const modalityButtons = modalityGroup.querySelectorAll('.option-btn');
                         modalityButtons.forEach(btn => {
                             btn.style.opacity = '0.5';
                             btn.style.pointerEvents = 'none';
-                            btn.title = '单独判读模式不可切换';
+                            btn.title = '此模式不可切换模态';
                         });
-                        console.log('已禁用模态切换按钮（单独判读模式）');
+                        console.log('已禁用模态切换按钮（单独/复核判读模式）');
                     }
                 }
                 
@@ -1853,8 +1852,8 @@
 
         // 加载模型置信度（从第一个视频的metadata）
         async function loadModelConfidence(patient) {
-            // 教育模式-单独判读：不显示置信度
-            if (currentMode === 'edu' && eduSubMode === 'single') {
+            // 教育模式-单独判读/复核判读：不显示置信度
+            if (currentMode === 'edu' && (eduSubMode === 'single' || eduSubMode === 'review')) {
                 const confidenceContainer = document.getElementById('modelConfidence');
                 if (confidenceContainer) {
                     confidenceContainer.style.display = 'none';
@@ -2469,9 +2468,9 @@ function selectOption(element, group) {
 
             // 如果是模态切换，重新加载视频
             if (group === 'modality') {
-                // 教育模式1(single)禁止切换到热力图/识别框
-                if (eduSubMode === 'single') {
-                    alert('单独判读模式仅显示原视频');
+                // 教育模式-单独判读/复核判读禁止切换到热力图/识别框
+                if (eduSubMode === 'single' || eduSubMode === 'review') {
+                    alert('此模式仅显示原视频');
                     return;
                 }
                 const modalityText = element.textContent.trim();

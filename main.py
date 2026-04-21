@@ -1031,28 +1031,44 @@ async def submit_diagnosis_json(request: DiagnosisSubmitJsonRequest):
                     user_data = json.load(f)
             
             # 提取父任务ID（去掉后缀）
-            parent_id = re.sub(r'_SINGLE|_AI-ASSIST$', '', request.taskFolder)
+            parent_id = re.sub(r'_SINGLE|_AI-ASSIST|_REVIEW$', '', request.taskFolder)
             
             # 初始化嵌套结构
             if parent_id not in user_data:
                 user_data[parent_id] = {"stages": {}, "llm_analysis": {}}
             if "stages" not in user_data[parent_id]:
-                user_data[parent_id] = {"stages": {}, "llm_analysis": {}}
+                user_data[parent_id]["stages"] = {}
+            if "llm_analysis" not in user_data[parent_id]:
+                user_data[parent_id]["llm_analysis"] = {}
             
             # 在stats中添加模式标识
             stats['edu_sub_mode'] = request.eduSubMode
             stats['completed_at'] = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
             user_data[parent_id]["stages"][request.eduSubMode] = stats
             
+            # 检查是否为三阶段任务且三阶段都完成
+            is_triple = request.eduSubMode == "review"
+            stages = user_data[parent_id].get("stages", {})
+            all_stages_done = "single" in stages and "assist" in stages and "review" in stages
+            
             with open(user_res_path, "w", encoding="utf-8") as f:
                 json.dump(user_data, f, ensure_ascii=False, indent=2)
 
             print(f"📊 教育模式评分完成: {request.username} - 模式: {request.eduSubMode} - 得分: {stats['accuracy']*100}%")
             
-            # 7. [新增] 异步调用大模型分析（使用parent_id和stage确保key匹配）
-            print(f"🔔 准备触发AI分析: username={request.username}, parent_id={parent_id}, stage={request.eduSubMode}")
-            asyncio.create_task(analyze_with_llm(request.username, parent_id, request.eduSubMode, stats))
-            print(f"🔔 已创建AI分析任务")
+            # 三阶段都完成时，触发综合分析（取第一和第三阶段对比）
+            if is_triple and all_stages_done:
+                print(f"🔔 三阶段全部完成，准备触发AI综合分析")
+                asyncio.create_task(analyze_with_llm(
+                    request.username, 
+                    parent_id, 
+                    "triple",
+                    {"single": stages["single"], "assist": stages["assist"], "review": stages["review"]}
+                ))
+                print(f"🔔 已创建三阶段综合分析任务")
+            else:
+                # 非三阶段或未全部完成，不触发单独分析
+                print(f"🔔 当前阶段: {request.eduSubMode}，三阶段完成状态: {all_stages_done}，跳过LLM分析")
             
             return {"message": "评估完成，AI分析报告生成中", "stats": stats}
 
@@ -1085,8 +1101,8 @@ async def analyze_with_llm(username: str, parent_id: str, stage: str, stats: Dic
     Args:
         username: 用户名
         parent_id: 父任务ID（不含后缀）
-        stage: 阶段标识 "single" 或 "assist"
-        stats: 统计数据
+        stage: 阶段标识 "single", "assist", 或 "triple"
+        stats: 统计数据（三阶段时为包含三个阶段数据的字典）
     """
     print(f"🔍 [AI分析] 开始执行: username={username}, parent_id={parent_id}, stage={stage}")
     try:
@@ -1131,7 +1147,7 @@ async def analyze_with_llm(username: str, parent_id: str, stage: str, stats: Dic
         )
         
         print(f"🤖 正在调用大模型分析: {username} - {parent_id}/{stage} (模型: {selected_model.get('display_name', 'unknown')})")
-        analysis_result = await analyzer.analyze_performance(stats)
+        analysis_result = await analyzer.analyze_performance(stats, stage)
         print(f"🔍 [AI分析] 大模型返回结果: {analysis_result.get('status')}")
         
         # 3. 更新成绩单（使用嵌套结构）

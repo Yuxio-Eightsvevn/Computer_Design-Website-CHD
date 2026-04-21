@@ -1,14 +1,14 @@
 [
   {
     "filename": "pic_01.png",
-    "caption": "智能超声分析"
-  },
-  {
-    "filename": "pic_02.png",
     "caption": "多维度诊断视图"
   },
   {
+    "filename": "pic_02.png",
+    "caption": "关键帧精准定位"
+  },
+  {
     "filename": "pic_03.png",
-    "caption": "精准医疗辅助"
+    "caption": "AI专家报告分析"
   }
 ]

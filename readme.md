@@ -1945,5 +1945,164 @@ for username in users:
 
 ---
 
+### 12.18 删除任务时自动清理用户成绩 (2026-04-21)
+
+**问题描述**：
+- `delete_edu_task` 函数删除任务时，只删除了物理文件和索引，没有清理用户的成绩记录
+- `unpublish-task` 函数只处理旧格式后缀结构，没有处理新格式嵌套结构
+
+**修复内容**：
+
+#### 1. delete_edu_task 函数 (routes_oridata.py:1114-1134)
+
+**新增逻辑**：删除任务时同步清理所有用户的成绩记录
+
+```python
+# 3. 删除所有用户的成绩记录
+target_users = task.get("target_users", [])
+for username in target_users:
+    result_file = EDU_RESULTS_DIR / f"{username}.json"
+    if result_file.exists():
+        with open(result_file, "r", encoding="utf-8") as f:
+            user_data = json.load(f)
+        # 删除新格式嵌套结构（父键）
+        if submission_id in user_data:
+            del user_data[submission_id]
+        # 删除旧格式后缀结构
+        if f"{submission_id}_SINGLE" in user_data:
+            del user_data[f"{submission_id}_SINGLE"]
+        if f"{submission_id}_AI-ASSIST" in user_data:
+            del user_data[f"{submission_id}_AI-ASSIST"]
+        with open(result_file, "w", encoding="utf-8") as f:
+            json.dump(user_data, f, ensure_ascii=False, indent=2)
+```
+
+#### 2. unpublish-task 函数 (routes_oridata.py:853-860)
+
+**修复逻辑**：增加对新格式嵌套结构的删除支持
+
+```python
+# 新格式：直接删除父键（包含stages嵌套结构）
+if submission_id in user_data:
+    del user_data[submission_id]
+# 旧格式后缀结构（兼容旧数据）
+if f"{submission_id}_SINGLE" in user_data:
+    del user_data[f"{submission_id}_SINGLE"]
+if f"{submission_id}_AI-ASSIST" in user_data:
+    del user_data[f"{submission_id}_AI-ASSIST"]
+```
+
+**相关文件**：
+| 文件 | 修改内容 |
+|------|----------|
+| routes_oridata.py | delete_edu_task 增加删除用户成绩逻辑 |
+| routes_oridata.py | unpublish-task 增加新格式删除支持 |
+
+---
+
+### 12.19 三阶段教育系统实现 (2026-04-21)
+
+**更新内容**：
+
+#### 系统架构
+
+三阶段教育模式新增"复核判读"阶段：
+
+| 阶段 | 后缀 | 说明 | UI限制 |
+|------|------|------|--------|
+| 第一阶段 | `_SINGLE` | 单独判读 | 仅显示原视频，禁用heatmap/bbox |
+| 第二阶段 | `_AI-ASSIST` | AI辅助判读 | 显示所有模态 |
+| 第三阶段 | `_REVIEW` | 复核判读 | 仅显示原视频，禁用heatmap/bbox |
+
+**publish_mode 枚举**: `"single"` | `"dual"` | `"triple"`
+
+#### 核心逻辑变更
+
+##### 1. LLM分析触发时机 (main.py)
+
+**修改前**：每个阶段完成后立即触发LLM分析
+
+**修改后**：仅当三阶段全部完成后，触发一次综合分析（对比第一阶段和第三阶段）
+
+```python
+# 三阶段都完成时，触发综合分析
+if is_triple and all_stages_done:
+    asyncio.create_task(analyze_with_llm(
+        username, parent_id, "triple",
+        {"single": stages["single"], "assist": stages["assist"], "review": stages["review"]}
+    ))
+```
+
+##### 2. LLM Prompt变更 (llm_analyzer.py)
+
+三阶段分析时，prompt包含：
+- 三个阶段的完整指标对比
+- 第一阶段 vs 第三阶段详细对比
+- 复核能力提升分析
+
+##### 3. 后端修改 (routes_oridata.py)
+
+| 函数 | 修改内容 |
+|------|----------|
+| publish-task | 支持 `publish_mode="triple"`，设置 `edu_sub_mode="triple"` |
+| get_user_edu_tasks | 增加三阶段完成状态判断 |
+| check_task_status | 增加 `_REVIEW` 后缀处理 |
+| get_user_edu_result | 增加 `_REVIEW` 后缀处理 |
+| trigger_llm_analysis | 增加 `_REVIEW` 后缀处理 |
+| unpublish-task | 增加 `_REVIEW` 删除支持 |
+
+##### 4. 前端修改 (edu_status.html)
+
+| 修改点 | 内容 |
+|--------|------|
+| 任务列表渲染 | 三阶段任务显示三个垂直按钮 |
+| 按钮解锁逻辑 | 阶段2需阶段1完成，阶段3需阶段2完成 |
+| openResultModal | 增加 `_REVIEW` 后缀识别 |
+| rerunTask | 增加 `_REVIEW` 后缀处理 |
+
+##### 5. 前端修改 (edu_admin.html)
+
+- 发布模式改为下拉选择：单阶段/双阶段/三阶段
+- 动态显示发布成功消息
+
+##### 6. 前端修改 (diagnosis.html)
+
+- `_REVIEW` 后缀处理
+- 复核判读模式与单独判读一致，禁用heatmap/bbox
+
+#### 数据结构
+
+```json
+{
+  "taskId": {
+    "stages": {
+      "single": { ... },
+      "assist": { ... },
+      "review": { ... }
+    },
+    "llm_analysis": {
+      "triple": {
+        "status": "completed",
+        "report": { ... },
+        "analyzed_at": "..."
+      }
+    }
+  }
+}
+```
+
+#### 相关文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| routes_oridata.py | publish-task三阶段支持、任务状态处理 |
+| main.py | 正则表达式、LLM触发逻辑 |
+| llm_analyzer.py | 三阶段prompt构造 |
+| edu_admin.html | 发布模式下拉选择 |
+| edu_status.html | 三按钮渲染、报告展示 |
+| diagnosis.html | REVIEW后缀处理、UI限制 |
+
+---
+
 *文档版本: 2026-04-21*
-*最后更新: 2026-04-21 - 三阶段教育系统重构(嵌套结构)实施完成*
+*最后更新: 2026-04-21 - 三阶段教育系统实现*

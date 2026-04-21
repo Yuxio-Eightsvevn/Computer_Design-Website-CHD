@@ -3,7 +3,7 @@
     "title": "CHD-AIDE"
   },
   "titleField": {
-    "image": "res/admin/images/pic_01.png",
+    "image": "res/login/images/pic_01.png",
     "welcomeText": "欢迎来到CHD-AIDE平台官方网站",
     "mainTitle": "CHD-AIDE",
     "subtitle": "推理辅助与教育平台",

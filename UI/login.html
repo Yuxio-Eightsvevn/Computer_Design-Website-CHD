@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="res/admin/css/main.css">
+    <link rel="stylesheet" href="res/login/css/main.css">
     <style>
         :root {
             --primary-color: #3a7bd5;
@@ -141,27 +141,6 @@
             background: var(--primary-dark);
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(58, 123, 213, 0.4);
-        }
-
-        /* Keywords */
-        .keywords-section {
-            width: 90%;
-            max-width: var(--max-width);
-            display: flex;
-            justify-content: space-evenly;
-            gap: 20px;
-            margin-bottom: 40px;
-            flex-wrap: wrap;
-        }
-        .keyword-item {
-            font-size: 16px;
-            color: var(--primary-color);
-            font-weight: 500;
-            letter-spacing: 2px;
-            transition: all 0.3s ease;
-        }
-        .keyword-item:hover {
-            color: var(--primary-dark);
         }
 
         /* MainContent */
@@ -378,7 +357,7 @@
     <!-- TitleField -->
     <section class="title-field">
         <div class="title-field-left">
-            <img id="titleImage" src="res/admin/images/pic_01.png" alt="平台图片">
+            <img id="titleImage" src="res/login/images/pic_01.png" alt="平台图片">
         </div>
         <div class="title-field-right">
             <p class="welcome-text" id="welcomeText"></p>
@@ -388,9 +367,6 @@
             <button class="login-btn-title" id="loginBtnTitle" onclick="openLoginModal()"></button>
         </div>
     </section>
-
-    <!-- Keywords -->
-    <section class="keywords-section" id="keywordsSection"></section>
 
     <!-- MainContent -->
     <main class="main-content">
@@ -425,11 +401,11 @@
         </div>
     </div>
 
-    <script src="res/admin/js/jquery.min.js"></script>
-    <script src="res/admin/js/browser.min.js"></script>
-    <script src="res/admin/js/breakpoints.min.js"></script>
-    <script src="res/admin/js/util.js"></script>
-    <script src="res/admin/js/main.js"></script>
+    <script src="res/login/js/jquery.min.js"></script>
+    <script src="res/login/js/browser.min.js"></script>
+    <script src="res/login/js/breakpoints.min.js"></script>
+    <script src="res/login/js/util.js"></script>
+    <script src="res/login/js/main.js"></script>
     <script>
         var config = {};
         var carouselImages = [];
@@ -449,7 +425,7 @@
 
         async function loadCarouselImages() {
             try {
-                var resp = await fetch('res/admin/images/carousel_images.json');
+                var resp = await fetch('res/login/images/carousel_images.json');
                 carouselImages = await resp.json();
                 renderCarousel();
                 startAutoPlay();
@@ -496,14 +472,6 @@
                 }
             }
 
-            // Keywords
-            var keywordsSection = document.getElementById('keywordsSection');
-            if (config.keywords && keywordsSection) {
-                keywordsSection.innerHTML = config.keywords.map(function(k) {
-                    return '<div class="keyword-item">' + k.text + '</div>';
-                }).join('');
-            }
-
             // Features
             var featuresRow = document.getElementById('featuresRow');
             if (config.features && featuresRow) {
@@ -530,7 +498,7 @@
 
             stack.innerHTML = carouselImages.map(function(img, i) {
                 return '<div class="carousel-card" data-index="' + i + '">' +
-                    '<img src="res/admin/images/' + img.filename + '" alt="' + img.caption + '">' +
+                    '<img src="res/login/images/' + img.filename + '" alt="' + img.caption + '">' +
                     '<div class="card-caption">' + img.caption + '</div>' +
                 '</div>';
             }).join('');

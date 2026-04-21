@@ -749,18 +749,26 @@ async def publish_edu_task(submission_id: str = Form(...), target_users: str = F
         users = json.loads(target_users)
         if not users: raise HTTPException(status_code=400, detail="发布对象不能为空")
         
-        # 根据 publish_mode 设置 is_dual_stage
+        # 根据 publish_mode 设置 is_dual_stage 和 edu_sub_mode
         is_dual_stage = (publish_mode == "dual")
+        is_triple_stage = (publish_mode == "triple")
+        edu_sub_mode = "triple" if is_triple_stage else ("dual" if is_dual_stage else "single")
         
         # 更新任务状态
         update_edu_task_index({
             "submission_id": submission_id,
             "status": "published",
             "target_users": users,
-            "is_dual_stage": is_dual_stage
+            "is_dual_stage": is_dual_stage,
+            "edu_sub_mode": edu_sub_mode
         })
         
-        mode_msg = "双阶段任务" if is_dual_stage else "单阶段任务"
+        if is_triple_stage:
+            mode_msg = "三级模式任务"
+        elif is_dual_stage:
+            mode_msg = "双阶段任务"
+        else:
+            mode_msg = "单阶段任务"
         return {"message": f"{mode_msg}已成功发布"}
     except Exception as e: raise HTTPException(status_code=400, detail=f"发布失败: {e}")
 
@@ -850,15 +858,16 @@ async def unpublish_edu_task(submission_id: str = Form(...)):
             try:
                 with open(result_file, "r", encoding="utf-8") as f:
                     user_data = json.load(f)
-                keys_to_delete = [submission_id]
-                if is_dual_stage:
-                    keys_to_delete.extend([
-                        f"{submission_id}_SINGLE",
-                        f"{submission_id}_AI-ASSIST"
-                    ])
-                for key in keys_to_delete:
-                    if key in user_data:
-                        del user_data[key]
+                # 新格式：直接删除父键（包含stages嵌套结构，三阶段也适用）
+                if submission_id in user_data:
+                    del user_data[submission_id]
+                # 旧格式后缀结构（兼容旧数据）
+                if f"{submission_id}_SINGLE" in user_data:
+                    del user_data[f"{submission_id}_SINGLE"]
+                if f"{submission_id}_AI-ASSIST" in user_data:
+                    del user_data[f"{submission_id}_AI-ASSIST"]
+                if f"{submission_id}_REVIEW" in user_data:
+                    del user_data[f"{submission_id}_REVIEW"]
                 with open(result_file, "w", encoding="utf-8") as f:
                     json.dump(user_data, f, ensure_ascii=False, indent=2)
             except Exception as e:
@@ -893,8 +902,31 @@ async def get_user_edu_tasks(username: str):
     for t in user_tasks:
         sub_id = t["submission_id"]
         is_dual = t.get("is_dual_stage", False)
+        is_triple = t.get("edu_sub_mode") == "triple"
         
-        if is_dual:
+        if is_triple:
+            # 三阶段任务：检查三个子任务是否都完成
+            task_result = user_results.get(sub_id, {})
+            stages = task_result.get("stages", {})
+            single_data = stages.get("single")
+            assist_data = stages.get("assist")
+            review_data = stages.get("review")
+            single_done = single_data is not None
+            assist_done = assist_data is not None
+            review_done = review_data is not None
+            all_done = single_done and assist_done and review_done
+            
+            t["is_completed"] = all_done
+            t["single_done"] = single_done
+            t["assist_done"] = assist_done
+            t["review_done"] = review_done
+            t["edu_sub_mode"] = "triple"
+            
+            if all_done:
+                t["last_score"] = review_data.get("accuracy", 0)
+            else:
+                t["last_score"] = None
+        elif is_dual:
             # 双阶段任务：检查两个子任务是否都完成
             # 使用嵌套结构: user_results[parent_id]["stages"]["single"]
             task_result = user_results.get(sub_id, {})
@@ -927,10 +959,10 @@ async def get_user_edu_tasks(username: str):
 @router.get("/api/edu/check-task-status/{submission_id}")
 async def check_task_status(submission_id: str):
     """检查教育任务状态，返回是否有效"""
-    # 处理双阶段任务：提取父任务ID
+    # 处理多阶段任务：提取父任务ID
     parent_id = submission_id
-    if submission_id.endswith('_SINGLE') or submission_id.endswith('_AI-ASSIST'):
-        parent_id = submission_id.rsplit('_', 1)[0]  # 去掉 _SINGLE 或 _AI-ASSIST 后缀
+    if submission_id.endswith('_SINGLE') or submission_id.endswith('_AI-ASSIST') or submission_id.endswith('_REVIEW'):
+        parent_id = submission_id.rsplit('_', 1)[0]  # 去掉后缀
     
     index_path = SYSTEM_EDU_DIR / "data.json"
     if not index_path.exists():
@@ -974,21 +1006,24 @@ async def get_user_edu_result(username: str, submission_id: str):
     elif submission_id.endswith('_AI-ASSIST'):
         parent_id = submission_id.replace('_AI-ASSIST', '')
         stage = 'assist'
+    elif submission_id.endswith('_REVIEW'):
+        parent_id = submission_id.replace('_REVIEW', '')
+        stage = 'review'
     
     # 尝试新嵌套结构
     if parent_id in data:
         task_data = data[parent_id]
-        # 如果指定了stage，只返回该stage的数据
+        # 如果指定了stage，返回合并后的数据（包含stages和llm_analysis）
         if stage:
+            result = {}
+            # 合并stages数据
             if "stages" in task_data and stage in task_data["stages"]:
-                result = task_data["stages"][stage]
-                result["stage"] = stage
-                return result
-            elif "llm_analysis" in task_data and stage in task_data["llm_analysis"]:
-                # 如果stages中没有，找llm_analysis中的记录
-                result = task_data["llm_analysis"][stage]
-                result["stage"] = stage
-                return result
+                result.update(task_data["stages"][stage])
+            # 合并llm_analysis数据
+            if "llm_analysis" in task_data and stage in task_data["llm_analysis"]:
+                result.update(task_data["llm_analysis"][stage])
+            result["stage"] = stage
+            return result
         else:
             # 返回整个任务数据
             return task_data
@@ -1026,6 +1061,9 @@ async def trigger_llm_analysis(username: str, submission_id: str):
     elif submission_id.endswith('_AI-ASSIST'):
         parent_id = submission_id.replace('_AI-ASSIST', '')
         stage = 'assist'
+    elif submission_id.endswith('_REVIEW'):
+        parent_id = submission_id.replace('_REVIEW', '')
+        stage = 'review'
     
     # 尝试嵌套结构
     if parent_id in user_data and stage:
@@ -1112,7 +1150,29 @@ async def delete_edu_task(submission_id: str):
         shutil.rmtree(SYSTEM_EDU_DIR / submission_id, ignore_errors=True)
         shutil.rmtree(SYSTEM_EDU_DIR / "processed" / submission_id, ignore_errors=True)
 
-        # 3. 更新索引
+        # 3. 删除所有用户的成绩记录
+        target_users = task.get("target_users", [])
+        for username in target_users:
+            result_file = EDU_RESULTS_DIR / f"{username}.json"
+            if result_file.exists():
+                try:
+                    with open(result_file, "r", encoding="utf-8") as f:
+                        user_data = json.load(f)
+                    # 删除新格式嵌套结构（父键）
+                    if submission_id in user_data:
+                        del user_data[submission_id]
+                    # 删除旧格式后缀结构
+                    if f"{submission_id}_SINGLE" in user_data:
+                        del user_data[f"{submission_id}_SINGLE"]
+                    if f"{submission_id}_AI-ASSIST" in user_data:
+                        del user_data[f"{submission_id}_AI-ASSIST"]
+                    with open(result_file, "w", encoding="utf-8") as f:
+                        json.dump(user_data, f, ensure_ascii=False, indent=2)
+                    print(f"🗑️ 已清理用户 {username} 的任务成绩")
+                except Exception as e:
+                    print(f"清理用户 {username} 成绩失败: {e}")
+
+        # 4. 更新索引
         data["tasks"] = [t for t in data["tasks"] if t["submission_id"] != submission_id]
         with open(index_path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)

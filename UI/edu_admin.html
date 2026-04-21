@@ -366,7 +366,11 @@
       <h3 id="p-task-title">发布任务</h3>
       <div style="margin: 15px 0;">
         <span style="font-size:13px; font-weight:600;">发布模式：</span>
-        <span style="font-size:13px; color:#10b981; margin-left:10px;">双阶段模式（单独判读 + AI辅助）</span>
+        <select id="publishModeSelect" style="margin-left:10px; padding:5px 10px; border-radius:6px; border:1px solid #cbd5e1;">
+          <option value="single">单阶段模式</option>
+          <option value="dual" selected>双阶段模式（单独判读 + AI辅助）</option>
+          <option value="triple">三阶段模式（单独 + AI辅助 + 复核）</option>
+        </select>
       </div>
       <p style="font-size:12px; color:#64748b; margin-top:5px;">请选择允许参与判读的医师：</p>
       <div class="user-grid" id="userList"></div>
@@ -820,17 +824,20 @@
       const selected = Array.from(document.querySelectorAll('input[name="targetUser"]:checked')).map(cb => cb.value);
       if (selected.length === 0) return alert("请选择至少一个医师进行发布");
 
+      const publishMode = document.getElementById('publishModeSelect').value;
+      const modeText = publishMode === 'triple' ? '三阶段' : (publishMode === 'dual' ? '双阶段' : '单阶段');
+
       const formData = new FormData();
       formData.append('submission_id', currentTargetTaskId);
       formData.append('target_users', JSON.stringify(selected));
-      formData.append('publish_mode', 'dual'); // 固定为双阶段模式
+      formData.append('publish_mode', publishMode);
 
       try {
         const r = await fetch('/api/edu/publish-task', { method: 'POST', body: formData });
         if (r.ok) {
             closeModal('publishModal');
             fetchTasks();
-            alert(`✅ 发布成功（双阶段），医师现在可以在教育模式中看到该批次。`);
+            alert(`✅ 发布成功（${modeText}），医师现在可以在教育模式中看到该批次。`);
         }
       } catch (e) { alert("发布失败，请检查网络"); }
     };

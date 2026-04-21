@@ -30,19 +30,20 @@ class LLMAnalyzer:
         # 检测是否为智谱AI
         self.is_zhipu = "bigmodel" in base_url.lower() or "zhipu" in base_url.lower()
     
-    async def analyze_performance(self, stats: Dict[str, Any]) -> Dict[str, Any]:
+    async def analyze_performance(self, stats: Dict[str, Any], stage: str = "single") -> Dict[str, Any]:
         """
         发送数据到大模型进行分析
         
         Args:
-            stats: 统计数据字典
+            stats: 统计数据字典（三阶段时为包含三个阶段数据的字典）
+            stage: 阶段标识 "single", "assist", 或 "triple"
             
         Returns:
             分析结果字典
         """
         try:
             # 1. 构造提示词
-            prompt = self._construct_prompt(stats)
+            prompt = self._construct_prompt(stats, stage)
             
             # 2. 选择endpoint
             endpoint = self._get_endpoint()
@@ -145,7 +146,7 @@ class LLMAnalyzer:
                 result = await response.json()
                 return result
     
-    def _construct_prompt(self, stats: Dict[str, Any]) -> str:
+    def _construct_prompt(self, stats: Dict[str, Any], stage: str = "single") -> str:
         """构造分析提示词"""
         
         # 添加背景说明
@@ -153,7 +154,6 @@ class LLMAnalyzer:
 【背景说明】
 这是一个医学诊断教育培训系统，用于训练医师的诊断能力。
 学员在判读过程中，系统会提供AI辅助诊断结果（包括置信度分数）作为参考。
-本次分析的是学员在使用AI辅助后的表现。
 
 【四种依赖的定义】
 1. **正确依赖 (Correct Reliance)** 
@@ -161,17 +161,17 @@ class LLMAnalyzer:
    - 含义:学员正确利用了AI的辅助,做出了正确判断
    - 医学意义:展现了良好的AI辅助诊断能力
 
-2. **依赖不足 (Insufficient Reliance)**}
+2. **依赖不足 (Insufficient Reliance)**
    - 定义:AI诊断正确,但学员诊断错误
    - 含义:AI给出了正确建议，但学员未能正确理解或采纳
    - 医学意义:需要加强对AI诊断结果的理解和信任
 
-3. **正确独立 (Correct Independence)**}
+3. **正确独立 (Correct Independence)**
    - 定义:AI诊断错误，但学员诊断正确
    - 含义:学员依靠自己的专业知识做出了正确判断
    - 医学意义:展现了扎实的专业诊断能力
 
-4. **过度依赖 (Over Reliance)**}
+4. **过度依赖 (Over Reliance)**
    - 定义:AI诊断错误，学员也诊断错误
    - 含义:学员过度依赖AI，未能发现AI的错误
    - 医学意义:需要培养批判性思维，不应盲目依赖AI
@@ -188,6 +188,74 @@ class LLMAnalyzer:
 - 置信度分数范围为0-1，表示AI对各类别的预测概率
 """
         
+        # 三阶段综合分析
+        if stage == "triple":
+            single = stats.get("single", {})
+            assist = stats.get("assist", {})
+            review = stats.get("review", {})
+            
+            prompt = f"""
+{background}
+
+{units_explanation}
+
+【三阶段医学诊断练习综合分析】
+
+本次分析为三阶段综合分析，包含：
+1. 第一阶段（单独判读）：学员仅凭原始视频进行诊断，不使用AI辅助
+2. 第二阶段（AI辅助判读）：学员使用AI热力图、边界框等辅助工具进行诊断
+3. 第三阶段（复核判读）：学员在AI辅助基础上进行最终复核确认
+
+【第一阶段 - 单独判读 基础指标】
+- 准确率: {single.get('accuracy', 0)*100:.1f}%
+- 敏感度: {single.get('sensitivity', 0)*100:.1f}%
+- 特异性: {single.get('specificity', 0)*100:.1f}%
+- 总用时: {single.get('formatted_duration', '未知')}
+
+【第二阶段 - AI辅助判读 基础指标】
+- 准确率: {assist.get('accuracy', 0)*100:.1f}%
+- 敏感度: {assist.get('sensitivity', 0)*100:.1f}%
+- 特异性: {assist.get('specificity', 0)*100:.1f}%
+- 总用时: {assist.get('formatted_duration', '未知')}
+
+【第三阶段 - 复核判读 基础指标】
+- 准确率: {review.get('accuracy', 0)*100:.1f}%
+- 敏感度: {review.get('sensitivity', 0)*100:.1f}%
+- 特异性: {review.get('specificity', 0)*100:.1f}%
+- 总用时: {review.get('formatted_duration', '未知')}
+
+【第一阶段 vs 第三阶段 详细对比】
+这是最重要的对比，反映学员在有AI参考的情况下的复核能力提升：
+
+准确率差异: {(review.get('accuracy', 0) - single.get('accuracy', 0))*100:+.1f}%
+敏感度差异: {(review.get('sensitivity', 0) - single.get('sensitivity', 0))*100:+.1f}%
+特异性差异: {(review.get('specificity', 0) - single.get('specificity', 0))*100:+.1f}%
+
+【第一阶段 AI依赖性分析（单独判读无AI辅助，此项不适用）】
+无
+
+【第三阶段 AI依赖性分析（复核判读）】
+{json.dumps(review.get('ai_dependency', {}), ensure_ascii=False, indent=2)}
+
+请从以下几个方面给出评价：
+1. 整体表现评价 - 综合三个阶段的准确率、敏感度、特异性等指标
+2. 第一阶段vs第三阶段对比分析 - 分析学员在有AI参考情况下的复核能力提升
+3. 诊断能力分析 - 分析学员在不同病种上的表现变化
+4. 改进建议 - 给出具体、可操作的改进建议（3-5条）
+
+请以JSON格式返回评价结果，包含以下字段：
+{{
+    "overall_evaluation": "整体评价文字",
+    "diagnosis_ability": "诊断能力分析文字",
+    "ai_tool_usage": "AI工具使用分析文字",
+    "improvement_suggestions": ["建议1", "建议2", "建议3"],
+    "strength_points": ["优势1", "优势2"],
+    "weakness_points": ["不足1", "不足2"]
+}}
+"""
+            return prompt
+        
+        # 单阶段分析（原有逻辑）
         # 构建完整提示词
         prompt = f"""
 {background}
