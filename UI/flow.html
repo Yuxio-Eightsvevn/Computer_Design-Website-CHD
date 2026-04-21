@@ -18,7 +18,8 @@
     }
     .card {
       width: 100%;
-      max-width: 1100px;
+      max-width: 1320px;
+      min-height: 384px;
       background: white;
       border-radius: 12px;
       padding: 36px;
@@ -39,12 +40,14 @@
     .userinfo { display:flex; flex-direction:column; }
     .welcome { font-size:26px; font-weight:700; color:#1f2937; }
     .meta { color:#6b7280; font-size:16px; margin-top:6px; }
-    .buttons { display:flex; gap:12px; flex-wrap:wrap; margin-top:18px; }
+    .buttons { display:flex; flex-wrap:wrap; margin-top:24px; gap:24px; justify-content:space-between; align-items:center; }
     .btn {
-      padding:16px 24px; border-radius:10px; border:none; cursor:pointer; font-weight:600; font-size:16px;
+      padding:20px 32px; border-radius:10px; border:none; cursor:pointer; font-weight:600; font-size:18px;
       background:linear-gradient(90deg,#667eea 0%,#5b8def 100%); color:#fff;
       box-shadow: 0 6px 18px rgba(102,126,234,0.12);
+      transition: all 0.2s;
     }
+    .btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
     .btn.secondary {
       background: linear-gradient(90deg,#10b981 0%,#14c38e 100%);
       box-shadow: 0 6px 18px rgba(20,195,142,0.12);
@@ -110,7 +113,6 @@
       <div class="userinfo">
         <div id="welcomeText" class="welcome">欢迎回来，加载中...</div>
         <div id="orgText" class="meta">机构：加载中...</div>
-        <div class="hint">请选择以下模式开始：</div>
       </div>
       <div style="flex:1"></div>
       <div>
@@ -118,17 +120,19 @@
       </div>
     </div>
 
+    <div class="hint" style="font-size:18px;margin-bottom:12px;">请选择以下模式开始：</div>
+
     <div class="buttons" role="navigation" aria-label="mode-buttons">
-      <button id="diagnoseBtn" class="btn">诊断模式</button>
-      <button id="eduBtn" class="btn secondary">教育模式</button>
-      <!-- [改动] 默认隐藏管理员专用按钮 -->
-      <button id="tasksBtn" class="btn ghost" style="display: none;">任务管理</button>
-      <button id="usersBtn" class="btn ghost" style="display: none;">用户管理</button>
+      <div style="display:flex;gap:24px;flex-wrap:wrap;">
+        <button id="diagnoseBtn" class="btn" data-desc-key="diagnoseBtn">诊断模式</button>
+        <button id="eduBtn" class="btn secondary" data-desc-key="eduBtn">教育模式</button>
+        <button id="tasksBtn" class="btn ghost" style="display: none;" data-desc-key="tasksBtn">任务管理</button>
+        <button id="usersBtn" class="btn ghost" style="display: none;" data-desc-key="usersBtn">用户管理</button>
+      </div>
+      <div style="color:#6b7280;font-size:13px;white-space:nowrap;">如需切换账号，请先退出再重新登录。</div>
     </div>
 
-    <div class="actions">
-      <div style="color:#6b7280;font-size:13px;">如需切换账号，请先退出再重新登录。</div>
-    </div>
+    <div id="buttonDesc" style="color:#6b7280;font-size:16px;min-height:24px;margin-top:12px;">请选择需要的功能</div>
   </div>
 
   <script>
@@ -142,6 +146,15 @@
       const tasksBtn = document.getElementById('tasksBtn');
       const usersBtn = document.getElementById('usersBtn');
       const logoutBtn = document.getElementById('logoutBtn');
+      const buttonDesc = document.getElementById('buttonDesc');
+      const allButtons = [diagnoseBtn, eduBtn, tasksBtn, usersBtn, logoutBtn];
+      let buttonDescriptions = {
+        diagnoseBtn: '进入诊断模式，进行正式病例诊断',
+        eduBtn: '进入教育模式，进行练习和学习',
+        tasksBtn: '管理教学任务批次',
+        usersBtn: '管理系统用户账号',
+        logoutBtn: '退出当前登录账号'
+      };
 
       function getCookieValue(name) {
         const cookies = document.cookie ? document.cookie.split('; ') : [];
@@ -152,7 +165,37 @@
         return null;
       }
 
+      async function loadButtonDescriptions() {
+        try {
+          const r = await fetch('/res/flow/descriptions.json');
+          if (r.ok) {
+            const data = await r.json();
+            buttonDescriptions = { ...buttonDescriptions, ...data };
+          }
+        } catch (e) {
+          console.warn('按钮描述加载失败，使用默认描述');
+        }
+      }
+
+      function setupButtonHoverEvents() {
+        allButtons.forEach(btn => {
+          if (!btn) return;
+          btn.addEventListener('mouseenter', () => {
+            const key = btn.getAttribute('data-desc-key');
+            if (key && buttonDescriptions[key]) {
+              buttonDesc.textContent = buttonDescriptions[key];
+            }
+          });
+          btn.addEventListener('mouseleave', () => {
+            buttonDesc.textContent = '请选择需要的功能';
+          });
+        });
+      }
+
       async function loadUser() {
+        await loadButtonDescriptions();
+        setupButtonHoverEvents();
+        
         let isAdmin = false; // [新增] 默认无管理员权限
         let uname = getCookieValue('username') || getCookieValue('user') || 'unknown';
         let org = '';

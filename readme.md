@@ -1144,168 +1144,594 @@ def update_user(user_id: int, doctor: str, organization: str,
 **更新内容**:
 
 教育模式新增**双阶段判读**功能，用户需要完成两个阶段：
-1. **单独判读**: 仅显示原始视频，禁用heatmap/bbox模态按钮
-2. **AI辅助判读**: 显示完整模态（original/heatmap/bbox），需先完成单独判读才可解锁
+1. **单独判读(Single)**: 仅显示原始视频，禁用heatmap/bbox模态按钮
+2. **AI辅助判读(Assist)**: 显示完整模态（original/heatmap/bbox），需先完成单独判读才可解锁
 3. **对比报告**: 显示两个阶段的详细对比分析
 
-**后端变更**:
+---
 
-| 接口/函数 | 修改位置 | 修改内容 |
-|-----------|----------|----------|
-| /api/edu/confirm-upload | routes_oridata.py | 新增 `is_dual_stage` 字段 |
-| /api/edu/publish-task | routes_oridata.py | 新增 `publish_mode` 参数(single/dual) |
-| DiagnosisSubmitJsonRequest | main.py | 新增 `eduSubMode` 字段 |
-| /api/diagnosis/submit-json | main.py | 保存时添加 `_SINGLE` / `_AI-ASSIST` 后缀 |
-| /api/edu/check-task-status | routes_oridata.py | 修复 `_SINGLE`/`_AI-ASSIST` 后缀处理 |
+#### 12.8.1 系统架构
 
-**前端变更**:
-
-| 页面 | 修改内容 |
-|------|----------|
-| edu_admin.html | 发布模式下拉框(single/dual)，默认dual |
-| edu_status.html | 双按钮垂直排列("单独判读"+"AI判读")，对比报告入口 |
-| diagnosis.html | 单独判读模式禁用heatmap/bbox按钮，检查前置任务完成状态 |
-
-**任务状态处理**:
+##### 工作流程图
 
 ```
-任务ID: task123
-├── task123_SINGLE      # 单独判读结果
-└── task123_AI-ASSIST  # AI辅助判读结果
+┌─────────────────────────────────────────────────────────────────┐
+│                     教育批次上传与发布流程                         │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  1. 管理员上传ZIP包 (edu_admin.html)                              │
+│     └── epoch_data.json + videos/                                │
+│                      │                                           │
+│                      ▼                                           │
+│  2. 后端解析并重组目录 (routes_oridata.py)                         │
+│     └── 标记 is_dual_stage = True                                │
+│                      │                                           │
+│                      ▼                                           │
+│  3. AI模型处理                                                     │
+│     └── 生成热力图、边界框、置信度                                │
+│                      │                                           │
+│                      ▼                                           │
+│  4. 管理员发布任务 (routes_oridata.py)                            │
+│     └── 设置 publish_mode = "dual"                               │
+│                      │                                           │
+│                      ▼                                           │
+│  5. 用户开始判读 (edu_status.html → diagnosis.html)              │
+│     ┌─────────────────────────────────────────────────────────┐  │
+│     │ 阶段1: 单独判读 (_SINGLE)                                │  │
+│     │   • 仅显示 original 视频                                 │  │
+│     │   • 禁用 heatmap/bbox 按钮                              │  │
+│     │   • 提交后保存为 taskId_SINGLE                          │  │
+│     └─────────────────────────────────────────────────────────┘  │
+│                          │                                       │
+│                          ▼                                       │
+│     ┌─────────────────────────────────────────────────────────┐  │
+│     │ 阶段2: AI辅助判读 (_AI-ASSIST)                           │  │
+│     │   • 显示 original/heatmap/bbox                         │  │
+│     │   • 需阶段1完成后才可进入                                 │  │
+│     │   • 提交后保存为 taskId_AI-ASSIST                        │  │
+│     └─────────────────────────────────────────────────────────┘  │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-**对比报告内容**:
-- 两个阶段的准确率、敏感度、特异性对比
-- AI依赖性分析对比
-- 各病种表现对比
+---
 
-**相关文件**:
-| 文件 | 修改内容 |
-|------|----------|
-| routes_oridata.py | is_dual_stage、publish_mode、check-task-status修复 |
-| main.py | DiagnosisSubmitJsonRequest、eduSubMode |
-| edu_admin.html | 发布模式选择UI |
-| edu_status.html | 双按钮、对比报告 |
-| diagnosis.html | 模态按钮禁用、状态检查 |
+#### 12.8.2 数据结构
+
+##### 任务索引 (SYSTEM/edu_data/data.json)
+
+```json
+{
+  "tasks": [
+    {
+      "submission_id": "task123",
+      "request_name": "测试批次",
+      "is_dual_stage": true,
+      "status": "published",
+      "target_users": ["doctor1", "doctor2"],
+      "request_pos": "processed/task123",
+      "request_case_cnt": 5,
+      "request_video_cnt": 15
+    }
+  ]
+}
+```
+
+##### 用户成绩单 (SYSTEM/edu_data/Doctor_Diag_Result/{username}.json)
+
+**当前实现** (使用后缀):
+
+```json
+{
+  "task123_SINGLE": {
+    "accuracy": 0.85,
+    "sensitivity": 0.80,
+    "specificity": 0.90,
+    "edu_sub_mode": "single",
+    "total_duration": 120.5,
+    "category_stats": {...},
+    "ai_dependency": {...}
+  },
+  "task123_AI-ASSIST": {
+    "accuracy": 0.92,
+    "sensitivity": 0.88,
+    "specificity": 0.95,
+    "edu_sub_mode": "assist",
+    "total_duration": 95.3,
+    "category_stats": {...},
+    "ai_dependency": {...}
+  }
+}
+```
+
+**问题**:
+- 任务ID被污染（包含 `_SINGLE` / `_AI-ASSIST` 后缀）
+- 需要字符串操作提取父任务ID
+- 代码中多处需要后缀处理逻辑
+- 不易扩展第三阶段
 
 ---
 
-### 12.11 AI分析等待界面与触发逻辑修复
+#### 12.8.3 API接口详解
 
-**更新内容**:
+##### 发布任务
 
-| 问题 | 修复位置 | 详细说明 |
-|------|----------|----------|
-| 等待界面显示秒数 | edu_status.html | 简化等待界面，不显示秒数/次数 |
-| AI分析key不匹配 | main.py | analyze_with_llm参数从original_task_folder改为save_key |
-| 缺少手动触发API | routes_oridata.py | 新增 /api/edu/trigger-llm-analysis 接口 |
-| 前端未触发分析 | edu_status.html | 检查failed/无状态时自动触发重新分析 |
-| 双阶段failed处理 | edu_status.html | failed状态时触发重新分析 |
+**接口**: `POST /api/edu/publish-task`
 
-**技术细节**:
+**参数**:
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| submission_id | string | 任务ID |
+| target_users | string (JSON数组) | 发布对象用户列表 |
+| publish_mode | string | "single" 或 "dual"，默认 "dual" |
 
-1. **等待界面简化**：
-   - 移除 "正在生成AI分析报告" 文字
-   - 移除轮询时的 `(attempts/maxAttempts)` 显示
-   - 只显示旋转齿轮动画
+**代码位置**: `routes_oridata.py:747`
 
-2. **AI分析key修复**：
-   ```python
-   # 修改前（key不匹配）
-   asyncio.create_task(analyze_with_llm(request.username, original_task_folder, stats))
-   
-   # 修改后（key匹配）
-   asyncio.create_task(analyze_with_llm(request.username, save_key, stats))
-   ```
+```python
+@router.post("/api/edu/publish-task")
+async def publish_edu_task(
+    submission_id: str = Form(...),
+    target_users: str = Form(...),
+    publish_mode: str = Form("dual")
+):
+    is_dual_stage = (publish_mode == "dual")
+    update_edu_task_index({
+        "submission_id": submission_id,
+        "status": "published",
+        "target_users": users,
+        "is_dual_stage": is_dual_stage
+    })
+```
 
-3. **手动触发API**：
-   - 支持 failed 状态重新触发
-   - 自动更新状态为 pending
+##### 提交诊断结果
 
-**相关文件**:
-| 文件 | 修改内容 |
-|------|----------|
-| edu_status.html | 等待界面、failed处理、双阶段处理 |
-| main.py | analyze_with_llm 参数 |
-| routes_oridata.py | trigger-llm-analysis 接口 |
+**接口**: `POST /api/diagnosis/submit-json`
+
+**请求体** (DiagnosisSubmitJsonRequest):
+```typescript
+{
+  username: string,
+  taskFolder: string,        // 任务文件夹
+  mode: "diag" | "edu",     // 模式
+  eduSubMode: "single" | "assist" | null,  // 教育子模式
+  submittedAt: string,
+  totalTime: object,
+  patientCount: number,
+  records: DiagnosisRecordSimple[]
+}
+```
+
+**代码位置**: `main.py:842`
+
+```python
+@app.post("/api/diagnosis/submit-json")
+async def submit_diagnosis_json(request: DiagnosisSubmitJsonRequest):
+    if request.mode == "edu":
+        # 1. 读取标准答案
+        gt_path = Path(DATA_BATCH_STORAGE) / "SYSTEM/edu_data" / original_task_folder / "epoch_data.json"
+        
+        # 2. 计算统计数据
+        stats = calculate_stats(request.records, ground_truth, ai_data)
+        
+        # 3. 保存成绩 (带后缀)
+        save_key = request.taskFolder
+        if request.eduSubMode == 'single':
+            save_key = f"{request.taskFolder}_SINGLE"
+        elif request.eduSubMode == 'assist':
+            save_key = f"{request.taskFolder}_AI-ASSIST"
+        
+        user_data[save_key] = stats
+        
+        # 4. 触发AI分析
+        asyncio.create_task(analyze_with_llm(request.username, save_key, stats))
+```
+
+##### 获取用户任务列表
+
+**接口**: `GET /api/edu/user/tasks/{username}`
+
+**返回结构**:
+```json
+{
+  "tasks": [
+    {
+      "submission_id": "task123",
+      "request_name": "测试批次",
+      "is_dual_stage": true,
+      "is_completed": false,
+      "single_done": true,      // 双阶段: 单独判读是否完成
+      "assist_done": false,      // 双阶段: AI辅助是否完成
+      "edu_sub_mode": "dual",
+      "last_score": 0.85
+    }
+  ]
+}
+```
+
+**代码位置**: `routes_oridata.py:867`
+
+##### 获取用户成绩
+
+**接口**: `GET /api/edu/user/result/{username}/{taskId}`
+
+**代码位置**: `routes_oridata.py:923`
+
+```python
+@router.get("/api/edu/user/result/{username}/{taskId}")
+async def get_user_edu_result(username: str, taskId: str):
+    # 处理双阶段任务：提取父任务ID
+    parent_id = taskId
+    if taskId.endswith('_SINGLE') or taskId.endswith('_AI-ASSIST'):
+        parent_id = taskId.rsplit('_', 1)[0]
+    
+    # 读取用户成绩单
+    result_file = EDU_RESULTS_DIR / f"{username}.json"
+    return user_results.get(taskId)  # 按完整taskId查找
+```
 
 ---
 
-### 12.12 AI分析检测与双阶段报告修复
+#### 12.8.4 前端实现
 
-**更新内容**:
+##### edu_status.html 任务卡片渲染
 
-| 问题 | 修复位置 | 详细说明 |
-|------|----------|----------|
-| 已有报告仍超时 | edu_status.html | pollForLLMAnalysis开始时先检查是否completed |
-| 双阶段已完成仍等待 | edu_status.html | 直接检查singleCompleted && assistCompleted |
-| 超时后显示错误 | edu_status.html | 改为显示等待界面+重新触发按钮 |
-| 按钮文字固定 | edu_status.html | 根据id后缀动态显示单独判别/AI辅助判别 |
-| 管理员任务状态错误 | routes_oridata.py | 双阶段任务检查两个子任务是否都完成 |
-| 管理员查看AI报告 | edu_admin.html | 双阶段报告显示AI评价内容 |
+**代码位置**: `edu_status.html:193-216`
 
-**相关文件**:
-| 文件 | 修改内容 |
-|------|----------|
-| edu_status.html | 检测completed状态、超时处理、双阶段逻辑 |
-| routes_oridata.py | task-status API支持双阶段检查 |
-| edu_admin.html | 双阶段对比报告、显示AI评价 |
+```javascript
+if (isDualStage) {
+    // 双阶段任务：两个垂直按钮
+    div.innerHTML = `
+        <button onclick="handleTask('${id}_SINGLE', ...)">
+            ${singleDone ? '✅ 已完成' : '单独判读'}
+        </button>
+        <button ${!singleDone ? 'disabled' : ''} onclick="handleTask('${id}_AI-ASSIST', ...)">
+            ${assistDone ? '✅ 已完成' : 'AI辅助判读'}
+        </button>
+    `;
+} else {
+    // 普通任务
+    div.innerHTML = `<button onclick="handleTask('${id}', ...)">开始判读</button>`;
+}
+```
+
+##### diagnosis.html 单独判读模式禁用
+
+**代码位置**: `diagnosis.html:1636-1646`
+
+```javascript
+// 单独判读模式：禁用模态切换按钮
+if (currentMode === 'edu' && eduSubMode === 'single') {
+    const modalityGroup = document.querySelector('.diagnosis-group');
+    const modalityButtons = modalityGroup.querySelectorAll('.option-btn');
+    modalityButtons.forEach(btn => {
+        btn.style.opacity = '0.5';
+        btn.style.pointerEvents = 'none';
+        btn.title = '单独判读模式不可切换';
+    });
+}
+```
+
+##### URL参数传递
+
+```
+# 单独判读
+/diagnosis.html?mode=edu&taskId=xxx_SINGLE&eduSubMode=single
+
+# AI辅助判读
+/diagnosis.html?mode=edu&taskId=xxx_AI-ASSIST&eduSubMode=assist
+```
 
 ---
 
-### 12.13 UI界面放大改进
+#### 12.8.5 对比报告
 
-**更新内容**:
+双阶段任务完成后，显示**对比报告**，包含：
 
-应用户要求，对多个页面的UI元素进行了放大处理，提升视觉效果和可操作性：
+##### 指标对比表格
 
-#### A. flow.html
-| 元素 | 修改前 | 修改后 |
-|------|--------|--------|
-| 卡片宽度 | 900px | 1100px |
-| 卡片内边距 | 28px | 36px |
-| 头像尺寸 | 72px | 80px |
-| 头像字体 | 28px | 32px |
-| 欢迎文字 | 20px | 26px |
-| 元信息文字 | 14px | 16px |
-| 按钮内边距 | 12px 18px | 16px 24px |
-| 按钮字体 | 14px | 16px |
+| 指标 | 单独判读 | AI辅助判读 | 差值 |
+|------|----------|------------|------|
+| 准确率 | 85.0% | 92.0% | +7.0% |
+| 敏感度 | 80.0% | 88.0% | +8.0% |
+| 特异性 | 90.0% | 95.0% | +5.0% |
 
-#### B. diagnosis.html
-| 元素 | 修改前 | 修改后 |
-|------|--------|--------|
-| 置信度标签 | Normal | 正常 |
-| 临床判断按钮 | Normal | 正常 |
-| .option-btn 内边距 | 12px 16px | 16px 24px |
-| .option-btn 字体 | 14px | 16px |
+##### AI依赖性分析
 
-#### C. edu_status.html
-| 元素 | 修改前 | 修改后 |
-|------|--------|--------|
-| 导航栏内边距 | 15px 25px | 20px 30px |
-| 任务卡片内边距 | 18px | 24px |
-| 按钮内边距 | 8px 16px | 12px 20px |
-| 按钮字体 | 13px | 16px |
-| 侧边栏文字 | 12px | 14px |
-| 任务名称字体 | 默认(16px) | 16px (明确) |
-| 任务元信息 | 14px | 15px |
-| 按钮宽度 | 120px | 140px |
-| 指标标签 | 12px | 14px |
+| 类型 | 说明 | 单独判读 | AI辅助 |
+|------|------|----------|--------|
+| 正确依赖 | AI正确+判读正确 | 12 | 18 |
+| 依赖不足 | AI正确+判读错误 | 3 | 1 |
+| 正确独立 | AI错误+判读正确 | 2 | 1 |
+| 过度依赖 | AI错误+判读错误 | 3 | 0 |
 
-#### D. 通用UI改进
-- 所有按钮添加悬停效果：`filter: brightness(1.1)` + `transform: translateY(-1px)`
-- Git合并冲突修复：清除所有HTML文件中的 `<<<<<<< HEAD` 等冲突标记
+##### 六维雷达图对比
+
+使用统一六维指标进行叠加对比：
+1. 准确率 (Accuracy)
+2. 敏感度 (Sensitivity)
+3. 特异性 (Specificity)
+4. 病种均衡性 (Category Balance)
+5. 诊断效率 (Diagnosis Efficiency)
+6. 决策一致性 (Decision Consistency)
+
+---
+
+#### 12.8.6 关键代码索引
+
+| 功能 | 文件 | 行号 |
+|------|------|------|
+| 发布任务，设置双阶段 | routes_oridata.py | 747-765 |
+| 保存成绩（后缀逻辑） | main.py | 1032-1042 |
+| 计算统计数据 | main.py | 866-1023 |
+| 获取用户任务列表 | routes_oridata.py | 867-920 |
+| 检查任务状态 | routes_oridata.py | 923-939 |
+| 任务卡片渲染 | edu_status.html | 193-234 |
+| 禁用模态按钮 | diagnosis.html | 1636-1646 |
+| 提交诊断 | diagnosis.html | 2820-2850 |
+| 对比报告渲染 | edu_status.html | 720-800 |
+
+---
+
+#### 12.8.7 相关文件
+
+| 文件 | 职责 |
+|------|------|
+| main.py | 统计数据计算、成绩保存、AI分析触发 |
+| routes_oridata.py | 任务发布、状态检查、成绩读取 |
+| edu_admin.html | 发布任务界面 |
+| edu_status.html | 任务列表、对比报告渲染 |
+| diagnosis.html | 诊断界面、模态控制 |
+
+---
+
+### 12.16 三阶段教育系统重构计划 (Plan A - 嵌套结构)
+
+**重构目标**: 将使用后缀的成绩存储改为嵌套结构，便于扩展第三阶段。
+
+#### 12.16.1 新数据结构
+
+**成绩单** (SYSTEM/edu_data/Doctor_Diag_Result/{username}.json)
+
+```json
+{
+  "task123": {
+    "stages": {
+      "single": {
+        "accuracy": 0.85,
+        "sensitivity": 0.80,
+        "specificity": 0.90,
+        "edu_sub_mode": "single",
+        "total_duration": 120.5,
+        "category_stats": {...},
+        "ai_dependency": {...},
+        "completed_at": "2026-04-21T10:30:00"
+      },
+      "assist": {
+        "accuracy": 0.92,
+        "sensitivity": 0.88,
+        "specificity": 0.95,
+        "edu_sub_mode": "assist",
+        "total_duration": 95.3,
+        "category_stats": {...},
+        "ai_dependency": {...},
+        "completed_at": "2026-04-21T10:35:00"
+      }
+    },
+    "llm_analysis": {
+      "single": { "status": "completed", "report": "..." },
+      "assist": { "status": "pending" }
+    }
+  }
+}
+```
+
+#### 12.16.2 代码更改计划
+
+##### Step 1: main.py - 保存逻辑重构
+
+**文件**: `main.py`
+**行号**: 1025-1045
+
+**修改前**:
+```python
+save_key = request.taskFolder
+if request.eduSubMode:
+    if request.eduSubMode == 'single':
+        save_key = f"{request.taskFolder}_SINGLE"
+    elif request.eduSubMode == 'assist':
+        save_key = f"{request.taskFolder}_AI-ASSIST"
+user_data[save_key] = stats
+```
+
+**修改后**:
+```python
+parent_id = re.sub(r'_SINGLE|_AI-ASSIST$', '', request.taskFolder)
+if parent_id not in user_data:
+    user_data[parent_id] = {"stages": {}, "llm_analysis": {}}
+if "stages" not in user_data[parent_id]:
+    user_data[parent_id] = {"stages": {}, "llm_analysis": {}}
+user_data[parent_id]["stages"][request.eduSubMode] = stats
+```
+
+##### Step 2: main.py - AI分析触发
+
+**文件**: `main.py`
+**行号**: 1049-1051
+
+**修改后**:
+```python
+asyncio.create_task(analyze_with_llm(
+    request.username,
+    parent_id,  # 使用父任务ID
+    request.eduSubMode,  # 传递阶段参数
+    stats
+))
+```
+
+##### Step 3: main.py - analyze_with_llm 函数
+
+**文件**: `main.py`
+**行号**: 1078
+
+**函数签名修改**:
+```python
+async def analyze_with_llm(username: str, task_folder: str, stage: str, stats: Dict):
+    # 修改保存逻辑
+    user_data[parent_id]["llm_analysis"][stage] = {"status": "completed", "report": llm_report}
+```
+
+##### Step 4: routes_oridata.py - 读取逻辑
+
+**文件**: `routes_oridata.py`
+**行号**: 793-812
+
+**修改后**:
+```python
+if is_dual_stage:
+    parent_id = submission_id
+    single_data = res_data.get(parent_id, {}).get("stages", {}).get("single")
+    assist_data = res_data.get(parent_id, {}).get("stages", {}).get("assist")
+    user_info["completed"] = single_data is not None and assist_data is not None
+```
+
+##### Step 5: routes_oridata.py - 获取用户任务
+
+**文件**: `routes_oridata.py`
+**行号**: 896-913
+
+**修改后**:
+```python
+if is_dual:
+    single_id = f"{sub_id}_SINGLE"  # 仍用于URL跳转
+    assist_id = f"{sub_id}_AI-ASSIST"
+    single_done = single_id in user_results
+    assist_done = assist_id in user_results
+    # 但保存时使用嵌套结构
+```
+
+##### Step 6: edu_status.html - 任务列表
+
+**文件**: `edu_status.html`
+**行号**: 193-216
+
+**URL保持不变**（用于传递阶段信息）:
+```javascript
+handleTask('${t.submission_id}_SINGLE', '${t.request_name}_SINGLE', singleDone, 'single', '${t.submission_id}')
+```
+
+##### Step 7: edu_status.html - 成绩读取
+
+**文件**: `edu_status.html`
+**行号**: 294-302
+
+**修改后**:
+```javascript
+const rSingle = await fetch(`/api/edu/user/result/${username}/${taskParentId}?stage=single`);
+const rAssist = await fetch(`/api/edu/user/result/${username}/${taskParentId}?stage=assist`);
+```
+
+##### Step 8: diagnosis.html - 提交逻辑
+
+**文件**: `diagnosis.html`
+**行号**: 2830-2835
+
+**保持不变**，因为 `eduSubMode` 已经在 URL 参数中
+
+---
+
+#### 12.16.3 API更改
+
+##### 新增: 获取指定阶段成绩
+
+**接口**: `GET /api/edu/user/result/{username}/{taskId}?stage={stage}`
+
+**返回**:
+```json
+{
+  "stage": "single",
+  "accuracy": 0.85,
+  "sensitivity": 0.80,
+  ...
+}
+```
+
+---
+
+#### 12.16.4 影响范围
+
+| 文件 | 改动量 | 说明 |
+|------|--------|------|
+| main.py | 中 | 保存逻辑、AI分析函数 |
+| routes_oridata.py | 小 | 读取逻辑 |
+| edu_status.html | 小 | 成绩读取 |
+| diagnosis.html | 无 | 无需改动 |
+| edu_admin.html | 小 | 管理员查看报告 |
+
+---
+
+#### 12.16.5 向后兼容
+
+**已有数据迁移**: 可以写一个一次性脚本将旧格式转换为新格式
+
+```python
+# 迁移脚本逻辑
+for username in users:
+    old_data = read_json(f"{username}.json.old")
+    new_data = {}
+    for key, value in old_data.items():
+        if key.endswith("_SINGLE"):
+            parent = key.replace("_SINGLE", "")
+            new_data[parent]["stages"]["single"] = value
+        elif key.endswith("_AI-ASSIST"):
+            parent = key.replace("_AI-ASSIST", "")
+            new_data[parent]["stages"]["assist"] = value
+        else:
+            new_data[key] = value
+    write_json(f"{username}.json", new_data)
+```
+
+---
+
+#### 12.16.6 第三阶段扩展
+
+新结构便于添加第三阶段，只需：
+
+1. 在 `publish_mode` 添加 `"triple"` 选项
+2. 在 `stages` 中添加 `"review"` 阶段
+3. 前端添加第三个按钮
+
+```json
+{
+  "task123": {
+    "stages": {
+      "single": {...},
+      "assist": {...},
+      "review": {...}  // 第三阶段
+    }
+  }
+}
+```
 
 **相关文件**:
 | 文件 | 修改内容 |
 |------|----------|
-| flow.html | 卡片、按钮、字体尺寸全面放大 |
+| flow.html | 卡片、按钮、字体尺寸全面放大，按钮hover效果 |
 | diagnosis.html | 置信度标签、临床判断按钮、option-btn样式 |
-| edu_status.html | 导航栏、任务卡片、按钮、侧边栏、指标标签 |
-| admin.html | Git冲突修复 |
-| edu_admin.html | Git冲突修复 |
-| task_status.html | Git冲突修复 |
-| dashboard.html | Git冲突修复 |
+| edu_status.html | 导航栏、任务卡片、按钮、侧边栏、指标标签，按钮hover效果 |
+| edu_admin.html | 按钮hover效果 |
+| task_status.html | 按钮hover效果 |
+| dashboard.html | 按钮hover效果 |
+| admin.html | 按钮hover效果 |
+| login.html | 登录按钮hover效果，介绍文字间距 |
+
+**按钮hover效果已应用到的页面**:
+- admin.html ✅
+- dashboard.html ✅
+- edu_admin.html ✅
+- edu_status.html ✅
+- flow.html ✅
+- task_status.html ✅
+- login.html (login-btn-title, login-btn) ✅
 
 ---
 
@@ -1396,20 +1822,48 @@ def update_user(user_id: int, doctor: str, organization: str,
 | TitleField圆角 | 16px |
 | TitleField图片最大高度 | 390px (增加30%) |
 | 轮播图高度 | 455px (增加30%) |
+| 轮播图图片最小高度 | 85% |
 | 欢迎文本字体 | 16px, letter-spacing: 1px |
 | 主标题字体 | 50px, 800 weight, letter-spacing: 4px |
 | 副标题字体 | 20px, letter-spacing: 2px |
-| 介绍文本字体 | 15px, line-height: 2, letter-spacing: 0.5px |
+| 介绍文本字体 | 15px, line-height: 2, letter-spacing: 2px, text-justify: inter-character |
 | 按钮内边距 | 18px 50px |
 | 按钮圆角 | 30px |
 | 按钮字体 | 18px |
-| 关键词药片圆角 | 25px |
+| 关键词样式 | 等间距排列，无卡片/分隔 |
+| 轮播图图片 | object-fit: contain 完整显示 |
 
 **相关文件**:
 | 文件 | 修改内容 |
 |------|----------|
-| login.html | 全新布局结构、CSS样式、JS渲染逻辑 |
+| login.html | 全新布局结构、CSS样式、JS渲染逻辑，介绍文字间距，轮播图完整显示 |
 | login_config.json | 重构JSON结构，支持独立配置 |
+
+---
+
+### 12.15 按钮hover效果与UI细节修复 (2026-04-21)
+
+**更新内容**:
+
+#### A. 按钮hover效果
+为以下页面添加统一按钮hover效果：`filter: brightness(1.1)` + `transform: translateY(-1px)`
+
+| 页面 | 状态 |
+|------|------|
+| admin.html | ✅ 已添加 |
+| dashboard.html | ✅ 已添加 |
+| edu_admin.html | ✅ 已添加 |
+| edu_status.html | ✅ 已添加 |
+| flow.html | ✅ 已添加 |
+| task_status.html | ✅ 已添加 |
+| login.html | ✅ 已添加 (login-btn-title, login-btn) |
+
+#### B. login.html介绍文字间距
+- 添加 `text-justify: inter-character` 支持中文文字间距
+- 添加 `text-align: justify` 两端对齐
+
+#### C. login.html轮播图完整显示
+- 改用 `object-fit: contain` 确保图片完整显示，允许留白
 
 ---
 
@@ -1432,5 +1886,5 @@ def update_user(user_id: int, doctor: str, organization: str,
 
 ---
 
-*文档版本: 2026-04-20*
-*最后更新: 2026-04-20 - 添加login.html布局重构 + UI界面放大改进*
+*文档版本: 2026-04-21*
+*最后更新: 2026-04-21 - 添加双阶段教育系统详细文档 + 三阶段重构计划(Plan A)*

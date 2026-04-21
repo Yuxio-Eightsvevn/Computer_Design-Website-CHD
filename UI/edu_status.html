@@ -11,13 +11,14 @@
     .container { max-width: 1200px; margin: 30px auto; padding: 0 20px; display: flex; gap: 16px; align-items: flex-start; }
     .sidebar { width: 240px; flex-shrink: 0; }
     .main { flex: 1; }
-    .navbar { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 20px 30px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; }
+    .navbar { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 18px 25px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; }
     .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); margin-top: 20px; }
     .task-card { background: white; border-radius: 10px; padding: 24px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #e2e8f0; transition: all 0.2s; }
     .task-card:hover { border-color: #10b981; transform: translateX(5px); }
     .task-card.completed { border-left: 5px solid #10b981; }
     .task-card.pending { border-left: 5px solid #f59e0b; }
-    .btn { padding: 12px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; font-size: 16px; }
+    .btn { padding: 12px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; font-size: 16px; transition: all 0.2s; }
+    .btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
     .btn-start { background: #10b981; color: white; }
     .btn-view { background: #f1f5f9; color: #475569; }
     .score-badge { font-size: 20px; font-weight: 800; color: #10b981; }
@@ -68,7 +69,7 @@
         </div>
     </div>
     <div class="main">
-      <div class="navbar"><div>🎓 教育练习中心</div><button onclick="window.location.href='/flow'" class="btn" style="background:rgba(255,255,255,0.2); color:white">返回</button></div>
+      <div class="navbar"><div style="font-size:20px;">🎓 教育练习中心</div><button onclick="window.location.href='/flow'" class="btn" style="background:rgba(255,255,255,0.2); color:white">返回</button></div>
       <div id="taskList" class="card">
           <p style="text-align:center; color:#94a3b8">正在拉取分发给您的教学批次...</p>
       </div>
@@ -204,13 +205,13 @@ async function fetchEduTasks() {
                             </div>
                         </div>
                         <div style="display:flex; flex-direction:column; gap:8px; align-items:center;">
-                            <button class="btn ${singleDone ? 'btn-view' : 'btn-start'}" style="width:140px;" onclick="handleTask('${t.submission_id}_SINGLE', '${t.request_name}_SINGLE', ${singleDone}, 'single', '${t.submission_id}')">
+                            <button class="btn ${singleDone ? 'btn-view' : 'btn-start'}" style="width:180px;white-space:nowrap;" onclick="handleTask('${t.submission_id}_SINGLE', '${t.request_name}_SINGLE', ${singleDone}, 'single', '${t.submission_id}')">
                                 ${singleDone ? '✅ 已完成' : '单独判读'}
                             </button>
-                            <button class="btn ${assistDone ? 'btn-view' : 'btn-start'}" style="width:120px; ${!singleDone ? 'opacity:0.5;cursor:not-allowed;' : ''}" ${!singleDone ? 'disabled' : ''} onclick="${!singleDone ? '' : `handleTask('${t.submission_id}_AI-ASSIST', '${t.request_name}_AI-ASSIST', ${assistDone}, 'assist', '${t.submission_id}')`}">
+                            <button class="btn ${assistDone ? 'btn-view' : 'btn-start'}" style="width:180px;white-space:nowrap; ${!singleDone ? 'opacity:0.5;cursor:not-allowed;' : ''}" ${!singleDone ? 'disabled' : ''} onclick="${!singleDone ? '' : `handleTask('${t.submission_id}_AI-ASSIST', '${t.request_name}_AI-ASSIST', ${assistDone}, 'assist', '${t.submission_id}')`}">
                                 ${assistDone ? '✅ 已完成' : (singleDone ? 'AI辅助判读' : '⚠️ AI辅助判读')}
                             </button>
-                            ${bothDone ? `<button class="btn btn-view" style="width:120px; margin-top:5px;" onclick="openResultModal('${t.submission_id}', '${t.request_name}', null, '${t.submission_id}')">查看报告</button>` : ''}
+                            ${bothDone ? `<button class="btn btn-view" style="width:180px;white-space:nowrap; margin-top:5px;" onclick="openResultModal('${t.submission_id}', '${t.request_name}', null, '${t.submission_id}')">查看报告</button>` : ''}
                         </div>
                     `;
                 } else {
@@ -225,7 +226,7 @@ async function fetchEduTasks() {
                         </div>
                         <div style="display:flex; align-items:center; gap:15px;">
                             ${t.is_completed ? `<div class="score-badge">${(t.last_score*100).toFixed(0)}%</div>` : ''}
-                            <button class="btn ${t.is_completed ? 'btn-view' : 'btn-start'}" onclick="handleTask('${t.submission_id}', '${t.request_name}', ${t.is_completed})">
+                            <button class="btn ${t.is_completed ? 'btn-view' : 'btn-start'}" style="white-space:nowrap; min-width:120px;" onclick="handleTask('${t.submission_id}', '${t.request_name}', ${t.is_completed})">
                                 ${t.is_completed ? '查看报告' : '开始判读'}
                             </button>
                         </div>
