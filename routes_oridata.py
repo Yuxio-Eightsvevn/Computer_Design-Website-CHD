@@ -793,22 +793,23 @@ async def get_edu_task_detail_status(submission_id: str):
                 if is_dual_stage:
                     # 双阶段任务：检查两个子任务是否都提交了诊断结果
                     # 完成条件：两个阶段都提交了诊断结果
-                    single_key = f"{submission_id}_SINGLE"
-                    assist_key = f"{submission_id}_AI-ASSIST"
-                    single_exists = single_key in res_data
-                    assist_exists = assist_key in res_data
+                    # 使用嵌套结构: res_data[parent_id]["stages"]["single"]
+                    single_data = res_data.get(submission_id, {}).get("stages", {}).get("single")
+                    assist_data = res_data.get(submission_id, {}).get("stages", {}).get("assist")
+                    single_exists = single_data is not None
+                    assist_exists = assist_data is not None
                     
                     print(f"🔍 [admin-task-status] user={username}, single_exists={single_exists}, assist_exists={assist_exists}")
                     
                     if single_exists and assist_exists:
                         user_info["completed"] = True
                         # 取两个阶段的平均分
-                        single_score = res_data[single_key].get("accuracy", 0)
-                        assist_score = res_data[assist_key].get("accuracy", 0)
+                        single_score = single_data.get("accuracy", 0)
+                        assist_score = assist_data.get("accuracy", 0)
                         user_info["score"] = (single_score + assist_score) / 2
                         user_info["details"] = {
-                            "single": res_data[single_key],
-                            "assist": res_data[assist_key]
+                            "single": single_data,
+                            "assist": assist_data
                         }
                 else:
                     # 普通任务：检查原始task ID是否已提交诊断结果
@@ -895,10 +896,13 @@ async def get_user_edu_tasks(username: str):
         
         if is_dual:
             # 双阶段任务：检查两个子任务是否都完成
-            single_id = f"{sub_id}_SINGLE"
-            assist_id = f"{sub_id}_AI-ASSIST"
-            single_done = single_id in user_results
-            assist_done = assist_id in user_results
+            # 使用嵌套结构: user_results[parent_id]["stages"]["single"]
+            task_result = user_results.get(sub_id, {})
+            stages = task_result.get("stages", {})
+            single_data = stages.get("single")
+            assist_data = stages.get("assist")
+            single_done = single_data is not None
+            assist_done = assist_data is not None
             both_done = single_done and assist_done
             
             t["is_completed"] = both_done
@@ -908,8 +912,8 @@ async def get_user_edu_tasks(username: str):
             
             if both_done:
                 t["last_score"] = max(
-                    user_results.get(single_id, {}).get("accuracy", 0),
-                    user_results.get(assist_id, {}).get("accuracy", 0)
+                    single_data.get("accuracy", 0),
+                    assist_data.get("accuracy", 0)
                 )
             else:
                 t["last_score"] = None
@@ -947,17 +951,60 @@ async def check_task_status(submission_id: str):
 
 @router.get("/api/edu/user/result/{username}/{submission_id}")
 async def get_user_edu_result(username: str, submission_id: str):
+    """
+    获取用户教育任务成绩
+    支持新旧两种格式：
+    - 新格式（嵌套结构）: /result/username/taskId?stage=single
+    - 旧格式（后缀结构）: /result/username/taskId_SINGLE
+    """
     result_file = EDU_RESULTS_DIR / f"{username}.json"
     if not result_file.exists(): raise HTTPException(status_code=404)
     with open(result_file, "r", encoding="utf-8") as f: data = json.load(f)
-    if submission_id not in data: raise HTTPException(status_code=404)
-    return data[submission_id]
+    
+    # 尝试提取stage参数（Query参数）
+    from urllib.parse import urlparse, parse_qs
+    # 这里stage会从查询参数获取
+    
+    # 提取父任务ID（去掉后缀）
+    parent_id = submission_id
+    stage = None
+    if submission_id.endswith('_SINGLE'):
+        parent_id = submission_id.replace('_SINGLE', '')
+        stage = 'single'
+    elif submission_id.endswith('_AI-ASSIST'):
+        parent_id = submission_id.replace('_AI-ASSIST', '')
+        stage = 'assist'
+    
+    # 尝试新嵌套结构
+    if parent_id in data:
+        task_data = data[parent_id]
+        # 如果指定了stage，只返回该stage的数据
+        if stage:
+            if "stages" in task_data and stage in task_data["stages"]:
+                result = task_data["stages"][stage]
+                result["stage"] = stage
+                return result
+            elif "llm_analysis" in task_data and stage in task_data["llm_analysis"]:
+                # 如果stages中没有，找llm_analysis中的记录
+                result = task_data["llm_analysis"][stage]
+                result["stage"] = stage
+                return result
+        else:
+            # 返回整个任务数据
+            return task_data
+    
+    # 兼容旧格式：直接用submission_id查找
+    if submission_id in data:
+        return data[submission_id]
+    
+    raise HTTPException(status_code=404)
 
 
 @router.post("/api/edu/trigger-llm-analysis/{username}/{submission_id}")
 async def trigger_llm_analysis(username: str, submission_id: str):
     """
     手动触发AI分析（当自动触发失败时使用）
+    支持嵌套结构和新旧两种格式
     """
     from main import analyze_with_llm, DATA_BATCH_STORAGE
     from pathlib import Path
@@ -970,6 +1017,52 @@ async def trigger_llm_analysis(username: str, submission_id: str):
     with open(result_file, "r", encoding="utf-8") as f:
         user_data = json.load(f)
     
+    # 提取父任务ID和阶段
+    parent_id = submission_id
+    stage = None
+    if submission_id.endswith('_SINGLE'):
+        parent_id = submission_id.replace('_SINGLE', '')
+        stage = 'single'
+    elif submission_id.endswith('_AI-ASSIST'):
+        parent_id = submission_id.replace('_AI-ASSIST', '')
+        stage = 'assist'
+    
+    # 尝试嵌套结构
+    if parent_id in user_data and stage:
+        task_data = user_data[parent_id]
+        stages_data = task_data.get("stages", {})
+        llm_analysis = task_data.get("llm_analysis", {})
+        
+        if stage in stages_data:
+            stats = stages_data[stage]
+        else:
+            raise HTTPException(status_code=404, detail=f"阶段 {stage} 的成绩不存在")
+        
+        # 检查是否已有分析结果
+        if llm_analysis.get(stage, {}).get("status") == "completed":
+            return {"message": "分析已完成", "status": "completed"}
+        if llm_analysis.get(stage, {}).get("status") == "failed":
+            # 清空失败状态，允许重新触发
+            if "llm_analysis" not in task_data:
+                task_data["llm_analysis"] = {}
+            task_data["llm_analysis"][stage] = {"status": "pending"}
+            with open(result_file, "w", encoding="utf-8") as f:
+                json.dump(user_data, f, ensure_ascii=False, indent=2)
+        
+        # 异步调用大模型分析
+        import asyncio
+        asyncio.create_task(analyze_with_llm(username, parent_id, stage, stats))
+        
+        # 更新状态为pending
+        if "llm_analysis" not in task_data:
+            task_data["llm_analysis"] = {}
+        task_data["llm_analysis"][stage] = {"status": "pending"}
+        with open(result_file, "w", encoding="utf-8") as f:
+            json.dump(user_data, f, ensure_ascii=False, indent=2)
+        
+        return {"message": "已触发AI分析", "status": "pending"}
+    
+    # 兼容旧格式
     if submission_id not in user_data:
         raise HTTPException(status_code=404, detail="任务记录不存在")
     
@@ -988,7 +1081,7 @@ async def trigger_llm_analysis(username: str, submission_id: str):
     
     # 异步调用大模型分析
     import asyncio
-    asyncio.create_task(analyze_with_llm(username, submission_id, stats))
+    asyncio.create_task(analyze_with_llm(username, submission_id, None, stats))
     
     # 更新状态为pending
     stats["llm_analysis_status"] = "pending"

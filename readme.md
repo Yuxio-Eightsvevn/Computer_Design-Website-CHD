@@ -1886,5 +1886,64 @@ for username in users:
 
 ---
 
+### 12.17 三阶段教育系统重构实施 (2026-04-21)
+
+**执行时间**: 2026-04-21
+
+#### 实施内容
+
+##### 1. main.py - 保存逻辑重构
+
+**文件**: `main.py`
+**行号**: ~1025-1050
+
+**更改**:
+- 使用嵌套结构保存成绩: `user_data[parent_id]["stages"][eduSubMode] = stats`
+- 提取父任务ID时去掉 `_SINGLE` / `_AI-ASSIST` 后缀
+- 增加 `completed_at` 时间戳
+
+##### 2. main.py - analyze_with_llm 函数
+
+**文件**: `main.py`
+**行号**: ~1081
+
+**更改**:
+- 函数签名从 `analyze_with_llm(username, task_folder, stats)` 改为 `analyze_with_llm(username, parent_id, stage, stats)`
+- 保存时使用嵌套结构: `user_data[parent_id]["llm_analysis"][stage]`
+
+##### 3. routes_oridata.py - 管理员任务状态
+
+**文件**: `routes_oridata.py`
+**行号**: ~793
+
+**更改**:
+- 使用 `res_data.get(submission_id, {}).get("stages", {}).get("single")` 替代原来的 `res_data[single_key]`
+
+##### 4. routes_oridata.py - 用户任务列表
+
+**文件**: `routes_oridata.py`
+**行号**: ~897
+
+**更改**:
+- 使用嵌套结构检查完成状态
+- 获取分数使用 `stages["single"].get("accuracy")`
+
+##### 5. routes_oridata.py - API支持新旧格式
+
+**文件**: `routes_oridata.py`
+**行号**: ~952, ~961
+
+**更改**:
+- `get_user_edu_result` API: 自动识别新旧格式
+- `trigger_llm_analysis` API: 自动识别新旧格式
+
+#### 兼容性
+
+**向后兼容**: 前端代码无需修改，后端API自动兼容新旧两种格式：
+- 新格式: `user_data[taskId]["stages"]["single"]`
+- 旧格式: `user_data[taskId_SINGLE]`
+
+---
+
 *文档版本: 2026-04-21*
-*最后更新: 2026-04-21 - 添加双阶段教育系统详细文档 + 三阶段重构计划(Plan A)*
+*最后更新: 2026-04-21 - 三阶段教育系统重构(嵌套结构)实施完成*

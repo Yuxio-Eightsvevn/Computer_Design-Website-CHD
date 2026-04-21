@@ -1023,32 +1023,35 @@ async def submit_diagnosis_json(request: DiagnosisSubmitJsonRequest):
             }
 
             # 6. 存入 SYSTEM 个人成绩单 (Doctor_Diag_Result/{user}.json)
+            # 使用嵌套结构：{"task123": {"stages": {"single": {...}, "assist": {...}}}}
             user_res_path = Path(DATA_BATCH_STORAGE) / "SYSTEM" / "edu_data" / "Doctor_Diag_Result" / f"{request.username}.json"
             user_data = {}
             if user_res_path.exists():
                 with open(user_res_path, "r", encoding="utf-8") as f:
                     user_data = json.load(f)
             
-            # 根据 eduSubMode 添加后缀（如果 taskFolder 不带后缀则添加）
-            save_key = request.taskFolder
-            if request.eduSubMode and not save_key.endswith('_SINGLE') and not save_key.endswith('_AI-ASSIST'):
-                if request.eduSubMode == 'single':
-                    save_key = f"{request.taskFolder}_SINGLE"
-                elif request.eduSubMode == 'assist':
-                    save_key = f"{request.taskFolder}_AI-ASSIST"
+            # 提取父任务ID（去掉后缀）
+            parent_id = re.sub(r'_SINGLE|_AI-ASSIST$', '', request.taskFolder)
+            
+            # 初始化嵌套结构
+            if parent_id not in user_data:
+                user_data[parent_id] = {"stages": {}, "llm_analysis": {}}
+            if "stages" not in user_data[parent_id]:
+                user_data[parent_id] = {"stages": {}, "llm_analysis": {}}
             
             # 在stats中添加模式标识
             stats['edu_sub_mode'] = request.eduSubMode
-            user_data[save_key] = stats
+            stats['completed_at'] = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+            user_data[parent_id]["stages"][request.eduSubMode] = stats
             
             with open(user_res_path, "w", encoding="utf-8") as f:
                 json.dump(user_data, f, ensure_ascii=False, indent=2)
 
             print(f"📊 教育模式评分完成: {request.username} - 模式: {request.eduSubMode} - 得分: {stats['accuracy']*100}%")
             
-            # 7. [新增] 异步调用大模型分析（使用带后缀的save_key确保key匹配）
-            print(f"🔔 准备触发AI分析: username={request.username}, save_key={save_key}")
-            asyncio.create_task(analyze_with_llm(request.username, save_key, stats))
+            # 7. [新增] 异步调用大模型分析（使用parent_id和stage确保key匹配）
+            print(f"🔔 准备触发AI分析: username={request.username}, parent_id={parent_id}, stage={request.eduSubMode}")
+            asyncio.create_task(analyze_with_llm(request.username, parent_id, request.eduSubMode, stats))
             print(f"🔔 已创建AI分析任务")
             
             return {"message": "评估完成，AI分析报告生成中", "stats": stats}
@@ -1075,16 +1078,17 @@ async def submit_diagnosis_json(request: DiagnosisSubmitJsonRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-async def analyze_with_llm(username: str, task_folder: str, stats: Dict[str, Any]):
+async def analyze_with_llm(username: str, parent_id: str, stage: str, stats: Dict[str, Any]):
     """
     异步调用大模型分析
     
     Args:
         username: 用户名
-        task_folder: 任务文件夹
+        parent_id: 父任务ID（不含后缀）
+        stage: 阶段标识 "single" 或 "assist"
         stats: 统计数据
     """
-    print(f"🔍 [AI分析] 开始执行: username={username}, task_folder={task_folder}")
+    print(f"🔍 [AI分析] 开始执行: username={username}, parent_id={parent_id}, stage={stage}")
     try:
         # 1. 读取LLM配置（新格式）
         print(f"🔍 [AI分析] 检查配置文件: {LLM_MODELS_FILE}")
@@ -1126,11 +1130,11 @@ async def analyze_with_llm(username: str, task_folder: str, stats: Dict[str, Any
             model=selected_model.get("model", "glm-4")
         )
         
-        print(f"🤖 正在调用大模型分析: {username} - {task_folder} (模型: {selected_model.get('display_name', 'unknown')})")
+        print(f"🤖 正在调用大模型分析: {username} - {parent_id}/{stage} (模型: {selected_model.get('display_name', 'unknown')})")
         analysis_result = await analyzer.analyze_performance(stats)
         print(f"🔍 [AI分析] 大模型返回结果: {analysis_result.get('status')}")
         
-        # 3. 更新成绩单
+        # 3. 更新成绩单（使用嵌套结构）
         user_res_path = Path(DATA_BATCH_STORAGE) / "SYSTEM" / "edu_data" / "Doctor_Diag_Result" / f"{username}.json"
         print(f"🔍 [AI分析] 成绩单路径: {user_res_path}")
         print(f"🔍 [AI分析] 成绩单存在: {user_res_path.exists()}")
@@ -1140,20 +1144,24 @@ async def analyze_with_llm(username: str, task_folder: str, stats: Dict[str, Any
                 user_data = json.load(f)
             
             print(f"🔍 [AI分析] 当前成绩单keys: {list(user_data.keys())}")
-            print(f"🔍 [AI分析] 查找key: {task_folder}")
-            print(f"🔍 [AI分析] key存在: {task_folder in user_data}")
             
-            if task_folder in user_data:
-                user_data[task_folder]["llm_analysis_status"] = analysis_result.get("status", "failed")
-                user_data[task_folder]["llm_analysis"] = analysis_result
-                user_data[task_folder]["llm_model_used"] = selected_model.get("display_name", "unknown")
+            # 使用嵌套结构: user_data[parent_id]["llm_analysis"][stage]
+            if parent_id in user_data:
+                if "llm_analysis" not in user_data[parent_id]:
+                    user_data[parent_id]["llm_analysis"] = {}
+                user_data[parent_id]["llm_analysis"][stage] = {
+                    "status": analysis_result.get("status", "failed"),
+                    "report": analysis_result,
+                    "model_used": selected_model.get("display_name", "unknown"),
+                    "analyzed_at": datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+                }
                 
                 with open(user_res_path, "w", encoding="utf-8") as f:
                     json.dump(user_data, f, ensure_ascii=False, indent=2)
                 
-                print(f"✅ 大模型分析完成: {username} - {task_folder}")
+                print(f"✅ 大模型分析完成: {username} - {parent_id}/{stage}")
             else:
-                print(f"⚠️ [AI分析] 成绩单中未找到key: {task_folder}")
+                print(f"⚠️ [AI分析] 成绩单中未找到父任务: {parent_id}")
         else:
             print(f"⚠️ [AI分析] 成绩单文件不存在")
         
@@ -1167,9 +1175,13 @@ async def analyze_with_llm(username: str, task_folder: str, stats: Dict[str, Any
                 with open(user_res_path, "r", encoding="utf-8") as f:
                     user_data = json.load(f)
                 
-                if task_folder in user_data:
-                    user_data[task_folder]["llm_analysis_status"] = "failed"
-                    user_data[task_folder]["llm_analysis"] = {"error": str(e)}
+                if parent_id in user_data:
+                    if "llm_analysis" not in user_data[parent_id]:
+                        user_data[parent_id]["llm_analysis"] = {}
+                    user_data[parent_id]["llm_analysis"][stage] = {
+                        "status": "failed",
+                        "error": str(e)
+                    }
                     
                     with open(user_res_path, "w", encoding="utf-8") as f:
                         json.dump(user_data, f, ensure_ascii=False, indent=2)

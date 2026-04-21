@@ -317,16 +317,17 @@
         }
 
         .option-btn {
-            padding: 16px 24px;
+            padding: 10px 12px;
             border: 2px solid #e9ecef;
             background: white;
             border-radius: 8px;
             cursor: pointer;
-            font-size: 16px;
+            font-size: 13px;
             font-weight: 500;
             color: #495057;
             transition: all 0.3s ease;
             text-align: center;
+            white-space: nowrap;
         }
 
         .option-btn:hover {
@@ -1124,7 +1125,7 @@
                     <!-- 模态切换 -->
                     <div class="diagnosis-group">
                         <div class="group-label">诊断模态:</div>
-                        <div class="diagnosis-options" style="grid-template-columns: repeat(3, 1fr);">
+                        <div class="diagnosis-options" style="grid-template-columns: repeat(3, minmax(80px, 1fr));">
                             <button class="option-btn active" onclick="selectOption(this, 'modality')">原视频</button>
                             <button class="option-btn" onclick="selectOption(this, 'modality')">热力图</button>
                             <button class="option-btn" onclick="selectOption(this, 'modality')">病灶定位框</button>
