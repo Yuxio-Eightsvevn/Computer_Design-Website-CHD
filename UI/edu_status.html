@@ -83,9 +83,9 @@
           <div style="display:flex; gap:10px; margin-top:15px; flex-shrink:0;">
               <button class="btn btn-view" style="flex:1" onclick="closeModal()">关闭</button>
               <button class="btn btn-start" style="flex:1" id="btn-re-run">重新练习</button>
-              <button class="btn btn-start" style="flex:1; display:none;" id="btn-re-run-single">重新进行单独判读</button>
-              <button class="btn btn-start" style="flex:1; display:none;" id="btn-re-run-assist">重新进行AI辅助判读</button>
-              <button class="btn btn-start" style="flex:1; display:none;" id="btn-re-run-review">重新进行复核判读</button>
+              <button class="btn btn-start" style="flex:1; display:none;" id="btn-re-run-single">重新进行独立诊断</button>
+              <button class="btn btn-start" style="flex:1; display:none;" id="btn-re-run-assist">重新进行AI辅助诊断</button>
+              <button class="btn btn-start" style="flex:1; display:none;" id="btn-re-run-review">重新进行独立复诊</button>
           </div>
       </div>
   </div>
@@ -94,9 +94,31 @@
 let currentUser = null;
 let radarSingleChart = null;
 let radarAssistChart = null;
+let avatarConfig = { avatars: {} };
+
+async function loadAvatarConfig() {
+    try {
+        const r = await fetch('/UI/res/share/user_avatar_config.json');
+        if (r.ok) {
+            avatarConfig = await r.json();
+        }
+    } catch (e) {
+        console.warn('头像配置加载失败，使用默认头像');
+    }
+}
+
+async function setUserAvatar(avatarElem, username) {
+    const avatarPath = avatarConfig.avatars[username];
+    if (avatarPath) {
+        avatarElem.innerHTML = `<img src="/UI/${avatarPath}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" onerror="this.parentElement.textContent='${username ? username[0].toUpperCase() : 'U'}'">`;
+    } else {
+        avatarElem.textContent = username ? username[0].toUpperCase() : 'U';
+    }
+}
 
 async function loadUser() {
     console.log("🔍 开始加载用户信息...");
+    await loadAvatarConfig();
     
     try {
         const r = await fetch('/api/users/current');
@@ -115,10 +137,10 @@ async function loadUser() {
                 const avatarElem = document.getElementById('avatar');
                 const orgElem = document.getElementById('currentUserOrg');
                 
-                if (nameElem) nameElem.textContent = currentUser.username;
+                if (nameElem) nameElem.textContent = currentUser.doctor || currentUser.username;
                 
-                if (avatarElem && currentUser.username && currentUser.username.length > 0) {
-                    avatarElem.textContent = currentUser.username[0].toUpperCase();
+                if (avatarElem) {
+                    setUserAvatar(avatarElem, currentUser.username);
                 }
                 
                 if (orgElem) {
@@ -209,13 +231,13 @@ async function fetchEduTasks() {
                         </div>
                         <div style="display:flex; flex-direction:column; gap:8px; align-items:center;">
                             <button class="btn ${singleDone ? 'btn-view' : 'btn-start'}" style="width:180px;white-space:nowrap;" onclick="handleTask('${t.submission_id}_SINGLE', '${t.request_name}_SINGLE', ${singleDone}, 'single', '${t.submission_id}')">
-                                ${singleDone ? '✅ 已完成' : '单独判读'}
+                                ${singleDone ? '✅ 已完成' : '独立诊断'}
                             </button>
                             <button class="btn ${assistDone ? 'btn-view' : 'btn-start'}" style="width:180px;white-space:nowrap; ${!singleDone ? 'opacity:0.5;cursor:not-allowed;' : ''}" ${!singleDone ? 'disabled' : ''} onclick="${!singleDone ? '' : `handleTask('${t.submission_id}_AI-ASSIST', '${t.request_name}_AI-ASSIST', ${assistDone}, 'assist', '${t.submission_id}')`}">
-                                ${assistDone ? '✅ 已完成' : (singleDone ? 'AI辅助判读' : '⚠️ AI辅助判读')}
+                                ${assistDone ? '✅ 已完成' : (singleDone ? 'AI辅助诊断' : '⚠️ AI辅助诊断')}
                             </button>
                             <button class="btn ${reviewDone ? 'btn-view' : 'btn-start'}" style="width:180px;white-space:nowrap; ${!assistDone ? 'opacity:0.5;cursor:not-allowed;' : ''}" ${!assistDone ? 'disabled' : ''} onclick="${!assistDone ? '' : `handleTask('${t.submission_id}_REVIEW', '${t.request_name}_REVIEW', ${reviewDone}, 'review', '${t.submission_id}')`}">
-                                ${reviewDone ? '✅ 已完成' : (assistDone ? '复核判读' : '⚠️ 复核判读')}
+                                ${reviewDone ? '✅ 已完成' : (assistDone ? '独立复诊' : '⚠️ 独立复诊')}
                             </button>
                             ${allDone ? `<button class="btn btn-view" style="width:180px;white-space:nowrap; margin-top:5px;" onclick="openResultModal('${t.submission_id}', '${t.request_name}', null, '${t.submission_id}')">查看报告</button>` : ''}
                         </div>
@@ -236,10 +258,10 @@ async function fetchEduTasks() {
                         </div>
                         <div style="display:flex; flex-direction:column; gap:8px; align-items:center;">
                             <button class="btn ${singleDone ? 'btn-view' : 'btn-start'}" style="width:180px;white-space:nowrap;" onclick="handleTask('${t.submission_id}_SINGLE', '${t.request_name}_SINGLE', ${singleDone}, 'single', '${t.submission_id}')">
-                                ${singleDone ? '✅ 已完成' : '单独判读'}
+                                ${singleDone ? '✅ 已完成' : '独立诊断'}
                             </button>
                             <button class="btn ${assistDone ? 'btn-view' : 'btn-start'}" style="width:180px;white-space:nowrap; ${!singleDone ? 'opacity:0.5;cursor:not-allowed;' : ''}" ${!singleDone ? 'disabled' : ''} onclick="${!singleDone ? '' : `handleTask('${t.submission_id}_AI-ASSIST', '${t.request_name}_AI-ASSIST', ${assistDone}, 'assist', '${t.submission_id}')`}">
-                                ${assistDone ? '✅ 已完成' : (singleDone ? 'AI辅助判读' : '⚠️ AI辅助判读')}
+                                ${assistDone ? '✅ 已完成' : (singleDone ? 'AI辅助诊断' : '⚠️ AI辅助诊断')}
                             </button>
                             ${bothDone ? `<button class="btn btn-view" style="width:180px;white-space:nowrap; margin-top:5px;" onclick="openResultModal('${t.submission_id}', '${t.request_name}', null, '${t.submission_id}')">查看报告</button>` : ''}
                         </div>
@@ -463,7 +485,7 @@ async function pollForLLMAnalysis(id, name, data) {
     const maxAttempts = 30;
     const isSingle = id.endsWith('_SINGLE');
     const isAssist = id.endsWith('_AI-ASSIST');
-    const rerunLabel = isSingle ? '重新进行单独诊断' : (isAssist ? '重新进行AI辅助诊断' : '重新练习');
+    const rerunLabel = isSingle ? '重新进行独立诊断' : (isAssist ? '重新进行AI辅助诊断' : '重新练习');
     
     const poll = async () => {
         attempts++;
@@ -594,7 +616,7 @@ function showBasicReport(id, name, data) {
     
     const isSingle = id.endsWith('_SINGLE');
     const isAssist = id.endsWith('_AI-ASSIST');
-    const rerunLabel = isSingle ? '重新进行单独诊断' : (isAssist ? '重新进行AI辅助诊断' : '重新练习');
+    const rerunLabel = isSingle ? '重新进行独立诊断' : (isAssist ? '重新进行AI辅助诊断' : '重新练习');
     
     document.getElementById('resultModalContent').innerHTML = `
         <h2 style="color:#1e293b">🎯 教学评估报告</h2>
@@ -855,7 +877,7 @@ function showDualStageReport(parentId, name, singleData, assistData) {
                 <h3 style="font-size:13px; color:#1e293b; margin-bottom:6px;">🎯 雷达图对比</h3>
                 <div style="display:flex; gap:10px; justify-content:center;">
                     <div style="text-align:center;">
-                        <div style="font-size:11px; color:#667eea;">单独判读</div>
+                        <div style="font-size:11px; color:#667eea;">独立诊断</div>
                         <canvas id="radarSingle" width="180" height="180"></canvas>
                     </div>
                     <div style="text-align:center;">
@@ -1047,7 +1069,7 @@ function showTripleStageReport(parentId, name, singleData, assistData, reviewDat
                 <h4 style="font-size:13px; color:#1e293b; margin-bottom:10px; text-align:center;">📈 准确率总体对比</h4>
                 <div style="display:flex; gap:8px; margin-bottom:10px;">
                     <div style="flex:1; padding:8px; background:#f0f9ff; border-radius:6px; text-align:center;">
-                        <div style="font-size:10px; color:#64748b;">单独诊断</div>
+                        <div style="font-size:10px; color:#64748b;">独立诊断</div>
                         <div style="font-size:16px; font-weight:700; color:#667eea;">${((s.accuracy || 0)*100).toFixed(1)}%</div>
                     </div>
                     <div style="flex:1; padding:8px; background:#ecfdf5; border-radius:6px; text-align:center;">
@@ -1055,17 +1077,17 @@ function showTripleStageReport(parentId, name, singleData, assistData, reviewDat
                         <div style="font-size:16px; font-weight:700; color:#10b981;">${((a.accuracy || 0)*100).toFixed(1)}%</div>
                     </div>
                     <div style="flex:1; padding:8px; background:#fef3c7; border-radius:6px; text-align:center;">
-                        <div style="font-size:10px; color:#64748b;">复核诊断</div>
+                        <div style="font-size:10px; color:#64748b;">独立复诊</div>
                         <div style="font-size:16px; font-weight:700; color:#f59e0b;">${((r.accuracy || 0)*100).toFixed(1)}%</div>
                     </div>
                 </div>
                 <div style="display:flex; gap:8px;">
                     <div style="flex:1; padding:8px; background:#ecfdf5; border-radius:6px; text-align:center;">
-                        <div style="font-size:10px; color:#64748b;">AI辅助对比单独</div>
+                        <div style="font-size:10px; color:#64748b;">AI辅助对比独立</div>
                         <div style="font-size:14px; font-weight:700; color:${assistAccDiff > 0 ? '#10b981' : (assistAccDiff < 0 ? '#ef4444' : '#64748b')};">${assistAccDiff > 0 ? '+' : ''}${assistAccDiff.toFixed(1)}%</div>
                     </div>
                     <div style="flex:1; padding:8px; background:#fef3c7; border-radius:6px; text-align:center;">
-                        <div style="font-size:10px; color:#64748b;">复核对比单独</div>
+                        <div style="font-size:10px; color:#64748b;">独立复诊对比独立</div>
                         <div style="font-size:14px; font-weight:700; color:${accDiff > 0 ? '#10b981' : (accDiff < 0 ? '#ef4444' : '#64748b')};">${accDiff > 0 ? '+' : ''}${accDiff.toFixed(1)}%</div>
                     </div>
                 </div>
@@ -1103,10 +1125,10 @@ function showTripleStageReport(parentId, name, singleData, assistData, reviewDat
                 <table style="width:100%; font-size:12px; border-collapse:collapse;">
                     <tr style="background:#f8fafc;">
                         <th style="padding:5px; text-align:left; border:1px solid #e2e8f0;">指标</th>
-                        <th style="padding:5px; text-align:center; border:1px solid #e2e8f0;">单独</th>
+                        <th style="padding:5px; text-align:center; border:1px solid #e2e8f0;">独立</th>
                         <th style="padding:5px; text-align:center; border:1px solid #e2e8f0;">AI辅助</th>
-                        <th style="padding:5px; text-align:center; border:1px solid #e2e8f0;">复核</th>
-                        <th style="padding:5px; text-align:center; border:1px solid #e2e8f0;">复核提升</th>
+                        <th style="padding:5px; text-align:center; border:1px solid #e2e8f0;">独立复诊</th>
+                        <th style="padding:5px; text-align:center; border:1px solid #e2e8f0;">复诊提升</th>
                     </tr>
                     <tr>
                         <td style="padding:5px; border:1px solid #e2e8f0;">准确率</td>
@@ -1135,7 +1157,7 @@ function showTripleStageReport(parentId, name, singleData, assistData, reviewDat
                 <h3 style="font-size:13px; color:#1e293b; margin-bottom:6px;">🎯 三阶段六维图对比</h3>
                 <div style="display:flex; gap:50px; justify-content:center;">
                     <div style="text-align:center;">
-                        <div style="font-size:10px; color:#667eea;">单独</div>
+                        <div style="font-size:10px; color:#667eea;">独立</div>
                         <canvas id="radarSingle" width="130" height="130"></canvas>
                     </div>
                     <div style="text-align:center;">
@@ -1143,7 +1165,7 @@ function showTripleStageReport(parentId, name, singleData, assistData, reviewDat
                         <canvas id="radarAssist" width="130" height="130"></canvas>
                     </div>
                     <div style="text-align:center;">
-                        <div style="font-size:10px; color:#f59e0b;">复核</div>
+                        <div style="font-size:10px; color:#f59e0b;">独立复诊</div>
                         <canvas id="radarReview" width="130" height="130"></canvas>
                     </div>
                 </div>

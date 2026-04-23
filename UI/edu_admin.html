@@ -366,7 +366,7 @@
       <h3 id="p-task-title">发布任务</h3>
       <div style="margin: 15px 0;">
         <span style="font-size:13px; font-weight:600;">发布模式：</span>
-        <span style="margin-left:10px; padding:5px 10px; background:#fef3c7; border:1px solid #f59e0b; border-radius:6px; color:#92400e; font-weight:600;">三阶段模式（单独 + AI辅助 + 复核）</span>
+        <span style="margin-left:10px; padding:5px 10px; background:#fef3c7; border:1px solid #f59e0b; border-radius:6px; color:#92400e; font-weight:600;">三阶段模式（独立诊断 + AI辅助诊断 + 独立复诊）</span>
         <input type="hidden" id="publishModeSelect" value="triple">
       </div>
       <p style="font-size:12px; color:#64748b; margin-top:5px;">请选择允许参与判读的医师：</p>
@@ -978,7 +978,7 @@
             
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin:20px 0;">
                 <div style="background:#f0f9ff; padding:15px; border-radius:10px; text-align:center;">
-                    <div style="font-size:14px; color:#0369a1; margin-bottom:10px;">单独判读</div>
+                    <div style="font-size:14px; color:#0369a1; margin-bottom:10px;">独立诊断</div>
                     <div style="font-size:24px; font-weight:700; color:#1e293b;">${(s.accuracy * 100).toFixed(1)}%</div>
                     <div style="font-size:12px; color:#64748b;">准确率</div>
                 </div>
@@ -1084,7 +1084,7 @@
             
             <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; margin:15px 0;">
                 <div style="padding:12px; background:#f0f9ff; border-radius:8px; text-align:center;">
-                    <h4 style="font-size:13px; color:#667eea; margin-bottom:8px;">单独判读</h4>
+                    <h4 style="font-size:13px; color:#667eea; margin-bottom:8px;">独立诊断</h4>
                     <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
                         <div>
                             <div style="font-size:10px; color:#64748b;">准确率</div>
@@ -1118,7 +1118,7 @@
                     </div>
                 </div>
                 <div style="padding:12px; background:#fef3c7; border-radius:8px; text-align:center;">
-                    <h4 style="font-size:13px; color:#f59e0b; margin-bottom:8px;">复核判读</h4>
+                    <h4 style="font-size:13px; color:#f59e0b; margin-bottom:8px;">独立复诊</h4>
                     <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
                         <div>
                             <div style="font-size:10px; color:#64748b;">准确率</div>

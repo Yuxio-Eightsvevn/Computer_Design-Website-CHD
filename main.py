@@ -847,8 +847,8 @@ async def submit_diagnosis_json(request: DiagnosisSubmitJsonRequest):
     """
     try:
         # 定义诊断名与 Label 的映射
-        LABEL_MAP = {"Normal": 0, "VSD": 1, "ASD": 2, "PDA": 3}
-        LABEL_REVERSE_MAP = {0: "Normal", 1: "VSD", 2: "ASD", 3: "PDA"}
+        LABEL_MAP = {"正常": 0, "Normal": 0, "VSD": 1, "ASD": 2, "PDA": 3}
+        LABEL_REVERSE_MAP = {0: "正常", 1: "VSD", 2: "ASD", 3: "PDA"}
         
         # --- 情况 A：教育模式 (Assessment) ---
         if request.mode == "edu":
@@ -870,7 +870,7 @@ async def submit_diagnosis_json(request: DiagnosisSubmitJsonRequest):
             
             # [新增] 病种统计
             category_stats = {
-                "Normal": {"total": 0, "correct": 0, "error": 0},
+                "正常": {"total": 0, "correct": 0, "error": 0},
                 "VSD": {"total": 0, "correct": 0, "error": 0},
                 "ASD": {"total": 0, "correct": 0, "error": 0},
                 "PDA": {"total": 0, "correct": 0, "error": 0}
@@ -976,7 +976,7 @@ async def submit_diagnosis_json(request: DiagnosisSubmitJsonRequest):
             
             # 病种级别时间比较
             category_time_analysis = {}
-            for category in ["Normal", "VSD", "ASD", "PDA"]:
+            for category in ["正常", "VSD", "ASD", "PDA"]:
                 category_cases = [c for c in case_time_data if c["groundTruth"] == category]
                 if category_cases:
                     avg_time = sum(c["viewTime"] for c in category_cases) / len(category_cases)
@@ -1046,8 +1046,19 @@ async def submit_diagnosis_json(request: DiagnosisSubmitJsonRequest):
             stats['completed_at'] = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
             user_data[parent_id]["stages"][request.eduSubMode] = stats
             
-            # 检查是否为三阶段任务
-            is_triple = request.eduSubMode == "review"
+            # 检查是否为三阶段任务（从任务发布时的edu_sub_mode判断）
+            # 注意：request.taskFolder可能带后缀(_SINGLE/_AI-ASSIST/_REVIEW)，需要用parent_id匹配
+            is_task_triple = False
+            task_info_path = Path(DATA_BATCH_STORAGE) / "SYSTEM" / "edu_data" / "data.json"
+            if task_info_path.exists():
+                with open(task_info_path, "r", encoding="utf-8") as f:
+                    task_data = json.load(f)
+                    for t in task_data.get("tasks", []):
+                        if t.get("submission_id") == parent_id:
+                            is_task_triple = (t.get("edu_sub_mode") == "triple")
+                            break
+            
+            is_triple = is_task_triple
             stages = user_data[parent_id].get("stages", {})
             dual_done = "single" in stages and "assist" in stages
             triple_done = "single" in stages and "assist" in stages and "review" in stages

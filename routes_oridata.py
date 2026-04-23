@@ -6,6 +6,7 @@ import datetime
 import random
 import string
 import json
+import re
 import aiofiles
 import asyncio
 import shutil
@@ -546,12 +547,23 @@ async def clear_stuck_tasks(username: str):
         # 检查是否有 .processing 文件（正在运行）
         ori_path = user_root / ORIDATA_DIRNAME / submission_id
         processing_flag = ori_path / ".processing"
+        STUCK_THRESHOLD = 1800  # 30分钟（秒），超过此时间判定为系统中断残留
         
         if processing_flag.exists():
-            # 正在运行，保留
-            kept_tasks.append(task)
-            print(f"⏭️ 任务 {submission_id} 正在运行，跳过")
-            continue
+            try:
+                age_seconds = time.time() - processing_flag.stat().st_mtime
+                if age_seconds > STUCK_THRESHOLD:
+                    # .processing 文件存在但超过30分钟，判定为系统中断残留
+                    print(f"⚠️ 任务 {submission_id} 的 .processing 文件已存在 {age_seconds/60:.0f} 分钟，判定为系统中断残留，将清理")
+                else:
+                    # 正在运行，保留
+                    kept_tasks.append(task)
+                    print(f"⏭️ 任务 {submission_id} 正在运行（.processing 文件较新），跳过")
+                    continue
+            except Exception as e:
+                print(f"⚠️ 无法读取 .processing 文件时间: {e}，保留任务")
+                kept_tasks.append(task)
+                continue
         
         # 满足删除条件
         try:
@@ -786,8 +798,12 @@ async def get_edu_task_detail_status(submission_id: str):
 
     target_users = task.get("target_users", [])
     is_dual_stage = task.get("is_dual_stage", False)
+    is_triple_stage = task.get("edu_sub_mode") == "triple"
     user_status_list = []
-    print(f"🔍 [admin-task-status] submission_id={submission_id}, is_dual_stage={is_dual_stage}")
+    print(f"🔍 [admin-task-status] submission_id={submission_id}, is_dual_stage={is_dual_stage}, is_triple_stage={is_triple_stage}")
+    
+    # 提取parent_id（去掉后缀），用于嵌套结构查询
+    parent_id = re.sub(r'_SINGLE|_AI-ASSIST|_REVIEW$', '', submission_id)
 
     # 扫描每个用户的成绩单
     for username in target_users:
@@ -798,12 +814,34 @@ async def get_edu_task_detail_status(submission_id: str):
             with open(result_file, "r", encoding="utf-8") as f:
                 res_data = json.load(f)
                 
-                if is_dual_stage:
+                if is_triple_stage:
+                    # 三阶段任务：检查三个子任务是否都提交了诊断结果
+                    single_data = res_data.get(parent_id, {}).get("stages", {}).get("single")
+                    assist_data = res_data.get(parent_id, {}).get("stages", {}).get("assist")
+                    review_data = res_data.get(parent_id, {}).get("stages", {}).get("review")
+                    single_exists = single_data is not None
+                    assist_exists = assist_data is not None
+                    review_exists = review_data is not None
+                    
+                    print(f"🔍 [admin-task-status] user={username}, single_exists={single_exists}, assist_exists={assist_exists}, review_exists={review_exists}")
+                    
+                    if single_exists and assist_exists and review_exists:
+                        user_info["completed"] = True
+                        # 取三个阶段的平均分
+                        single_score = single_data.get("accuracy", 0)
+                        assist_score = assist_data.get("accuracy", 0)
+                        review_score = review_data.get("accuracy", 0)
+                        user_info["score"] = (single_score + assist_score + review_score) / 3
+                        user_info["details"] = {
+                            "single": single_data,
+                            "assist": assist_data,
+                            "review": review_data
+                        }
+                elif is_dual_stage:
                     # 双阶段任务：检查两个子任务是否都提交了诊断结果
-                    # 完成条件：两个阶段都提交了诊断结果
                     # 使用嵌套结构: res_data[parent_id]["stages"]["single"]
-                    single_data = res_data.get(submission_id, {}).get("stages", {}).get("single")
-                    assist_data = res_data.get(submission_id, {}).get("stages", {}).get("assist")
+                    single_data = res_data.get(parent_id, {}).get("stages", {}).get("single")
+                    assist_data = res_data.get(parent_id, {}).get("stages", {}).get("assist")
                     single_exists = single_data is not None
                     assist_exists = assist_data is not None
                     
@@ -820,7 +858,7 @@ async def get_edu_task_detail_status(submission_id: str):
                             "assist": assist_data
                         }
                 else:
-                    # 普通任务：检查原始task ID是否已提交诊断结果
+                    # 普通单阶段任务：检查原始task ID是否已提交诊断结果
                     if submission_id in res_data:
                         print(f"🔍 [admin-task-status] user={username}, exists=True")
                         user_info["completed"] = True
@@ -1225,14 +1263,26 @@ async def clear_stuck_edu_tasks():
         # 检查是否有 .processing 文件（正在运行）
         processed_path = SYSTEM_EDU_DIR / "processed" / submission_id
         processing_flag = processed_path / ".processing"
+        STUCK_THRESHOLD = 1800  # 30分钟
         
         if processing_flag.exists():
-            # 正在运行，保留
-            kept_tasks.append(task)
-            print(f"⏭️ 任务 {submission_id} 正在运行，跳过")
-        else:
-            # 无效任务，可以清理
-            # 将状态改为 unreleased，而不是物理删除
+            try:
+                age_seconds = time.time() - processing_flag.stat().st_mtime
+                if age_seconds > STUCK_THRESHOLD:
+                    # .processing 文件存在但超过30分钟，判定为系统中断残留
+                    print(f"⚠️ 任务 {submission_id} 的 .processing 文件已存在 {age_seconds/60:.0f} 分钟，判定为系统中断残留，将清理")
+                else:
+                    # 正在运行，保留
+                    kept_tasks.append(task)
+                    print(f"⏭️ 任务 {submission_id} 正在运行（.processing 文件较新），跳过")
+                    continue
+            except Exception as e:
+                print(f"⚠️ 无法读取 .processing 文件时间: {e}，保留任务")
+                kept_tasks.append(task)
+                continue
+        
+        # 无效任务，可以清理
+        # 将状态改为 unreleased，而不是物理删除
             task["status"] = "unreleased"
             kept_tasks.append(task)
             deleted_tasks.append(submission_id)

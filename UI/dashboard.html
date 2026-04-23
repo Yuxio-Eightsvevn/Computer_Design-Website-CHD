@@ -174,16 +174,39 @@
       }
 
       // --- [同步自 task_status.html 的用户信息加载逻辑] ---
+      let avatarConfig = { avatars: {} };
+
+      async function loadAvatarConfig() {
+          try {
+              const r = await fetch('/UI/res/share/user_avatar_config.json');
+              if (r.ok) {
+                  avatarConfig = await r.json();
+              }
+          } catch (e) {
+              console.warn('头像配置加载失败，使用默认头像');
+          }
+      }
+
+      async function setUserAvatar(avatarElem, username) {
+          const avatarPath = avatarConfig.avatars[username];
+          if (avatarPath) {
+              avatarElem.innerHTML = `<img src="/UI/${avatarPath}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" onerror="this.parentElement.textContent='${username ? username[0].toUpperCase() : 'U'}'">`;
+          } else {
+              avatarElem.textContent = username ? username[0].toUpperCase() : 'U';
+          }
+      }
+
       async function loadCurrentUser() {
+        await loadAvatarConfig();
         try {
           const r = await fetch('/api/users/current');
           if (r.ok) {
             const d = await r.json();
             if (d && d.data) {
               currentUser = d.data;
-              document.getElementById('currentUserName').textContent = currentUser.username;
+              document.getElementById('currentUserName').textContent = currentUser.doctor || currentUser.username;
               document.getElementById('currentUserOrg').textContent = currentUser.organization || '未知机构';
-              document.getElementById('avatarBox').textContent = currentUser.username[0].toUpperCase();
+              setUserAvatar(document.getElementById('avatarBox'), currentUser.username);
               fetchUploadCount(currentUser.username);
               return;
             }

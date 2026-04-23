@@ -1256,7 +1256,7 @@
                 <strong style="color: #667eea;">教育练习中心 → 点击"查看报告"</strong><br>
                 查看详细评估结果。
             </p>
-            <button class="btn btn-primary" onclick="closeEduCompleteModal()" style="width: 100%; padding: 12px; font-size: 14px; font-weight: 600; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; cursor: pointer;">
+            <button class="btn btn-primary" id="completeModalBtn" style="width: 100%; padding: 12px; font-size: 14px; font-weight: 600; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; cursor: pointer;">
                 查看报告
             </button>
         </div>
@@ -1537,7 +1537,7 @@
             const userDataStr = localStorage.getItem('userData');
             if (userDataStr) {
                 userData = JSON.parse(userDataStr);
-                document.getElementById('navUsername').textContent = userData.username;
+                document.getElementById('navUsername').textContent = userData.doctor || userData.username;
             }
             
             // 加载病人列表
@@ -1632,7 +1632,7 @@
                 loadPatientVideos(0);
                 updateProgressText();
                 
-                // 教育模式-单独判读/复核判读：禁用模态切换按钮
+                // 教育模式-独立诊断/独立复诊：禁用模态切换按钮
                 if (currentMode === 'edu' && (eduSubMode === 'single' || eduSubMode === 'review')) {
                     const modalityGroup = document.querySelector('.diagnosis-group'); // 第一个是模态切换
                     if (modalityGroup) {
@@ -1642,7 +1642,7 @@
                             btn.style.pointerEvents = 'none';
                             btn.title = '此模式不可切换模态';
                         });
-                        console.log('已禁用模态切换按钮（单独/复核判读模式）');
+                        console.log('已禁用模态切换按钮（独立诊断/独立复诊模式）');
                     }
                 }
                 
@@ -1843,7 +1843,10 @@
             progressFill.style.width = `${percentage}%`;
             
             // 如果完成全部诊断且所有记录都有 severity，显示提交按钮
-            const allRecordsComplete = Object.values(diagnosisRecords).every(r => r.diagnosis && r.severity);
+            // 判读模式只要求诊断，教育模式同时要求诊断和严重度
+            const allRecordsComplete = Object.values(diagnosisRecords).every(r => 
+                r.diagnosis && (currentMode === 'edu' ? r.severity : true)
+            );
             if (completedCount === patients.length && patients.length > 0 && allRecordsComplete) {
                 submitBtn.style.display = 'block';
             } else {
@@ -2469,17 +2472,17 @@ function selectOption(element, group) {
 
             // 如果是模态切换，重新加载视频
             if (group === 'modality') {
-                // 教育模式-单独判读/复核判读禁止切换到热力图/识别框
+                // 教育模式-独立诊断/独立复诊禁止切换到热力图/识别框
                 if (eduSubMode === 'single' || eduSubMode === 'review') {
                     alert('此模式仅显示原视频');
                     return;
                 }
                 const modalityText = element.textContent.trim();
-                if (modalityText === '普通') {
+                if (modalityText === '原视频') {
                     currentModality = 'original';
                 } else if (modalityText === '热力图') {
                     currentModality = 'heatmap';
-                } else if (modalityText === '模型识别框') {
+                } else if (modalityText === '病灶定位框') {
                     currentModality = 'bbox';
                 }
                 // 重新加载当前病人的视频（使用新的模态）
@@ -2872,12 +2875,7 @@ function selectOption(element, group) {
                     clearDraft();
                     
                     // [核心修改] 根据模式返回对应的状态界面
-                    if (currentMode === 'edu') {
-                        // 显示教育模式完成提示弹窗
-                        showEduCompleteModal();
-                    } else {
-                        window.location.href = '/task_status';
-                    }
+                    showEduCompleteModal(currentMode);
                 } catch (error) {
                     console.error('提交失败:', error);
                     alert('提交失败，请重试');
@@ -2926,10 +2924,26 @@ function selectOption(element, group) {
         }
 
         // 显示教育模式完成提示弹窗
-        function showEduCompleteModal() {
+        function showEduCompleteModal(mode) {
             const modal = document.getElementById('eduCompleteModal');
+            const btn = document.getElementById('completeModalBtn');
             if (modal) {
                 modal.style.display = 'flex';
+            }
+            if (btn) {
+                if (mode === 'edu') {
+                    btn.textContent = '返回教育练习中心';
+                    btn.onclick = () => {
+                        modal.style.display = 'none';
+                        window.location.href = '/edu_status';
+                    };
+                } else {
+                    btn.textContent = '返回诊断任务列表';
+                    btn.onclick = () => {
+                        modal.style.display = 'none';
+                        window.location.href = '/task_status';
+                    };
+                }
             }
         }
 

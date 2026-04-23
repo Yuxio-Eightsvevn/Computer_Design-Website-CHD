@@ -177,6 +177,27 @@
         }
       }
 
+      let avatarConfig = { avatars: {} };
+      async function loadAvatarConfig() {
+        try {
+          const r = await fetch('/UI/res/share/user_avatar_config.json');
+          if (r.ok) {
+            avatarConfig = await r.json();
+          }
+        } catch (e) {
+          console.warn('头像配置加载失败，使用默认头像');
+        }
+      }
+
+async function setUserAvatar(avatarElem, username) {
+        const avatarPath = avatarConfig.avatars[username];
+        if (avatarPath) {
+            avatarElem.innerHTML = `<img src="/UI/${avatarPath}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" onerror="this.parentElement.textContent='${username ? username[0].toUpperCase() : 'U'}'">`;
+        } else {
+            avatarElem.textContent = username ? username[0].toUpperCase() : 'U';
+        }
+      }
+
       function setupButtonHoverEvents() {
         allButtons.forEach(btn => {
           if (!btn) return;
@@ -193,6 +214,7 @@
       }
 
       async function loadUser() {
+        await loadAvatarConfig();
         await loadButtonDescriptions();
         setupButtonHoverEvents();
         
@@ -201,6 +223,7 @@
         let org = '';
 
         // 优先通过后端的 /api/users/current 获取
+        let doctor = '';
         try {
           const resp = await fetch('/api/users/current');
           if (resp.ok) {
@@ -209,6 +232,7 @@
               const u = body.data;
               uname = u.username || u.user || u.login || u.name || uname;
               org = u.organization || u.org || u.organizationName || u.department || '';
+              doctor = u.doctor || u.name || '';
               // [新增] 提取管理员标识，严格判断是否为 true
               isAdmin = u.is_admin === true; 
             }
@@ -217,15 +241,16 @@
           // 忽略，尝试 cookie 回退
         }
 
-        applyUser(uname, org, isAdmin);
+        applyUser(uname, org, isAdmin, doctor);
       }
 
-      // [改动] 增加 isAdmin 参数，用于控制按钮显示
-      function applyUser(username, org, isAdmin) {
+      // [改动] 增加 isAdmin 和 doctor 参数
+      function applyUser(username, org, isAdmin, doctor) {
         const uname = username || 'unknown';
-        welcomeText.textContent = `欢迎回来，${uname}`;
+        const displayName = doctor || uname;
+        welcomeText.textContent = `欢迎回来，${displayName}`;
         orgText.textContent = org ? `机构：${org}` : '机构：未知机构';
-        avatar.textContent = (uname && uname[0]) ? uname[0].toUpperCase() : 'U';
+        setUserAvatar(avatar, uname);
 
         // [新增] 根据权限动态显示管理按钮
         if (isAdmin) {

@@ -1,4 +1,4 @@
-# 儿童先心病超声诊断平台 - README
+﻿# 儿童先心病超声诊断平台 - README
 
 ---
 
@@ -2187,4 +2187,201 @@ print(f"🔔 当前阶段: {request.eduSubMode}，跳过LLM分析（仅在三阶
 ---
 
 *文档版本: 2026-04-22*
-*最后更新: 2026-04-22 - 二阶段/三阶段日志区分修复*
+*最后更新: 2026-04-22 - 清空任务时间戳检测修复*
+
+### 12.23 清空任务时间戳检测修复 (2026-04-22)
+
+**问题**：点击"原视频"或"病灶定位框"按钮时，视频只会闪烁并保持原模态。
+
+**原因**：HTML按钮文本（原视频/病灶定位框）与 selectOption 函数中的判断条件（普通/模型识别框）不匹配。
+
+**修复内容** (diagnosis.html:2478-2483):
+
+`javascript
+// 修改前
+if (modalityText === '普通') { ... }
+else if (modalityText === '模型识别框') { ... }
+
+// 修改后
+if (modalityText === '原视频') { ... }
+else if (modalityText === '病灶定位框') { ... }
+`
+
+---
+### 12.24 清空任务逻辑增强：基于时间戳判断系统中断残留 (2026-04-22)
+
+**问题**：系统关闭时，AI 推理可能仍在执行并完成，但后续清理代码未执行，导致 `.processing` 文件残留。
+
+**修复内容** (`routes_oridata.py`):
+
+| 位置 | 修改 |
+|------|------|
+| `clear_stuck_tasks` (第549-565行) | 增加 `.processing` 文件时间戳检查 |
+| `clear_stuck_edu_tasks` (第1239-1255行) | 增加 `.processing` 文件时间戳检查 |
+
+**新逻辑**：
+
+```python
+if processing_flag.exists():
+    age_seconds = time.time() - processing_flag.stat().st_mtime
+    if age_seconds > 1800:  # 超过30分钟
+        # 判定为系统中断残留，执行清理
+    else:
+        # 正在运行，保留
+        continue
+```
+
+**效果**：
+
+| 场景 | 修改前 | 修改后 |
+|------|--------|--------|
+| 正常在运行 | 保留 | 保留（文件较新） |
+| 系统中断残留 | 保留 | 删除（文件超30分钟） |
+
+---
+### 12.25 login.html 核心功能栏 CSS Grid 自适应布局 (2026-04-22)
+
+**问题**：核心功能栏使用 `flex` + 硬编码 `width: 33.33%`，只能固定3列，无法自适应配置项数量。
+
+**修复内容** (`login.html:234-248`):
+
+```css
+/* 修改前 */
+.features-row { display: flex; gap: 20px; }
+.feature-item { flex: 1; width: 33.33%; }
+
+/* 修改后 */
+.features-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+}
+@media (max-width: 1200px) { .features-row { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 900px)  { .features-row { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px)  { .features-row { grid-template-columns: 1fr; } }
+```
+
+**效果**：最多4列自适应，屏幕收窄时自动减少列数。
+
+---
+### 12.26 用户头像配置化 (2026-04-23)
+
+**功能**：支持通过配置文件为指定用户设置自定义头像图标。
+
+**新增文件**：`/UI/res/share/user_avatar_config.json`
+
+```json
+{
+  "avatars": {
+    "admin": "res/share/icon/admin.png",
+    "TestAccount": "res/share/icon/TestAccount.png"
+  }
+}
+```
+
+**修改的文件**：
+
+| 文件 | 修改内容 |
+|------|---------|
+| `flow.html` | 添加 `loadAvatarConfig()`、`setUserAvatar()` 函数 |
+| `edu_status.html` | 添加 `loadAvatarConfig()`、`setUserAvatar()` 函数 |
+| `dashboard.html` | 添加 `loadAvatarConfig()`、`setUserAvatar()` 函数 |
+| `task_status.html` | 添加 `loadAvatarConfig()`、`setUserAvatar()` 函数 |
+
+**逻辑**：
+1. 页面加载时调用 `loadAvatarConfig()` 读取配置
+2. 设置头像时调用 `setUserAvatar(elem, username)`
+3. 若用户在配置文件中存在 → 显示图标图片
+4. 若用户不在配置中 → 回退显示首字母
+
+**向后兼容**：配置文件中未收录的用户仍显示首字母头像。
+
+---
+### 12.27 用户显示名从 username 改为 doctor (2026-04-23)
+
+**功能**：界面显示的用户名称从登录用户名（username）改为医师姓名（doctor）。
+
+**修改的文件**：
+
+| 文件 | 行号 | 修改内容 |
+|------|------|---------|
+| `flow.html` | 232, 245-250 | 提取 `doctor` 字段，显示医师姓名 |
+| `edu_status.html` | 140 | 显示 `doctor \|\| username` |
+| `dashboard.html` | 207 | 显示 `doctor \|\| username` |
+| `task_status.html` | 202 | 显示 `doctor \|\| username` |
+| `diagnosis.html` | 1540 | 显示 `doctor \|\| username` |
+
+**注意**：头像设置仍使用 `username`（作为用户标识）。
+
+---
+### 12.28 LLM分析触发逻辑修复与提示词约束增强 (2026-04-23)
+
+**问题1**：三阶段任务在二阶段完成时错误触发二阶段对比分析
+
+**原因**：`main.py:1050` 使用 `request.eduSubMode == "review"` 判断是否为三阶段，但完成第二阶段时 `eduSubMode` 是 `assist` 而非 `review`，导致 `is_triple=False`，错误进入二阶段分支。
+
+**修复** (`main.py:1049-1058`)：从任务发布时的 `edu_sub_mode` 判断任务类型，而非当前提交的阶段。
+
+```python
+# 从任务发布时的edu_sub_mode判断
+task_info_path = Path(DATA_BATCH_STORAGE) / "SYSTEM" / "edu_data" / "data.json"
+is_task_triple = False
+if task_info_path.exists():
+    with open(task_info_path, "r", encoding="utf-8") as f:
+        task_data = json.load(f)
+        for t in task_data.get("tasks", []):
+            if t.get("submission_id") == request.taskFolder:
+                is_task_triple = (t.get("edu_sub_mode") == "triple")
+                break
+```
+
+---
+
+**问题2**：AI评价与数据事实不符（如复核准确率下降却评价为"有所提升"）
+
+**修复** (`llm_analyzer.py`)：在三阶段和二阶段提示词中增加【重要约束】和【数据核实】步骤：
+
+```python
+【重要约束 - 请务必遵守】
+1. 你必须严格依照上述数据进行分析，禁止臆测或推理未给出的信息
+2. 如果数据显示准确率下降，你必须如实描述下降，不能说"有所提升"
+3. 如果数据显示准确率为0%或100%，你必须如实反映，不能暗示任何隐藏信息
+4. 所有评价结论必须直接来源于给出的数据，禁止添加数据中不存在的信息
+5. 对于数据中的每一个数值变化，必须明确指出是升高还是降低，并给出具体数值
+
+请从以下几个方面给出评价：
+0. **数据核实** - 在给出任何分析前，先核实数据：
+   - 第一阶段准确率: XX%
+   - 第二/第三阶段准确率: XX%
+   - 相比首次的准确率变化: +/-XX%（必须如实反映）
+1. 整体表现评价 - 必须如实反映数据中的准确率是升是降
+...
+```
+
+---
+---
+
+## 📋 待修复问题 (Known Issues)
+
+### [TODO] 后端接受返回绑定显示名而非内部名的 Bug
+
+**问题描述**：系统存在前后端标签名不一致的问题：
+- **前端显示**：`正常`、`VSD`、`ASD`、`PDA`
+- **后端期望**：内部名 `Normal`、`VSD`、`ASD`、`PDA`
+- **已修复**：当前 `LABEL_MAP` 已临时改为 `"正常": 0` 等，临时兼容前端
+
+**根本修复方案（待实施）**：
+
+| 方案 | 描述 | 优点 | 缺点 |
+|------|------|------|------|
+| A. 前后端统一用内部名 | 前端按钮文字改为 `Normal` 等 | 后端无需改 | 用户界面显示英文 |
+| B. 后端全面支持显示名 | 后端同时支持 `正常`/`Normal` | 用户体验好 | 需要改多处代码 |
+| C. 建立映射层 | 前端传内部名，后端转显示名 | 最规范 | 改动较大 |
+
+**建议**：采用方案 A（统一用内部名），对用户更专业，且避免乱码风险。
+
+**涉及文件**：
+- `UI/diagnosis.html` - 诊断按钮文字（第1172-1175行）
+- `main.py` - `LABEL_MAP`/`LABEL_REVERSE_MAP`（第850-851行）
+
+---
