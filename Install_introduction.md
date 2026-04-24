@@ -132,10 +132,13 @@ data_batch_storage/
 | 文件/目录 | 说明 |
 |-----------|------|
 | `users.db` | SQLite用户数据库 |
-| `config/llm_config.json` | 大模型配置 |
+| `config/llm_config.json` | 大模型API配置 |
+| `UI/login_config.json` | 登录页面配置 |
+| `UI/res/share/background_config.json` | 背景/标题配置 |
+| `UI/res/share/user_avatar_config.json` | 用户头像配置 |
 | `model/Codes/` | 模型代码 |
+| `model/*.py` | 模型入口脚本 (heart_diagnosis.py, model_main.py 等) |
 | `model/README.md` | 模型说明 |
-| `model/*.py` | 模型入口脚本 |
 | `model/singleview/.gitkeep` | 占位文件 |
 | `model/multiviews/.gitkeep` | 占位文件 |
 | `model/Baseline_4size/.gitkeep` | 占位文件 |

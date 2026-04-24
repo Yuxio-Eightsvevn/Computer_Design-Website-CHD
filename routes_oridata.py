@@ -279,9 +279,10 @@ async def run_model_inference_wrapper(request_path: Path, output_root: Path, req
         print(f"⚠️ [AI任务] 无法创建状态标记: {e}")
     
     try:
-        # 1. 运行 AI 诊断模型（捕获返回的推理时间）
+        # 1. 运行 AI 诊断模型（计时）
+        start_time = time.time()
         inference_result = await asyncio.to_thread(run_diagnosis, target_dir=str(request_path), output_dir=str(output_root))
-        inference_duration = inference_result.get("duration", 0) if isinstance(inference_result, dict) else 0
+        inference_duration = time.time() - start_time
         
         # 2. 结果转码：遍历 output_videos 下的所有视频并修复编码
         processed_task_dir = output_root / submission_id

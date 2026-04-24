@@ -381,6 +381,24 @@
     </div>
   </div>
 
+  <!-- 部署面板 -->
+  <div id="deployPanel" class="modal-overlay" style="display:none;">
+    <div class="modal-card" style="max-width:600px;">
+      <h3 style="color:#1e293b; margin-bottom:15px;">🚀 部署检测面板</h3>
+      <div style="margin-bottom:15px;">
+        <button class="btn btn-primary" onclick="checkModels()" style="margin-right:10px;">🔍 模型检测</button>
+        <button class="btn btn-ghost" onclick="resetData()" style="background:#dc3545; color:white;">🗑️ 重置数据</button>
+      </div>
+      <div id="deployResult" style="display:none; padding:15px; background:#f8fafc; border-radius:8px; margin-bottom:15px;">
+        <pre id="deployResultText" style="font-size:12px; white-space:pre-wrap; margin:0;"></pre>
+      </div>
+      <div style="display:flex; justify-content:space-between;">
+        <button class="btn btn-ghost" onclick="cancelDeploy()">取消，稍后处理</button>
+        <button class="btn btn-primary" onclick="completeDeploy()" style="background:#10b981;">✅ 确定部署完成</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     let currentZipFile = null;
     let currentTempId = null;
@@ -393,6 +411,88 @@
       loadModels();
       loadInferenceStats();
       setInterval(fetchTasks, 5000); 
+      checkDeployConfig();
+    }
+    
+    async function checkDeployConfig() {
+      try {
+        const r = await fetch('/api/admin/deploy-config');
+        if (r.ok) {
+          const config = await r.json();
+          if (!config.deployCompleted) {
+            document.getElementById('deployPanel').style.display = 'flex';
+          }
+        }
+      } catch (e) {
+        console.error('检查部署配置失败:', e);
+      }
+    }
+    
+    async function checkModels() {
+      const resultDiv = document.getElementById('deployResult');
+      const resultText = document.getElementById('deployResultText');
+      resultDiv.style.display = 'block';
+      resultText.textContent = '正在检测模型文件...\n';
+      
+      try {
+        const r = await fetch('/api/admin/check-models', { method: 'POST' });
+        const data = await r.json();
+        
+        let msg = '=== 模型检测结果 ===\n\n';
+        msg += '【单视角模型】\n';
+        data.singleview.forEach(m => {
+          msg += `  ${m.exists ? '✅' : '❌'} ${m.file}\n`;
+        });
+        msg += '\n【多视角模型】\n';
+        data.multiviews.forEach(m => {
+          msg += `  ${m.exists ? '✅' : '❌'} ${m.file}\n`;
+        });
+        msg += '\n【基线特征】\n';
+        data.baseline.forEach(m => {
+          msg += `  ${m.exists ? '✅' : '❌'} ${m.file}\n`;
+        });
+        msg += `\n${data.allExist ? '✅ 所有模型文件齐全' : '❌ 部分模型文件缺失'}`;
+        resultText.textContent = msg;
+      } catch (e) {
+        resultText.textContent = '检测失败: ' + e.message;
+      }
+    }
+    
+    async function resetData() {
+      if (!confirm('确定要清空所有任务数据吗？此操作不可恢复！')) return;
+      
+      const resultDiv = document.getElementById('deployResult');
+      const resultText = document.getElementById('deployResultText');
+      resultDiv.style.display = 'block';
+      resultText.textContent = '正在重置数据...\n';
+      
+      try {
+        const r = await fetch('/api/admin/reset-data', { method: 'POST' });
+        if (r.ok) {
+          resultText.textContent = '✅ 数据已重置完成';
+        } else {
+          resultText.textContent = '❌ 重置失败';
+        }
+      } catch (e) {
+        resultText.textContent = '重置失败: ' + e.message;
+      }
+    }
+    
+    async function completeDeploy() {
+      try {
+        await fetch('/api/admin/deploy-config', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({deployCompleted: true})
+        });
+        document.getElementById('deployPanel').style.display = 'none';
+      } catch (e) {
+        alert('操作失败: ' + e.message);
+      }
+    }
+    
+    function cancelDeploy() {
+      document.getElementById('deployPanel').style.display = 'none';
     }
     
     async function loadInferenceStats() {

@@ -837,6 +837,126 @@ async def test_llm_model(model_id: str, request: Request):
             "error": str(e)
         }
 
+
+# ==================== 部署管理 API ====================
+
+DEPLOY_CONFIG_FILE = Path("UI") / "res" / "share" / "deploy_config.json"
+
+@app.get("/api/admin/deploy-config")
+async def get_deploy_config(request: Request):
+    """获取部署配置"""
+    username = request.cookies.get("username")
+    if not username:
+        raise HTTPException(status_code=401, detail="未登录")
+    
+    user = database.get_user_by_username(username)
+    if not user or not user.get('is_admin'):
+        raise HTTPException(status_code=403, detail="仅管理员可操作")
+    
+    if not DEPLOY_CONFIG_FILE.exists():
+        return {"deployCompleted": False}
+    
+    with open(DEPLOY_CONFIG_FILE, "r", encoding="utf-8") as f:
+        config = json.load(f)
+    
+    return config
+
+
+@app.post("/api/admin/deploy-config")
+async def save_deploy_config(request: Request):
+    """保存部署配置"""
+    username = request.cookies.get("username")
+    if not username:
+        raise HTTPException(status_code=401, detail="未登录")
+    
+    user = database.get_user_by_username(username)
+    if not user or not user.get('is_admin'):
+        raise HTTPException(status_code=403, detail="仅管理员可操作")
+    
+    body = await request.json()
+    
+    with open(DEPLOY_CONFIG_FILE, "w", encoding="utf-8") as f:
+        json.dump({"deployCompleted": bool(body.get("deployCompleted", True))}, f, ensure_ascii=False, indent=2)
+    
+    return {"message": "配置已保存"}
+
+
+@app.post("/api/admin/check-models")
+async def check_models(request: Request):
+    """检测模型文件是否存在"""
+    username = request.cookies.get("username")
+    if not username:
+        raise HTTPException(status_code=401, detail="未登录")
+    
+    user = database.get_user_by_username(username)
+    if not user or not user.get('is_admin'):
+        raise HTTPException(status_code=403, detail="仅管理员可操作")
+    
+    model_dir = Path("model")
+    results = {
+        "singleview": [],
+        "multiviews": [],
+        "baseline": [],
+        "allExist": True
+    }
+    
+    # 检查单视角模型
+    for i in range(4, 8):
+        path = model_dir / "singleview" / f"spatial_size_{i}.pth"
+        exists = path.exists()
+        results["allExist"] = results["allExist"] and exists
+        results["singleview"].append({"file": f"spatial_size_{i}.pth", "exists": exists})
+    
+    # 检查多视角模型
+    mv_path = model_dir / "multiviews" / "epoch_97.98295452219057.pth"
+    mv_exists = mv_path.exists()
+    results["allExist"] = results["allExist"] and mv_exists
+    results["multiviews"].append({"file": "epoch_97.98295452219057.pth", "exists": mv_exists})
+    
+    # 检查基线特征
+    for i in range(4, 8):
+        path = model_dir / "Baseline_4size" / f"final_baseline_features_{i}x{i}_512dim_1101.pt"
+        exists = path.exists()
+        results["allExist"] = results["allExist"] and exists
+        results["baseline"].append({"file": f"final_baseline_features_{i}x{i}_512dim_1101.pt", "exists": exists})
+    
+    return results
+
+
+@app.post("/api/admin/reset-data")
+async def reset_data(request: Request):
+    """重置所有任务数据"""
+    username = request.cookies.get("username")
+    if not username:
+        raise HTTPException(status_code=401, detail="未登录")
+    
+    user = database.get_user_by_username(username)
+    if not user or not user.get('is_admin'):
+        raise HTTPException(status_code=403, detail="仅管理员可操作")
+    
+    import shutil
+    
+    # 1. 清空用户任务数据
+    data_root = Path("data_batch_storage")
+    if data_root.exists():
+        for item in data_root.iterdir():
+            if item.name == "SYSTEM":
+                # 保留 SYSTEM 目录，清空 edu_data
+                edu_data_dir = item / "edu_data"
+                if edu_data_dir.exists():
+                    shutil.rmtree(edu_data_dir)
+                    edu_data_dir.mkdir(parents=True, exist_ok=True)
+                    # 重建必要的子目录
+                    (edu_data_dir / "processed").mkdir(parents=True, exist_ok=True)
+                    (edu_data_dir / "Doctor_Diag_Result").mkdir(parents=True, exist_ok=True)
+            else:
+                # 删除用户数据目录
+                if item.is_dir():
+                    shutil.rmtree(item)
+    
+    return {"message": "数据已重置"}
+
+
 # 提交诊断结果（支持智慧寻址）
 @app.post("/api/diagnosis/submit-json")
 async def submit_diagnosis_json(request: DiagnosisSubmitJsonRequest):
