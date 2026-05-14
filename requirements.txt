@@ -36,13 +36,3 @@ entmax>=1.0
 # System Dependencies:
 # - ffmpeg (for video processing) - Must be installed separately
 # - SQLite3 (included in Python standard library)
-
-# Installation Instructions:
-# 1. Install Python 3.8+ (recommended: Python 3.10)
-# 2. Install ffmpeg: 
-#    - Windows: choco install ffmpeg or download from https://ffmpeg.org/
-#    - Linux: sudo apt-get install ffmpeg
-#    - macOS: brew install ffmpeg
-# 3. Create virtual environment: python -m venv venv
-# 4. Activate: venv\Scripts\activate (Windows) or source venv/bin/activate (Linux/Mac)
-# 5. Install dependencies: pip install -r requirements.txt
