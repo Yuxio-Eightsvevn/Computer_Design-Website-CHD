@@ -76,8 +76,8 @@ fi
 
 # 6. 安装 Python 依赖
 echo "[6/7] 安装 Python 依赖..."
-pip install --upgrade pip
-pip install -r requirements.txt
+pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple
+pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 echo "✅ Python 依赖安装完成"
 
 # 7. 添加 .gitignore 条目（如需要）
@@ -97,7 +97,7 @@ fi
 # 安装模型目录额外依赖（如果有）
 if [ -f "model/requirements.txt" ]; then
     echo "📦 安装模型额外依赖..."
-    pip install -r model/requirements.txt
+    pip install -r model/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
     echo "✅ 模型依赖安装完成"
 fi
 
