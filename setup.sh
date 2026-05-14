@@ -50,12 +50,11 @@ fi
 
 # 4. 创建虚拟环境
 echo "[4/7] 创建虚拟环境..."
-# 检查是否需要安装 python3-venv (Debian/Ubuntu)
+# Debian/Ubuntu: 确保 python3-venv 和 python3-pip 已安装
 if command -v apt-get &> /dev/null; then
-    if ! python3 -m venv --help &> /dev/null 2>&1; then
-        echo "📦 安装 python3-venv..."
-        sudo apt-get update && sudo apt-get install -y python3.10-venv python3-pip
-    fi
+    echo "📦 安装 python3-venv 和 python3-pip..."
+    sudo apt-get update
+    sudo apt-get install -y python3.10-venv python3-pip
 fi
 
 if python3 -m venv CHD_venv; then
