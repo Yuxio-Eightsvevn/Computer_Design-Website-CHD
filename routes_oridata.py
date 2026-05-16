@@ -185,6 +185,7 @@ def update_user_task_index(username: str, task_update: dict):
                 "submission_id": sub_id, "request_name": task_update.get("request_name", "未命名任务"),
                 "request_pos": task_update.get("request_pos", ""), "request_case_cnt": task_update.get("request_case_cnt", 0),
                 "request_video_cnt": task_update.get("request_video_cnt", 0), "is_cmp": False,
+                "display_order": task_update.get("display_order", []),  # 新增
                 "upload_time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "cmp_time": None
             }
             data.setdefault("tasks", []).append(new_entry)
@@ -236,6 +237,7 @@ def update_edu_task_index(task_update: dict):
                 "target_users": [],      # 已发布的用户列表
                 "request_case_cnt": task_update.get("request_case_cnt", 0),
                 "request_video_cnt": task_update.get("request_video_cnt", 0),
+                "display_order": task_update.get("display_order", []),  # 新增
                 "upload_time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "is_cmp": False
             }
@@ -400,10 +402,14 @@ async def upload_oridata(
                         await out_f.write(chunk)
                 asyncio.create_task(generate_thumbnail_ffmpeg(dest_path, dest_path.with_name(dest_filename + ".jpg")))
 
+        # 生成 display_order（保持 case_names 的顺序，去重）
+        display_order = list(dict.fromkeys(case_names))  # 保持插入顺序
+        
         meta = {
             "submission_id": submission_id, "request_name": request_name, "username": username,
             "created_at": datetime.datetime.now().isoformat(), "total_cases": len(final_save_map),
-            "total_videos": actual_total_video_cnt, "warnings": warnings
+            "total_videos": actual_total_video_cnt, "warnings": warnings,
+            "display_order": display_order  # 新增
         }
         with open(submission_base / "metadata.json", "w", encoding="utf-8") as mf:
             json.dump(meta, mf, ensure_ascii=False, indent=2)
@@ -414,7 +420,8 @@ async def upload_oridata(
             "request_pos": f"processed/{submission_id}", 
             "request_case_cnt": len(final_save_map),
             "request_video_cnt": actual_total_video_cnt,
-            "is_cmp": False
+            "is_cmp": False,
+            "display_order": display_order  # 新增
         })
 
         # 触发模型 (is_system=False)
@@ -632,7 +639,8 @@ async def parse_edu_zip(file: UploadFile = File(...)):
             "suggested_name": Path(file.filename).stem,
             "case_count": case_cnt,
             "video_count": video_cnt,
-            "submission_id": generate_submission_id()
+            "submission_id": generate_submission_id(),
+            "display_order": list(epoch_data.keys())
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"解析失败: {str(e)}")
@@ -696,6 +704,7 @@ async def confirm_edu_upload(
             "submission_id": submission_id,
             "request_name": request_name,
             "is_dual_stage": True,  # 标记为双阶段任务
+            "display_order": list(epoch_data.keys()),  # 新增：保存原始顺序
             "request_pos": f"processed/{submission_id}",
             "request_case_cnt": len(epoch_data),
             "request_video_cnt": sum(len(c.get("videos", [])) for c in epoch_data.values()),

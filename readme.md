@@ -2385,3 +2385,84 @@ if task_info_path.exists():
 - `main.py` - `LABEL_MAP`/`LABEL_REVERSE_MAP`（第850-851行）
 
 ---
+### 12.29 display_order 字段与诊断顺序控制 (2026-05-16)
+
+**功能**：通过 `display_order` 字段控制病例显示顺序，支持打乱（shuffle）功能。
+
+**修改的文件**：
+
+| 文件 | 修改内容 |
+|------|----------|
+| `routes_oridata.py` | 教育模式/判读模式上传时保存 `display_order` |
+| `main.py` | `/api/tasks/{username}/{task_folder}/patients` 返回 `display_order` |
+| `diagnosis.html` | 读取 `display_order` 并应用顺序/打乱 |
+
+**display_order 逻辑**：
+
+| display_order 状态 | 处理方式 |
+|---------------------|----------|
+| `null` / `undefined` | 使用原顺序（字母序） |
+| `[]` (空数组) | 使用原顺序 |
+| 长度 = 病例数 | 正常按 display_order 排序 |
+| 长度 < 病例数 | 按 display_order 顺序展示（剩余忽略） |
+| 长度 > 病例数 | 使用原顺序 |
+
+**shuffle 默认值**：
+
+| 模式 | eduSubMode | shuffle 默认值 |
+|------|-----------|---------------|
+| 诊断 (diag) | - | `false` |
+| 教育 (edu) | `single` | `false` |
+| 教育 (edu) | `assist` | `true` |
+| 教育 (edu) | `review` | `true` |
+
+**文件编辑修改顺序**：
+```
+路径：data_batch_storage/{username}/oridata/{submission_id}/metadata.json
+或：data_batch_storage/SYSTEM/edu_data/{submission_id}/metadata.json
+
+修改 display_order 数组：
+{
+  "display_order": ["case1", "case2", "case3"],
+  ...
+}
+```
+
+---
+
+## 📋 待修复问题 (Known Issues)
+
+### [TODO] 后端接受返回绑定显示名而非内部名的 Bug
+
+**问题描述**：系统存在前后端标签名不一致的问题：
+- **前端显示**：`正常`、`VSD`、`ASD`、`PDA`
+- **后端期望**：内部名 `Normal`、`VSD`、`ASD`、`PDA`
+- **已修复**：当前 `LABEL_MAP` 已临时改为 `"正常": 0` 等，临时兼容前端
+
+**根本修复方案（待实施）**：
+
+| 方案 | 描述 | 优点 | 缺点 |
+|------|------|------|------|
+| A. 前后端统一用内部名 | 前端按钮文字改为 `Normal` 等 | 后端无需改 | 用户界面显示英文 |
+| B. 后端全面支持显示名 | 后端同时支持 `正常`/`Normal` | 用户体验好 | 需要改多处代码 |
+| C. 建立映射层 | 前端传内部名，后端转显示名 | 最规范 | 改动较大 |
+
+**建议**：采用方案 A（统一用内部名），对用户更专业，且避免乱码风险。
+
+**涉及文件**：
+- `UI/diagnosis.html` - 诊断按钮文字（第1172-1175行）
+- `main.py` - `LABEL_MAP`/`LABEL_REVERSE_MAP`（第850-851行）
+
+---
+
+### [TODO] 未判读病例的默认值逻辑
+
+**问题描述**：当 `display_order` 长度 < 病例数时，剩余病例暂不显示，但这些病例的诊断默认值如何处理尚未实现。
+
+**预计影响**：
+- `submitDiagnosis()` - 需要处理未显示病例的诊断值
+- AI 分析逻辑 - 需要确认如何处理缺失的诊断数据
+
+**待实现**：定义未判读病例的默认诊断值（如 `-1` 表示未判读）或从 UI/UX 层面禁止用户跳过这些病例。
+
+---

@@ -1294,6 +1294,7 @@
         let userData = null;
         let currentMode = 'diag'; // [核心修复] 将变量提升至全局，默认为判读模式
         let eduSubMode = 'assist'; // 教育子模式：single(禁用热力图) / assist(AI辅助)
+        let shuffleEnabled = false; // [新增] 是否打乱病例显示顺序
         let video3DViewer = null; // 3D查看器实例
         let currentSeverity = null;
         let timerInterval = null;
@@ -1311,6 +1312,16 @@
             taskName: ''
         };
         let isReturningToDashboard = false; // 标记是否正在返回主页
+        
+        // [新增] Fisher-Yates 洗牌算法
+        function shuffleArray(arr) {
+            const shuffled = [...arr];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            return shuffled;
+        }
         
         // [新增] 查看时间追踪
         let patientViewTimes = {};  // {patientId: seconds}
@@ -1452,6 +1463,23 @@
             const urlParams = new URLSearchParams(window.location.search);
             currentMode = urlParams.get('mode') || 'diag'; // 默认为判读模式
             eduSubMode = urlParams.get('eduSubMode') || 'assist'; // 教育子模式
+            
+            // [新增] 解析 shuffle 参数
+            const shuffleParam = urlParams.get('shuffle');
+            if (shuffleParam !== null) {
+                shuffleEnabled = shuffleParam === 'true';
+            } else {
+                // 根据模式设置默认值
+                if (currentMode === 'diag') {
+                    shuffleEnabled = false;
+                } else if (currentMode === 'edu' && eduSubMode === 'single') {
+                    shuffleEnabled = false;
+                } else {
+                    shuffleEnabled = true; // assist 或 review
+                }
+            }
+            console.log('🎲 shuffleEnabled =', shuffleEnabled);
+            
             taskInfo.username = urlParams.get('username');
             taskInfo.taskFolder = urlParams.get('task');
             taskInfo.taskName = urlParams.get('taskName') || '诊断任务';
@@ -1615,6 +1643,40 @@
                 patients = result.data;
                 console.log('病人列表:', patients);
                 console.log('病人数量:', patients ? patients.length : 0);
+                
+                // [新增] 应用 display_order 和 shuffle
+                if (result.display_order && result.display_order.length > 0) {
+                    // display_order 存在且非空
+                    if (result.display_order.length === patients.length) {
+                        // 长度正常：按 display_order 排序
+                        const orderMap = {};
+                        result.display_order.forEach((id, idx) => { orderMap[id] = idx; });
+                        patients.sort((a, b) => orderMap[a.id] - orderMap[b.id]);
+                        console.log('📋 display_order 已应用，共', patients.length, '个病例');
+                    } else if (result.display_order.length > patients.length) {
+                        // 长度大于病例数：回退使用原顺序
+                        console.log('⚠️ display_order 长度异常（', result.display_order.length, '> 实际病例数', patients.length, '），回退使用原顺序');
+                        // 不做任何排序，使用 patients 原有顺序（字母序）
+                    } else {
+                        // 长度小于病例数：只显示 display_order 中的病例
+                        const orderSet = new Set(result.display_order);
+                        patients = patients.filter(p => orderSet.has(p.id));
+                        // 再次按 display_order 排序
+                        const orderMap = {};
+                        result.display_order.forEach((id, idx) => { orderMap[id] = idx; });
+                        patients.sort((a, b) => orderMap[a.id] - orderMap[b.id]);
+                        console.log('⚠️ display_order 长度异常，只显示', patients.length, '个病例');
+                    }
+                } else {
+                    // display_order 为空/null：使用原顺序（已有 patients）
+                    console.log('⚠️ 无 display_order，使用原顺序（字母序）');
+                }
+                
+                // [新增] 应用 shuffle
+                if (shuffleEnabled) {
+                    patients = shuffleArray(patients);
+                    console.log('🔀 病例顺序已打乱');
+                }
                 
                 // 调试：显示任务路径信息
                 console.log('尝试访问路径:', {

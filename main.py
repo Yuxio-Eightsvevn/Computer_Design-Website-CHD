@@ -520,7 +520,46 @@ async def get_task_patients(username: str, task_folder: str):
         return (0, int(match.group()), p['id']) if match else (1, 0, p['id'])
     
     patients.sort(key=sort_key)
-    return {"data": patients}
+    
+    # [新增] 获取 display_order
+    display_order = None
+    from routes_oridata import BASE_DATA_DIR, SYSTEM_EDU_DIR, update_user_task_index, update_edu_task_index
+    
+    # 尝试从任务索引中获取 display_order
+    if base_prefix.startswith("SYSTEM"):
+        # 教育模式
+        idx_path = SYSTEM_EDU_DIR / "data.json"
+        if idx_path.exists():
+            with open(idx_path, "r", encoding="utf-8") as f:
+                task_data = json.load(f)
+            for t in task_data.get("tasks", []):
+                if t.get("submission_id") == final_task_id:
+                    display_order = t.get("display_order")
+                    # [新增] 如果 display_order 为空，自动生成并回填
+                    if not display_order:
+                        display_order = [p['id'] for p in patients]
+                        print(f'🔧 [display_order] 旧任务自动生成 display_order: {display_order}')
+                        # 回填到索引文件
+                        update_edu_task_index({"submission_id": final_task_id, "display_order": display_order})
+                    break
+    else:
+        # 判读模式
+        idx_path = BASE_DATA_DIR / username / "data.json"
+        if idx_path.exists():
+            with open(idx_path, "r", encoding="utf-8") as f:
+                task_data = json.load(f)
+            for t in task_data.get("tasks", []):
+                if t.get("submission_id") == final_task_id:
+                    display_order = t.get("display_order")
+                    # [新增] 如果 display_order 为空，自动生成并回填
+                    if not display_order:
+                        display_order = [p['id'] for p in patients]
+                        print(f'🔧 [display_order] 旧任务自动生成 display_order: {display_order}')
+                        # 回填到索引文件
+                        update_user_task_index(username, {"submission_id": final_task_id, "display_order": display_order})
+                    break
+    
+    return {"data": patients, "display_order": display_order}
 
 # --- [新增：元数据格式适配接口] ---
 @app.get("/api/get-metadata")
