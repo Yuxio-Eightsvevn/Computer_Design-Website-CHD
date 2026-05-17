@@ -610,6 +610,7 @@ class DiagnosisSubmitJsonRequest(BaseModel):
     totalTime: Dict[str, Any]
     patientCount: int
     records: List[DiagnosisRecordSimple]
+    skip_llm: Optional[bool] = False  # [新增] 跳过LLM分析（重做模式时使用）
 
 # ==================== 大模型配置管理 API（新版） ====================
 
@@ -1228,7 +1229,9 @@ async def submit_diagnosis_json(request: DiagnosisSubmitJsonRequest):
             print(f"📊 教育模式评分完成: {request.username} - 模式: {request.eduSubMode} - 得分: {stats['accuracy']*100}%")
             
             # 三阶段都完成时，触发综合分析（取第一和第三阶段对比）
-            if is_triple and triple_done:
+            if request.skip_llm:
+                print(f"🔔 重做模式，跳过LLM分析")
+            elif is_triple and triple_done:
                 print(f"🔔 三阶段全部完成，准备触发AI综合分析")
                 asyncio.create_task(analyze_with_llm(
                     request.username, 

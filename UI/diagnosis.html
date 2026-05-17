@@ -1483,6 +1483,13 @@
             taskInfo.username = urlParams.get('username');
             taskInfo.taskFolder = urlParams.get('task');
             taskInfo.taskName = urlParams.get('taskName') || '诊断任务';
+
+            // [新增] 解析重做模式参数
+            taskInfo.forceStart = urlParams.get('force_start') === 'true';
+            taskInfo.rerunMode = urlParams.get('rerun') === 'true';
+            if (taskInfo.forceStart || taskInfo.rerunMode) {
+                console.log('🔄 重做模式已启用:', { forceStart: taskInfo.forceStart, rerunMode: taskInfo.rerunMode });
+            }
             
             // 检查是否带有清除草稿的标记
             const clearCache = urlParams.get('clearCache');
@@ -1573,12 +1580,16 @@
             
             // 尝试恢复草稿（patients 已经加载完成）
             const draft = loadDraft();
-            if (draft) {
+            if (draft && !taskInfo.forceStart) {
                 console.log('🔄 检测到草稿,正在恢复...');
                 applyDraft(draft);
             } else {
-                console.log('📄 无草稿,从头开始');
-                loadPatientVideos(0); // 仅在无草稿时手动触发一次
+                if (taskInfo.forceStart) {
+                    console.log('🔄 重做模式，清除草稿并从头开始');
+                    clearDraft();
+                }
+                console.log('📄 无草稿或强制从头开始');
+                loadPatientVideos(0);
                 updateTimerDisplay();
                 updateProgressText();
             }
@@ -2914,8 +2925,9 @@ function selectOption(element, group) {
                             patientId: record.patientId,
                             diagnosis: record.diagnosis,
                             severity: record.severity,
-                            viewTime: patientViewTimes[record.patientId] || 0  // [新增] 查看时间
-                        }))
+                            viewTime: patientViewTimes[record.patientId] || 0
+                        })),
+                        skip_llm: taskInfo.rerunMode || false
                     };
                     
                     // 调用后端API保存诊断结果(JSON格式)

@@ -220,24 +220,50 @@ async function fetchEduTasks() {
                     const assistDone = t.assist_done;
                     const reviewDone = t.review_done;
                     const allDone = singleDone && assistDone && reviewDone;
-                    
+
+                    let singleBtnText = singleDone ? (allDone ? '🔄 重新独立诊断' : '✅ 已完成') : '独立诊断';
+                    let assistBtnText = assistDone ? (allDone ? '🔄 重新AI辅助诊断' : '✅ 已完成') : (singleDone ? 'AI辅助诊断' : '⚠️ AI辅助诊断');
+                    let reviewBtnText = reviewDone ? (allDone ? '🔄 重新独立复诊' : '✅ 已完成') : (assistDone ? '独立复诊' : '⚠️ 独立复诊');
+
+                    let singleBtnClass = singleDone ? 'btn-view' : 'btn-start';
+                    let assistBtnClass = assistDone ? 'btn-view' : 'btn-start';
+                    let reviewBtnClass = reviewDone ? 'btn-view' : 'btn-start';
+
+                    let assistDisabled = !singleDone && !assistDone ? 'disabled' : '';
+                    let reviewDisabled = !assistDone && !reviewDone ? 'disabled' : '';
+
+                    let assistOpacity = !singleDone ? 'opacity:0.5;cursor:not-allowed;' : '';
+                    let reviewOpacity = !assistDone ? 'opacity:0.5;cursor:not-allowed;' : '';
+
+                    const handleSingleClick = allDone
+                        ? `handleTask('${t.submission_id}_SINGLE', '${t.request_name}_SINGLE', false, 'single', '${t.submission_id}', true)`
+                        : `handleTask('${t.submission_id}_SINGLE', '${t.request_name}_SINGLE', ${singleDone}, 'single', '${t.submission_id}')`;
+
+                    const handleAssistClick = allDone
+                        ? `handleTask('${t.submission_id}_AI-ASSIST', '${t.request_name}_AI-ASSIST', false, 'assist', '${t.submission_id}', true)`
+                        : (!singleDone ? '' : `handleTask('${t.submission_id}_AI-ASSIST', '${t.request_name}_AI-ASSIST', ${assistDone}, 'assist', '${t.submission_id}')`);
+
+                    const handleReviewClick = allDone
+                        ? `handleTask('${t.submission_id}_REVIEW', '${t.request_name}_REVIEW', false, 'review', '${t.submission_id}', true)`
+                        : (!assistDone ? '' : `handleTask('${t.submission_id}_REVIEW', '${t.request_name}_REVIEW', ${reviewDone}, 'review', '${t.submission_id}')`);
+
                     div.innerHTML = `
                         <div>
                             <div style="font-size:16px; font-weight:700;">${t.request_name}</div>
                             <div style="font-size:15px; color:#64748b; margin-top:4px;">
-                                病例: ${t.request_case_cnt} | 视频: ${t.request_video_cnt} | 
+                                病例: ${t.request_case_cnt} | 视频: ${t.request_video_cnt} |
                                 ${allDone ? '✅ 已完成(三阶段)' : (singleDone || assistDone || reviewDone ? '🔄 进行中' : '⏳ 待开始')}
                             </div>
                         </div>
                         <div style="display:flex; flex-direction:column; gap:8px; align-items:center;">
-                            <button class="btn ${singleDone ? 'btn-view' : 'btn-start'}" style="width:180px;white-space:nowrap;" onclick="handleTask('${t.submission_id}_SINGLE', '${t.request_name}_SINGLE', ${singleDone}, 'single', '${t.submission_id}')">
-                                ${singleDone ? '✅ 已完成' : '独立诊断'}
+                            <button class="btn ${singleBtnClass}" style="width:180px;white-space:nowrap;" onclick="${handleSingleClick}">
+                                ${singleBtnText}
                             </button>
-                            <button class="btn ${assistDone ? 'btn-view' : 'btn-start'}" style="width:180px;white-space:nowrap; ${!singleDone ? 'opacity:0.5;cursor:not-allowed;' : ''}" ${!singleDone ? 'disabled' : ''} onclick="${!singleDone ? '' : `handleTask('${t.submission_id}_AI-ASSIST', '${t.request_name}_AI-ASSIST', ${assistDone}, 'assist', '${t.submission_id}')`}">
-                                ${assistDone ? '✅ 已完成' : (singleDone ? 'AI辅助诊断' : '⚠️ AI辅助诊断')}
+                            <button class="btn ${assistBtnClass}" style="width:180px;white-space:nowrap; ${assistOpacity}" ${assistDisabled} onclick="${handleAssistClick}">
+                                ${assistBtnText}
                             </button>
-                            <button class="btn ${reviewDone ? 'btn-view' : 'btn-start'}" style="width:180px;white-space:nowrap; ${!assistDone ? 'opacity:0.5;cursor:not-allowed;' : ''}" ${!assistDone ? 'disabled' : ''} onclick="${!assistDone ? '' : `handleTask('${t.submission_id}_REVIEW', '${t.request_name}_REVIEW', ${reviewDone}, 'review', '${t.submission_id}')`}">
-                                ${reviewDone ? '✅ 已完成' : (assistDone ? '独立复诊' : '⚠️ 独立复诊')}
+                            <button class="btn ${reviewBtnClass}" style="width:180px;white-space:nowrap; ${reviewOpacity}" ${reviewDisabled} onclick="${handleReviewClick}">
+                                ${reviewBtnText}
                             </button>
                             ${allDone ? `<button class="btn btn-view" style="width:180px;white-space:nowrap; margin-top:5px;" onclick="openResultModal('${t.submission_id}', '${t.request_name}', null, '${t.submission_id}')">查看报告</button>` : ''}
                         </div>
@@ -304,17 +330,19 @@ window.addEventListener('DOMContentLoaded', function() {
     loadUser();
 });
 
-function handleTask(id, name, isComp, eduSubMode, parentId) {
+function handleTask(id, name, isComp, eduSubMode, parentId, isRerun = false) {
     if (!currentUser || !currentUser.username) {
         alert('请先登录');
         return;
     }
-    
-    if (isComp) {
+
+    const modeParam = eduSubMode ? `&eduSubMode=${eduSubMode}` : '';
+
+    if (isComp && !isRerun) {
         openResultModal(id, name, eduSubMode, parentId);
     } else {
-        const modeParam = eduSubMode ? `&eduSubMode=${eduSubMode}` : '';
-        window.location.href = `/diagnosis?username=${encodeURIComponent(currentUser.username)}&task=${encodeURIComponent(id)}&taskName=${encodeURIComponent(name)}&mode=edu${modeParam}`;
+        const forceStartParam = isRerun ? '&force_start=true&rerun=true&clearCache=true' : '';
+        window.location.href = `/diagnosis?username=${encodeURIComponent(currentUser.username)}&task=${encodeURIComponent(id)}&taskName=${encodeURIComponent(name)}&mode=edu${modeParam}${forceStartParam}`;
     }
 }
 
