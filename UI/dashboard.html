@@ -519,7 +519,12 @@
 
       loadCurrentUser(); setupDropzone();
       // 挂载到 window 确保内联 onclick 可用
-      window.staging = staging; window.renderRows = renderRows;
+      Object.defineProperty(window, 'staging', {
+          get: () => staging,
+          set: (val) => { staging = val; }
+      });
+      window.addVideoToCase = addVideoToCase;
+      window.renderRows = renderRows;
 
       // 初始化背景配置
       (async function initBackground() {
