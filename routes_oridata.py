@@ -1343,8 +1343,57 @@ async def clear_stuck_edu_tasks():
     with open(index_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
     
+    # === 孤儿检测：清理不在 data.json 中的残留目录 ===
+    oridata_dir = SYSTEM_EDU_DIR / "oridata"
+    processed_dir = SYSTEM_EDU_DIR / "processed"
+    
+    # 获取 data.json 中所有的 submission_id
+    indexed_ids = set(task["submission_id"] for task in data["tasks"])
+    
+    # 获取实际存在的目录
+    existing_ids = set()
+    if oridata_dir.exists():
+        existing_ids.update(d.name for d in oridata_dir.iterdir() if d.is_dir())
+    if processed_dir.exists():
+        existing_ids.update(d.name for d in processed_dir.iterdir() if d.is_dir())
+    
+    # 孤儿 = 存在但不在 data.json 中
+    orphan_ids = existing_ids - indexed_ids
+    orphans_cleaned = 0
+    
+    for orphan_id in orphan_ids:
+        orphan_oridata = oridata_dir / orphan_id
+        orphan_processed = processed_dir / orphan_id
+        orphan_failed_flag = oridata_dir / f"{orphan_id}.failed"
+        orphan_processing_flag = oridata_dir / f"{orphan_id}.processing"
+        
+        # 如果有 .processing 文件，说明正在运行，不清理
+        if orphan_processing_flag.exists():
+            print(f"⏭️ 孤儿任务 {orphan_id} 正在运行（.processing存在），跳过")
+            continue
+        
+        # 清理孤儿目录
+        try:
+            if orphan_oridata.exists():
+                shutil.rmtree(orphan_oridata)
+                orphans_cleaned += 1
+                print(f"🗑️ 已删除孤儿原始数据: {orphan_oridata}")
+            
+            if orphan_processed.exists():
+                shutil.rmtree(orphan_processed)
+                orphans_cleaned += 1
+                print(f"🗑️ 已删除孤儿处理结果: {orphan_processed}")
+            
+            if orphan_failed_flag.exists():
+                orphan_failed_flag.unlink()
+                print(f"🗑️ 已删除孤儿失败标记: {orphan_failed_flag}")
+            
+        except Exception as e:
+            print(f"⚠️ 清理孤儿任务 {orphan_id} 失败: {e}")
+    
     return {
-        "message": f"已清理 {len(deleted_tasks)} 个无效任务记录，{deleted_folders} 个后台文件夹",
+        "message": f"已清理 {len(deleted_tasks)} 个无效任务记录，{deleted_folders} 个后台文件夹，{orphans_cleaned} 个孤儿目录",
         "deleted_count": len(deleted_tasks),
-        "deleted_folders": deleted_folders
+        "deleted_folders": deleted_folders,
+        "orphans_cleaned": orphans_cleaned
     }
