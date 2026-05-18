@@ -542,6 +542,7 @@ async def clear_stuck_tasks(username: str):
     tasks = data.get("tasks", [])
     deleted_tasks = []
     kept_tasks = []
+    deleted_folders = 0
     
     for task in tasks:
         submission_id = task.get("submission_id")
@@ -574,11 +575,20 @@ async def clear_stuck_tasks(username: str):
                 continue
         
         # 满足删除条件
+        folder_deleted = False
         try:
             # 删除原始数据
             if ori_path.exists():
                 shutil.rmtree(ori_path)
+                folder_deleted = True
+                deleted_folders += 1
                 print(f"🗑️ 已删除原始数据: {ori_path}")
+            
+            # 删除 .failed 文件（如果存在）
+            failed_flag = ori_path.parent / f"{submission_id}.failed"
+            if failed_flag.exists():
+                failed_flag.unlink()
+                print(f"🗑️ 已删除失败标记: {failed_flag}")
             
             # 删除处理结果（如果存在）
             request_pos = task.get("request_pos")
@@ -586,6 +596,8 @@ async def clear_stuck_tasks(username: str):
                 proc_path = user_root / request_pos
                 if proc_path.exists():
                     shutil.rmtree(proc_path)
+                    folder_deleted = True
+                    deleted_folders += 1
                     print(f"🗑️ 已删除处理结果: {proc_path}")
             
             deleted_tasks.append({
@@ -604,8 +616,9 @@ async def clear_stuck_tasks(username: str):
         json.dump(data, f, ensure_ascii=False, indent=2)
     
     return {
-        "message": f"已清理 {len(deleted_tasks)} 个卡住的任务",
+        "message": f"已清理 {len(deleted_tasks)} 个任务记录，{deleted_folders} 个后台文件夹",
         "deleted_count": len(deleted_tasks),
+        "deleted_folders": deleted_folders,
         "deleted_tasks": deleted_tasks,
         "kept_count": len(kept_tasks)
     }
@@ -1260,6 +1273,7 @@ async def clear_stuck_edu_tasks():
     tasks = data.get("tasks", [])
     deleted_tasks = []
     kept_tasks = []
+    deleted_folders = 0
     
     for task in tasks:
         submission_id = task.get("submission_id")
@@ -1271,8 +1285,9 @@ async def clear_stuck_edu_tasks():
             continue
         
         # 检查是否有 .processing 文件（正在运行）
-        processed_path = SYSTEM_EDU_DIR / "processed" / submission_id
-        processing_flag = processed_path / ".processing"
+        # 注意：AI任务wrapper在 SYSTEM_EDU_DIR / "oridata" / {id} / ".processing" 创建标记
+        oridata_path = SYSTEM_EDU_DIR / "oridata" / submission_id
+        processing_flag = oridata_path / ".processing"
         STUCK_THRESHOLD = 1800  # 30分钟
         
         if processing_flag.exists():
@@ -1292,14 +1307,44 @@ async def clear_stuck_edu_tasks():
                 continue
         
         # 无效任务，可以清理
-        # 将状态改为 unreleased，而不是物理删除
+        folder_deleted = False
+        try:
+            # 删除 oridata 目录（原始数据）
+            if oridata_path.exists():
+                shutil.rmtree(oridata_path)
+                folder_deleted = True
+                deleted_folders += 1
+                print(f"🗑️ 已删除原始数据: {oridata_path}")
+            
+            # 删除 .failed 文件（如果存在）
+            failed_flag = (SYSTEM_EDU_DIR / "oridata" / f"{submission_id}.failed")
+            if failed_flag.exists():
+                failed_flag.unlink()
+                print(f"🗑️ 已删除失败标记: {failed_flag}")
+            
+            # 删除后台处理结果 processed/{submission_id}/
+            processed_path = SYSTEM_EDU_DIR / "processed" / submission_id
+            if processed_path.exists():
+                shutil.rmtree(processed_path)
+                folder_deleted = True
+                deleted_folders += 1
+                print(f"🗑️ 已删除处理结果: {processed_path}")
+            
+            deleted_tasks.append(submission_id)
+            print(f"🧹 任务 {submission_id} 已清理物理文件夹")
+            
+        except Exception as e:
+            print(f"⚠️ 清理任务 {submission_id} 失败: {e}")
+            # 清理失败的任务改为未发布状态，保留在列表中
             task["status"] = "unreleased"
             kept_tasks.append(task)
-            deleted_tasks.append(submission_id)
-            print(f"🧹 任务 {submission_id} 已标记为无效（无processing文件），已移至未发布")
     
     data["tasks"] = kept_tasks
     with open(index_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
     
-    return {"message": f"已清理 {len(deleted_tasks)} 个无效任务", "deleted_count": len(deleted_tasks)}
+    return {
+        "message": f"已清理 {len(deleted_tasks)} 个无效任务记录，{deleted_folders} 个后台文件夹",
+        "deleted_count": len(deleted_tasks),
+        "deleted_folders": deleted_folders
+    }

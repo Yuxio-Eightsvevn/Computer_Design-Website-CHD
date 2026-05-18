@@ -412,7 +412,7 @@
         });
         if (r.ok) {
           const result = await r.json();
-          alert(`成功清理 ${result.deleted_count} 个失败任务`);
+          alert(`成功清理 ${result.deleted_count} 个任务记录，${result.deleted_folders} 个后台文件夹`);
           fetchTasks();
         } else {
           const error = await r.json();

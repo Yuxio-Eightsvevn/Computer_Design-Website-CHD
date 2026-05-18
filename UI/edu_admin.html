@@ -1407,12 +1407,12 @@
     }
 
     async function clearStuckEduTasks() {
-        if (!confirm("确定要清理无效的教育任务吗？\n\n这将把卡住的任务（AI处理中但无后台运行）移至未发布列表。")) return;
+        if (!confirm("确定要清理无效的教育任务吗？\n\n这将把卡住的任务（AI处理中但无后台运行）删除物理文件。")) return;
         try {
             const r = await fetch('/api/edu/admin/clear-stuck-tasks', { method: 'DELETE' });
             if (r.ok) {
                 const result = await r.json();
-                alert(`✅ 已清理 ${result.deleted_count} 个无效任务`);
+                alert(`✅ 已清理 ${result.deleted_count} 个无效任务记录，${result.deleted_folders} 个后台文件夹`);
                 fetchTasks(); // 刷新看板
             } else {
                 const error = await r.json();
