@@ -39,6 +39,7 @@ torch.cuda.manual_seed_all(42)
 
 # 配置
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
+torch.set_num_threads(2)  # 减少内存占用，适用于小内存服务器
 MODEL_INPUT_SIZE = (224, 224)
 FINAL_BOX_SIZE = 56
 ROI_AREA_THRESHOLD = 150
@@ -484,6 +485,12 @@ def diagnose(target_dir: str, output_dir: str, save_videos: bool = True) -> dict
             'error_count': sum(1 for r in video_results if r['status'] == 'error'),
             'output_dir': os.path.join(output_request_dir, case_id)
         })
+        
+        # [新增] 处理完每个case后清理内存，防止累积
+        import gc
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
     
     return {
         "request_name": request_name,
