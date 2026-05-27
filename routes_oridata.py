@@ -264,12 +264,12 @@ async def run_model_inference_wrapper(request_path: Path, output_root: Path, req
     
     # 确定状态文件路径（用户空间或系统空间）
     if is_system:
-        task_root = SYSTEM_EDU_DIR
+        task_root = SYSTEM_EDU_DIR / "oridata"  # 系统任务的原始数据在 oridata 下
     else:
         task_root = BASE_DATA_DIR / username
     
-    processing_flag = task_root / "oridata" / submission_id / ".processing"
-    failed_flag = task_root / "oridata" / submission_id / ".failed"
+    processing_flag = task_root / submission_id / ".processing"
+    failed_flag = task_root / submission_id / ".failed"
     
     # 创建处理中标记
     try:
@@ -671,7 +671,7 @@ async def confirm_edu_upload(
     2. [核心] 根据 epoch_data.json 将视频重组为 case 子目录结构，以适配 AI 模型。
     3. 触发推理。
     """
-    submission_base = SYSTEM_EDU_DIR / submission_id
+    submission_base = SYSTEM_EDU_DIR / "oridata" / submission_id
     processed_root = SYSTEM_EDU_DIR / "processed"
     
     try:
@@ -1331,7 +1331,7 @@ async def clear_stuck_edu_tasks():
                 print(f"🗑️ 已删除原始数据: {oridata_path}")
             
             # 删除 .failed 文件（如果存在）
-            failed_flag = (SYSTEM_EDU_DIR / "oridata" / f"{submission_id}.failed")
+            failed_flag = oridata_path / ".failed"
             if failed_flag.exists():
                 failed_flag.unlink()
                 print(f"🗑️ 已删除失败标记: {failed_flag}")
@@ -1378,8 +1378,8 @@ async def clear_stuck_edu_tasks():
     for orphan_id in orphan_ids:
         orphan_oridata = oridata_dir / orphan_id
         orphan_processed = processed_dir / orphan_id
-        orphan_failed_flag = oridata_dir / f"{orphan_id}.failed"
-        orphan_processing_flag = oridata_dir / f"{orphan_id}.processing"
+        orphan_failed_flag = orphan_oridata / ".failed"
+        orphan_processing_flag = orphan_oridata / ".processing"
         
         # 如果有 .processing 文件，说明正在运行，不清理
         if orphan_processing_flag.exists():

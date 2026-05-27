@@ -1020,8 +1020,13 @@ async def submit_diagnosis_json(request: DiagnosisSubmitJsonRequest):
             # 提取原始任务ID（去除多阶段后缀）
             original_task_folder = re.sub(r'_SINGLE|_AI-ASSIST|_REVIEW$', '', request.taskFolder)
             
-            # 1. 定位标准答案
-            gt_path = Path(DATA_BATCH_STORAGE) / "SYSTEM" / "edu_data" / original_task_folder / "epoch_data.json"
+            # 1. 定位标准答案 - 优先从 oridata 读取，回退到直接 edu_data（兼容旧数据）
+            gt_path = SYSTEM_EDU_DIR / "oridata" / original_task_folder / "epoch_data.json"
+            if not gt_path.exists():
+                gt_path = SYSTEM_EDU_DIR / original_task_folder / "epoch_data.json"
+                if gt_path.exists():
+                    print(f"⚠️ [submit_diagnosis] 使用回退路径读取 epoch_data.json (旧数据位置): {gt_path}")
+            
             if not gt_path.exists():
                 raise HTTPException(status_code=404, detail="教育批次答案文件丢失")
             
@@ -1323,8 +1328,12 @@ def record_mistakes_from_stats(username: str, parent_id: str, stats: Dict[str, A
         except Exception as e:
             print(f"⚠️ 读取任务索引失败: {e}")
     
-    # 获取病例名映射（从 epoch_data.json）- epoch_data.json 在 processed 目录的任务根目录
-    epoch_path = SYSTEM_EDU_DIR / "processed" / parent_id / "epoch_data.json"
+    # 获取病例名映射（从 epoch_data.json）- 优先从 oridata 读取，回退到直接 edu_data（兼容旧数据）
+    epoch_path = SYSTEM_EDU_DIR / "oridata" / parent_id / "epoch_data.json"
+    if not epoch_path.exists():
+        epoch_path = SYSTEM_EDU_DIR / parent_id / "epoch_data.json"
+        if epoch_path.exists():
+            print(f"⚠️ [错题记录] 使用回退路径读取 epoch_data.json (旧数据位置): {epoch_path}")
     case_ids = []
     if epoch_path.exists():
         try:
