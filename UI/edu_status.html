@@ -1607,7 +1607,7 @@ function showTripleStageReport(parentId, name, singleData, assistData, reviewDat
       startBtn.textContent = '创建中...';
       
       try {
-          const r = await fetch('/api/edu/mistakes/review', {
+          const r = await fetch('/api/edu/mistakes/prepare', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -1630,15 +1630,21 @@ function showTripleStageReport(parentId, name, singleData, assistData, reviewDat
               return;
           }
           
-          // 创建成功，跳转到临时任务
-          const tempId = result.temp_task_id;
-          const caseIds = result.case_ids;
+          // 存储错题会话数据到 sessionStorage
+          const mistakeSessionData = {
+              mistake_session_id: result.mistake_session_id,
+              cases: result.cases,
+              display_order: result.display_order,
+              mistake_ids: result.mistake_ids,
+              is_mistake_review: true
+          };
+          sessionStorage.setItem('mistakeReviewSession', JSON.stringify(mistakeSessionData));
           
-          alert('临时任务创建成功，正在跳转到诊断页面...');
+          alert('错题回顾准备成功，正在跳转到诊断页面...');
           closeMistakeReviewModal();
           
-          // 跳转到 diagnosis 页面
-          window.location.href = `/diagnosis?username=${encodeURIComponent(currentUser.username)}&task=${encodeURIComponent(tempId)}&taskName=${encodeURIComponent('错题回顾临时任务')}&mode=edu&eduSubMode=single&force_start=true&clearCache=true`;
+          // 跳转到 diagnosis 页面，传递特殊参数
+          window.location.href = `/diagnosis?username=${encodeURIComponent(currentUser.username)}&task=${encodeURIComponent(result.mistake_session_id)}&taskName=${encodeURIComponent('错题回顾')} &mode=edu&eduSubMode=single&force_start=true&mistake_review=true`;
           
       } catch (e) {
           alert('创建临时任务失败: ' + e.message);

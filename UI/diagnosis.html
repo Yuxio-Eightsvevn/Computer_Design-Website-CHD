@@ -1621,6 +1621,28 @@
         // 加载病人列表
         async function loadPatients() {
             try {
+                // 检查是否是错题回顾模式
+                const mistakeSessionData = sessionStorage.getItem('mistakeReviewSession');
+                if (mistakeSessionData && taskInfo.mistake_review) {
+                    // 错题回顾模式：从 sessionStorage 加载数据
+                    console.log('📝 错题回顾模式：从 sessionStorage 加载数据');
+                    const sessionData = JSON.parse(mistakeSessionData);
+                    patients = sessionData.cases || [];
+                    displayOrder = sessionData.display_order || [];
+                    console.log('📝 错题回顾数据:', { patients, displayOrder });
+                    
+                    if (!patients || patients.length === 0) {
+                        alert('错题回顾数据加载失败');
+                        returnToDashboard();
+                        return;
+                    }
+                    
+                    // 加载第一个病人的视频
+                    loadPatientVideos(0);
+                    updateProgressText();
+                    return;
+                }
+                
                 // 多阶段任务：去掉后缀，使用实际文件夹名称
                 let actualTaskFolder = taskInfo.taskFolder;
                 if (currentMode === 'edu' && (taskInfo.taskFolder.endsWith('_SINGLE') || taskInfo.taskFolder.endsWith('_AI-ASSIST') || taskInfo.taskFolder.endsWith('_REVIEW'))) {
@@ -2954,6 +2976,43 @@ function selectOption(element, group) {
                     }
                     
                     const result = await response.json();
+                    
+                    // 如果是错题回顾模式，提交后更新错题状态
+                    const mistakeSessionData = sessionStorage.getItem('mistakeReviewSession');
+                    if (mistakeSessionData && taskInfo.mistake_review) {
+                        try {
+                            const sessionData = JSON.parse(mistakeSessionData);
+                            const mistakeIds = sessionData.mistake_ids || [];
+                            
+                            // 遍历错题记录，更新状态
+                            for (let i = 0; i < mistakeIds.length; i++) {
+                                const mistakeId = mistakeIds[i];
+                                // 找到对应的记录
+                                const record = diagnosisRecords[sessionData.cases[i]?.id];
+                                if (record) {
+                                    // 调用更新 API
+                                    await fetch(`/api/edu/mistakes/${mistakeId}`, {
+                                        method: 'PUT',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({
+                                            username: taskInfo.username,
+                                            updates: {
+                                                "is_retried": true,
+                                                "last_choice": record.diagnosis,
+                                                "retry_result": record.diagnosis === '正常' || record.diagnosis === 'Normal' ? 'correct' : 'wrong'
+                                            }
+                                        })
+                                    });
+                                }
+                            }
+                            // 清除 sessionStorage
+                            sessionStorage.removeItem('mistakeReviewSession');
+                            console.log('📝 错题回顾状态已更新');
+                        } catch (e) {
+                            console.warn('更新错题状态失败:', e);
+                        }
+                    }
+                    
                     alert('诊断结果已提交并保存！');
                     console.log('提交成功:', result);
                     

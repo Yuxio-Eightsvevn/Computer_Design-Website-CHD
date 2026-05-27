@@ -1575,18 +1575,26 @@ async def create_mistake_review_task(request: Request):
                     break
                 
                 try:
-                    # 跨平台创建软链接
+                    # 跨平台创建链接（优先软链接，失败则回退到复制）
                     if target_path.exists() or target_path.is_symlink():
                         target_path.unlink()
-                    target_path.symlink_to(source_path)
+                    
+                    try:
+                        target_path.symlink_to(source_path)
+                        print(f"🔗 [错题创建] 软链接创建成功: {target_path} -> {source_path}")
+                    except OSError as e:
+                        if e.winerror == 1314:  # Windows 权限不足，回退到复制
+                            print(f"⚠️ [错题创建] 软链接权限不足，回退到复制: {source_path}")
+                            if source_path.is_dir():
+                                shutil.copytree(source_path, target_path)
+                            else:
+                                shutil.copy2(source_path, target_path)
+                        else:
+                            raise
                     created_cases.append(case_id)
                 except OSError as e:
-                    if e.winerror == 1314:  # Windows 权限不足
-                        link_failed = True
-                        link_error_msg = "创建软链接失败，请检查系统权限设置（需要管理员权限或启用开发者模式）"
-                    else:
-                        link_failed = True
-                        link_error_msg = f"创建软链接失败: {str(e)}"
+                    link_failed = True
+                    link_error_msg = f"创建链接失败: {str(e)}"
                     break
             
             # 清理失败的临时目录
@@ -1733,4 +1741,152 @@ async def update_mistake_record(request: Request, mistake_id: str):
         raise
     except Exception as e:
         print(f"❌ 更新错题记录失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/api/edu/mistakes/prepare")
+async def prepare_mistake_review(request: Request):
+    """准备错题回顾数据，直接返回原始视频路径，不创建临时目录"""
+    try:
+        body = await request.json()
+        mistake_ids = body.get("mistake_ids", [])
+        username = body.get("username", "")
+        
+        if not mistake_ids or not username:
+            raise HTTPException(status_code=400, detail="参数不完整")
+        
+        # 获取文件锁
+        lock_path = SYSTEM_EDU_DIR / "data.json.lock"
+        acquired = False
+        for _ in range(50):
+            try:
+                with open(lock_path, "x") as _: pass
+                acquired = True; break
+            except FileExistsError: time.sleep(0.1)
+        if not acquired:
+            raise HTTPException(status_code=503, detail="系统繁忙，请稍后重试")
+        
+        try:
+            # 读取 data.json 获取任务状态
+            index_path = SYSTEM_EDU_DIR / "data.json"
+            task_map = {}
+            if index_path.exists():
+                with open(index_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                task_map = {t["submission_id"]: t for t in data.get("tasks", [])}
+            
+            # 读取错题文件获取详细信息
+            mistake_file = SYSTEM_EDU_DIR / "mistake_task" / f"mistake_task_{username}.json"
+            mistake_data = {"mistakes": []}
+            if mistake_file.exists():
+                try:
+                    with open(mistake_file, "r", encoding="utf-8") as f:
+                        content = f.read().strip()
+                        if content:
+                            mistake_data = json.loads(content)
+                except: pass
+            
+            mistake_map = {m["id"]: m for m in mistake_data.get("mistakes", [])}
+            
+            # 分类并获取错题信息
+            accessible_mistakes = []
+            expired_mistakes = []
+            
+            for mid in mistake_ids:
+                if mid not in mistake_map:
+                    continue
+                mistake = mistake_map[mid]
+                sub_id = mistake.get("submission_id", "")
+                
+                if sub_id in task_map and task_map[sub_id].get("status") == "published":
+                    accessible_mistakes.append(mistake)
+                else:
+                    expired_mistakes.append(mistake)
+            
+            if expired_mistakes:
+                return {
+                    "has_expired": True,
+                    "accessible_count": len(accessible_mistakes),
+                    "expired_count": len(expired_mistakes),
+                    "expired_mistakes": expired_mistakes
+                }
+            
+            # 构建返回数据 - 直接从原始视频路径组织
+            processed_root = SYSTEM_EDU_DIR / "processed"
+            cases = []
+            display_order = []
+            
+            for mistake in accessible_mistakes:
+                sub_id = mistake["submission_id"]
+                case_id = mistake.get("case_name", "")  # case_name 就是 case_id
+                
+                case_path = processed_root / sub_id / case_id
+                if not case_path.exists():
+                    print(f"⚠️ [错题准备] 病例目录不存在: {case_path}")
+                    continue
+                
+                # 扫描 output_videos 获取视频
+                videos_dir = case_path / "output_videos"
+                video_groups = {}
+                
+                if videos_dir.exists():
+                    for v_file in videos_dir.iterdir():
+                        if v_file.is_file() and v_file.suffix.lower() == '.mp4':
+                            fn = v_file.name
+                            import re
+                            m_match = re.search(r'_(heatmap|bbox|original)\.mp4$', fn, re.IGNORECASE)
+                            if m_match:
+                                modality = m_match.group(1).lower()
+                                base_name = fn[:m_match.start()]
+                            else:
+                                modality = 'original'
+                                base_name = v_file.stem
+                            
+                            if base_name not in video_groups:
+                                video_groups[base_name] = {}
+                            
+                            rel_url = f"/data/SYSTEM/edu_data/processed/{sub_id}/{case_id}/output_videos/{fn}".replace("//", "/")
+                            video_groups[base_name][modality] = rel_url
+                
+                # 关联置信度元数据
+                videos_list = []
+                for bn in sorted(video_groups.keys()):
+                    abs_conf_path = case_path / "output_data" / "confidence_scores.json"
+                    metadata_url = None
+                    if abs_conf_path.exists():
+                        metadata_url = f"/api/get-metadata?path=SYSTEM/edu_data/processed/{sub_id}/{case_id}/output_data/confidence_scores.json"
+                    
+                    group = video_groups[bn]
+                    if 'original' not in group and group:
+                        group['original'] = list(group.values())[0]
+                    
+                    videos_list.append({
+                        'baseName': bn,
+                        'modalities': group,
+                        'metadataPath': metadata_url
+                    })
+                
+                if videos_list:
+                    cases.append({'id': case_id, 'videos': videos_list})
+                    display_order.append(case_id)
+            
+            # 生成错题会话ID
+            mistake_session_id = f"ms_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+            
+            return {
+                "has_expired": False,
+                "mistake_session_id": mistake_session_id,
+                "cases": cases,
+                "display_order": display_order,
+                "accessible_count": len(cases),
+                "mistake_ids": mistake_ids  # 返回给前端用于后续更新状态
+            }
+        
+        finally:
+            if lock_path.exists(): lock_path.unlink()
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ 准备错题回顾失败: {e}")
         raise HTTPException(status_code=500, detail=str(e))
