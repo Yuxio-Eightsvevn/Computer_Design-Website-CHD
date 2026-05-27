@@ -1225,7 +1225,7 @@ async def delete_edu_task(submission_id: str):
         if not task: raise HTTPException(status_code=404, detail="任务不存在")
 
         # 2. 物理删除 (原始包 + 处理结果)
-        shutil.rmtree(SYSTEM_EDU_DIR / submission_id, ignore_errors=True)
+        shutil.rmtree(SYSTEM_EDU_DIR / "oridata" / submission_id, ignore_errors=True)
         shutil.rmtree(SYSTEM_EDU_DIR / "processed" / submission_id, ignore_errors=True)
 
         # 3. 删除所有用户的成绩记录
@@ -1378,12 +1378,27 @@ async def clear_stuck_edu_tasks():
     for orphan_id in orphan_ids:
         orphan_oridata = oridata_dir / orphan_id
         orphan_processed = processed_dir / orphan_id
-        orphan_failed_flag = orphan_oridata / ".failed"
         orphan_processing_flag = orphan_oridata / ".processing"
+        orphan_failed_flag = orphan_oridata / ".failed"
         
-        # 如果有 .processing 文件，说明正在运行，不清理
+        # 检查 .processing 文件状态
+        skip_cleanup = False
         if orphan_processing_flag.exists():
-            print(f"⏭️ 孤儿任务 {orphan_id} 正在运行（.processing存在），跳过")
+            try:
+                age_seconds = time.time() - orphan_processing_flag.stat().st_mtime
+                STUCK_THRESHOLD = 1800  # 30分钟
+                if age_seconds > STUCK_THRESHOLD:
+                    # .processing 文件存在但超过30分钟，判定为系统中断残留，清理
+                    print(f"⚠️ 孤儿任务 {orphan_id} 的 .processing 文件已存在 {age_seconds/60:.0f} 分钟，判定为系统中断残留，将清理")
+                else:
+                    # .processing 文件较新，可能正在运行，不清理
+                    print(f"⏭️ 孤儿任务 {orphan_id} 正在运行（.processing文件较新），跳过")
+                    skip_cleanup = True
+            except Exception as e:
+                print(f"⚠️ 无法读取 .processing 文件时间: {e}，跳过")
+                skip_cleanup = True
+        
+        if skip_cleanup:
             continue
         
         # 清理孤儿目录
@@ -1402,6 +1417,7 @@ async def clear_stuck_edu_tasks():
                 orphan_failed_flag.unlink()
                 print(f"🗑️ 已删除孤儿失败标记: {orphan_failed_flag}")
             
+            print(f"🗑️ 已删除孤儿任务: {orphan_id}")
         except Exception as e:
             print(f"⚠️ 清理孤儿任务 {orphan_id} 失败: {e}")
     
@@ -1871,7 +1887,7 @@ async def prepare_mistake_review(request: Request):
                     display_order.append(case_id)
             
             # 生成错题会话ID
-            mistake_session_id = f"ms_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+            mistake_session_id = f"ms_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
             
             return {
                 "has_expired": False,

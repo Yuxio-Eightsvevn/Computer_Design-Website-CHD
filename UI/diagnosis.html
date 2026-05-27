@@ -2970,28 +2970,10 @@ function selectOption(element, group) {
                         skip_llm: taskInfo.rerunMode || false
                     };
                     
-                    // 调用后端API保存诊断结果(JSON格式)
-                    const response = await fetch('/api/diagnosis/submit-json', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify(diagnosisData)
-                    });
-                    
-                    if (!response.ok) {
-                        throw new Error('提交失败');
-                    }
-                    
-                    const result = await response.json();
-                    
-                    // 如果是错题回顾模式，使用专用提交端点
+                    // 如果是错题回顾模式，使用专用提交端点（跳过普通诊断提交）
                     const mistakeSessionData = sessionStorage.getItem('mistakeReviewSession');
                     if (mistakeSessionData && taskInfo.mistake_review) {
                         const sessionData = JSON.parse(mistakeSessionData);
-                        
-                        // 构建诊断数据
-                        const formattedMinutes = Math.floor(timerSeconds / 60);
-                        const formattedSeconds = timerSeconds % 60;
-                        const formattedTime = `${formattedMinutes}:${String(formattedSeconds).padStart(2, '0')}`;
                         
                         const orderedPatientIds = displayOrder.length > 0
                             ? [...patients].sort((a, b) => displayOrder.indexOf(a.id) - displayOrder.indexOf(b.id)).map(p => p.id)
@@ -3018,11 +3000,12 @@ function selectOption(element, group) {
                         });
                         
                         if (!mistakeResponse.ok) {
-                            throw new Error('错题提交失败');
+                            const err = await mistakeResponse.json();
+                            throw new Error(err.detail || '错题提交失败');
                         }
                         
                         const mistakeResult = await mistakeResponse.json();
-                        alert('错题回顾已完成！');
+                        console.log('✅ 错题回顾已完成:', mistakeResult);
                         
                         // 清除 sessionStorage
                         sessionStorage.removeItem('mistakeReviewSession');
@@ -3030,6 +3013,19 @@ function selectOption(element, group) {
                         showEduCompleteModal(currentMode);
                         return;
                     }
+                    
+                    // 调用后端API保存诊断结果(JSON格式)
+                    const response = await fetch('/api/diagnosis/submit-json', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(diagnosisData)
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error('提交失败');
+                    }
+                    
+                    const result = await response.json();
                     
                     // 正常提交流程
                     const submitResponse = await fetch('/api/diagnosis/submit-json', {

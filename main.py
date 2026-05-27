@@ -1023,9 +1023,18 @@ async def submit_diagnosis_json(request: DiagnosisSubmitJsonRequest):
             # 1. 定位标准答案 - 优先从 oridata 读取，回退到直接 edu_data（兼容旧数据）
             gt_path = SYSTEM_EDU_DIR / "oridata" / original_task_folder / "epoch_data.json"
             if not gt_path.exists():
-                gt_path = SYSTEM_EDU_DIR / original_task_folder / "epoch_data.json"
-                if gt_path.exists():
-                    print(f"⚠️ [submit_diagnosis] 使用回退路径读取 epoch_data.json (旧数据位置): {gt_path}")
+                fallback_gt_path = SYSTEM_EDU_DIR / original_task_folder / "epoch_data.json"
+                if fallback_gt_path.exists():
+                    print(f"⚠️ [submit_diagnosis] 使用回退路径读取 epoch_data.json (旧数据位置): {fallback_gt_path}")
+                    correct_dir = SYSTEM_EDU_DIR / "oridata" / original_task_folder
+                    try:
+                        correct_dir.mkdir(parents=True, exist_ok=True)
+                        shutil.copytree(SYSTEM_EDU_DIR / original_task_folder, correct_dir, dirs_exist_ok=True)
+                        print(f"✅ [submit_diagnosis] 已复制任务文件夹到正确位置: {correct_dir}")
+                        gt_path = correct_dir / "epoch_data.json"
+                    except Exception as copy_err:
+                        print(f"⚠️ [submit_diagnosis] 复制失败: {copy_err}")
+                        gt_path = fallback_gt_path
             
             if not gt_path.exists():
                 raise HTTPException(status_code=404, detail="教育批次答案文件丢失")
@@ -1230,6 +1239,7 @@ async def submit_diagnosis_json(request: DiagnosisSubmitJsonRequest):
             
             is_triple = is_task_triple
             stages = user_data[parent_id].get("stages", {})
+            llm_analysis = user_data[parent_id].get("llm_analysis", {})
             dual_done = "single" in stages and "assist" in stages
             triple_done = "single" in stages and "assist" in stages and "review" in stages
             
@@ -1242,24 +1252,34 @@ async def submit_diagnosis_json(request: DiagnosisSubmitJsonRequest):
             if request.skip_llm:
                 print(f"🔔 重做模式，跳过LLM分析")
             elif is_triple and triple_done:
-                print(f"🔔 三阶段全部完成，准备触发AI综合分析")
-                asyncio.create_task(analyze_with_llm(
-                    request.username, 
-                    parent_id, 
-                    "triple",
-                    {"single": stages["single"], "assist": stages["assist"], "review": stages["review"]}
-                ))
-                print(f"🔔 已创建三阶段综合分析任务")
+                # 检查是否已经触发过分析（防止重复调用）
+                existing_analysis = llm_analysis.get("triple", {})
+                if existing_analysis.get("status") in ("pending", "completed"):
+                    print(f"🔔 三阶段AI分析已在进行中或已完成，跳过重复触发 (status={existing_analysis.get('status')})")
+                else:
+                    print(f"🔔 三阶段全部完成，准备触发AI综合分析")
+                    asyncio.create_task(analyze_with_llm(
+                        request.username, 
+                        parent_id, 
+                        "triple",
+                        {"single": stages["single"], "assist": stages["assist"], "review": stages["review"]}
+                    ))
+                    print(f"🔔 已创建三阶段综合分析任务")
             elif not is_triple and dual_done:
-                # 二阶段任务：两阶段都完成时，触发双阶段对比分析
-                print(f"🔔 二阶段全部完成，准备触发AI对比分析")
-                asyncio.create_task(analyze_with_llm(
-                    request.username, 
-                    parent_id, 
-                    "assist",  # 使用 assist 作为 stage 参数，触发二阶段对比分析
-                    {"single": stages["single"], "assist": stages["assist"]}
-                ))
-                print(f"🔔 已创建二阶段对比分析任务")
+                # 检查是否已经触发过分析（防止重复调用）
+                existing_analysis = llm_analysis.get("assist", {})
+                if existing_analysis.get("status") in ("pending", "completed"):
+                    print(f"🔔 二阶段AI分析已在进行中或已完成，跳过重复触发 (status={existing_analysis.get('status')})")
+                else:
+                    # 二阶段任务：两阶段都完成时，触发双阶段对比分析
+                    print(f"🔔 二阶段全部完成，准备触发AI对比分析")
+                    asyncio.create_task(analyze_with_llm(
+                        request.username, 
+                        parent_id, 
+                        "assist",  # 使用 assist 作为 stage 参数，触发二阶段对比分析
+                        {"single": stages["single"], "assist": stages["assist"]}
+                    ))
+                    print(f"🔔 已创建二阶段对比分析任务")
             else:
                 if is_triple:
                     print(f"🔔 当前为三阶段任务，还需完成: single={('single' in stages)}, assist={('assist' in stages)}, review={('review' in stages)}，跳过LLM分析")
@@ -1331,9 +1351,19 @@ def record_mistakes_from_stats(username: str, parent_id: str, stats: Dict[str, A
     # 获取病例名映射（从 epoch_data.json）- 优先从 oridata 读取，回退到直接 edu_data（兼容旧数据）
     epoch_path = SYSTEM_EDU_DIR / "oridata" / parent_id / "epoch_data.json"
     if not epoch_path.exists():
-        epoch_path = SYSTEM_EDU_DIR / parent_id / "epoch_data.json"
-        if epoch_path.exists():
-            print(f"⚠️ [错题记录] 使用回退路径读取 epoch_data.json (旧数据位置): {epoch_path}")
+        fallback_path = SYSTEM_EDU_DIR / parent_id / "epoch_data.json"
+        if fallback_path.exists():
+            print(f"⚠️ [错题记录] 使用回退路径读取 epoch_data.json (旧数据位置): {fallback_path}")
+            correct_dir = SYSTEM_EDU_DIR / "oridata" / parent_id
+            try:
+                correct_dir.mkdir(parents=True, exist_ok=True)
+                shutil.copytree(fallback_path, correct_dir, dirs_exist_ok=True)
+                print(f"✅ [错题记录] 已复制任务文件夹到正确位置: {correct_dir}")
+                epoch_path = correct_dir / "epoch_data.json"
+            except Exception as copy_err:
+                print(f"⚠️ [错题记录] 复制失败: {copy_err}")
+                epoch_path = fallback_path
+    
     case_ids = []
     if epoch_path.exists():
         try:
@@ -1345,6 +1375,12 @@ def record_mistakes_from_stats(username: str, parent_id: str, stats: Dict[str, A
     
     print(f"🔍 [错题记录] epoch_data.json 路径: {epoch_path}, exists: {epoch_path.exists()}")
     print(f"🔍 [错题记录] case_ids: {case_ids}")
+    
+    # 建立已存在错题的索引，用于去重
+    existing_mistakes_map = {}  # key: "submission_id#case_name", value: mistake dict
+    for m in mistake_data["mistakes"]:
+        key = f"{m.get('submission_id')}#{m.get('case_name')}"
+        existing_mistakes_map[key] = m
     
     # 收集所有错题，用 case_id 作为 key，同 case_id 会被后面的阶段覆盖（保留最后阶段）
     all_mistakes = {}  # key: patient_id (case_id), value: mistake dict
@@ -1360,25 +1396,39 @@ def record_mistakes_from_stats(username: str, parent_id: str, stats: Dict[str, A
         for i, (gt, user) in enumerate(zip(gt_labels, user_labels)):
             if gt != user:  # 诊断错误
                 patient_id = case_ids[i] if i < len(case_ids) else f"case_{i}"
-                all_mistakes[patient_id] = {
-                    "id": f"mistake_{datetime.now().strftime('%Y%m%d%H%M%S')}_{len(all_mistakes)}",
-                    "submission_id": parent_id,
-                    "task_name": task_name,
-                    "stage": stage_name,
-                    "case_name": patient_id,  # 直接使用 patient_id 作为显示名
-                    "user_wrong_choice": user,
-                    "correct_category": gt,
-                    "is_retried": False,
-                    "last_choice": None,
-                    "retry_result": None,
-                    "added_time": datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
-                }
+                
+                # 检查是否已存在（同一 submission_id + case_name）
+                key = f"{parent_id}#{patient_id}"
+                if key in existing_mistakes_map:
+                    # 更新已存在记录（保留 is_retried, last_choice, retry_result）
+                    existing = existing_mistakes_map[key]
+                    existing["stage"] = stage_name
+                    existing["user_wrong_choice"] = user
+                    existing["correct_category"] = gt
+                    print(f"🔄 [错题记录] 更新已存在错题: {key}")
+                else:
+                    all_mistakes[patient_id] = {
+                        "id": f"mistake_{datetime.now().strftime('%Y%m%d%H%M%S')}_{len(all_mistakes)}",
+                        "submission_id": parent_id,
+                        "task_name": task_name,
+                        "stage": stage_name,
+                        "case_name": patient_id,
+                        "user_wrong_choice": user,
+                        "correct_category": gt,
+                        "is_retried": False,
+                        "last_choice": None,
+                        "retry_result": None,
+                        "added_time": datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+                    }
     
-    # 将 all_mistakes 转换为列表
+    # 将 all_mistakes 转换为列表并添加
     new_mistake_count = 0
-    for mistake in all_mistakes.values():
-        mistake_data["mistakes"].append(mistake)
-        new_mistake_count += 1
+    for patient_id, mistake in all_mistakes.items():
+        key = f"{parent_id}#{patient_id}"
+        if key not in existing_mistakes_map:
+            mistake_data["mistakes"].append(mistake)
+            existing_mistakes_map[key] = mistake  # 避免同一循环内重复添加
+            new_mistake_count += 1
     
     # 写入文件（需要锁）
     lock_path = mistake_file.with_suffix('.json.lock')
@@ -1415,6 +1465,28 @@ async def analyze_with_llm(username: str, parent_id: str, stage: str, stats: Dic
         stats: 统计数据（三阶段时为包含三个阶段数据的字典）
     """
     print(f"🔍 [AI分析] 开始执行: username={username}, parent_id={parent_id}, stage={stage}")
+    
+    # 防重入检查：如果状态已是 pending 或 completed，直接跳过
+    user_res_path = Path(DATA_BATCH_STORAGE) / "SYSTEM" / "edu_data" / "Doctor_Diag_Result" / f"{username}.json"
+    if user_res_path.exists():
+        try:
+            with open(user_res_path, "r", encoding="utf-8") as f:
+                user_data = json.load(f)
+            if parent_id in user_data:
+                llm_analysis = user_data[parent_id].get("llm_analysis", {})
+                existing_status = llm_analysis.get(stage, {}).get("status")
+                if existing_status in ("pending", "completed"):
+                    print(f"🔔 [AI分析] {stage} 阶段状态已是 {existing_status}，跳过重复执行")
+                    return
+                # 预占状态为 pending（防止重复调用）
+                if "llm_analysis" not in user_data[parent_id]:
+                    user_data[parent_id]["llm_analysis"] = {}
+                user_data[parent_id]["llm_analysis"][stage] = {"status": "pending"}
+                with open(user_res_path, "w", encoding="utf-8") as f:
+                    json.dump(user_data, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"⚠️ [AI分析] 防重入检查失败: {e}")
+    
     try:
         # 1. 读取LLM配置（新格式）
         print(f"🔍 [AI分析] 检查配置文件: {LLM_MODELS_FILE}")

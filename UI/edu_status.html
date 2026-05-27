@@ -72,7 +72,7 @@
       <div class="navbar">
         <div style="font-size:20px;">🎓 教育练习中心</div>
         <div style="display:flex; gap:10px;">
-            <button onclick="openMistakeReviewModal()" class="btn" style="background:rgba(255,255,255,0.2); color:white;">错题回顾</button>
+            <button onclick="openGlobalMistakeReviewModal()" class="btn" style="background:rgba(255,255,255,0.2); color:white;">错题回顾</button>
             <button onclick="window.location.href='/flow'" class="btn" style="background:rgba(255,255,255,0.2); color:white">返回</button>
         </div>
     </div>
@@ -96,31 +96,53 @@
       </div>
   </div>
 
-  <!-- 错题回顾弹窗 -->
-  <div id="mistakeReviewModal" class="modal-overlay" style="z-index:2000;">
+  <!-- 错题回顾弹窗（全局模式 - 右上角按钮） -->
+  <div id="globalMistakeReviewModal" class="modal-overlay" style="z-index:2000; display:none;">
       <div class="modal-card" style="display:flex; flex-direction:column; width:80%; max-height:85vh;">
-          <div id="mistakeReviewHeader" style="flex-shrink:0; padding:15px; border-bottom:1px solid #e2e8f0;">
+          <div style="flex-shrink:0; padding:15px; border-bottom:1px solid #e2e8f0;">
               <div style="display:flex; justify-content:space-between; align-items:center;">
                   <h2 style="color:#1e293b; font-size:18px;">📝 错题回顾</h2>
-                  <button onclick="closeMistakeReviewModal()" style="background:none; border:none; font-size:24px; cursor:pointer;">×</button>
+                  <button onclick="closeGlobalMistakeReviewModal()" style="background:none; border:none; font-size:24px; cursor:pointer;">×</button>
               </div>
               <div style="display:flex; gap:20px; margin-top:10px; align-items:center;">
-                  <span id="mistakeCountText" style="color:#64748b;">可访问: 0 | 已失效: 0</span>
+                  <span id="globalMistakeCountText" style="color:#64748b;">可访问: 0 | 已失效: 0</span>
                   <div style="margin-left:auto; display:flex; gap:10px;">
-                      <button onclick="selectAllMistakes()" class="btn btn-view" style="padding:5px 10px; font-size:12px;">全选</button>
-                      <button onclick="clearAllSelection()" class="btn btn-view" style="padding:5px 10px; font-size:12px;">清除选择</button>
-                      <button onclick="deleteExpiredMistakes()" class="btn btn-view" style="padding:5px 10px; font-size:12px; color:#ef4444;">删除失效</button>
+                      <button onclick="selectAllGlobalMistakes()" class="btn btn-view" style="padding:5px 10px; font-size:12px;">全选</button>
+                      <button onclick="clearAllGlobalSelection()" class="btn btn-view" style="padding:5px 10px; font-size:12px;">清除选择</button>
+                      <button onclick="deleteGlobalExpiredMistakes()" class="btn btn-view" style="padding:5px 10px; font-size:12px; color:#ef4444;">删除失效</button>
                   </div>
               </div>
           </div>
-          <div id="mistakeReviewContent" style="flex:1; overflow-y:auto; padding:15px;">
-              <div style="text-align:center; padding:40px;">
-                  <div style="font-size:48px; animation: spin 1s linear infinite;">⚙️</div>
+          <div id="globalMistakeReviewContent" style="flex:1; overflow-y:auto; padding:15px;">
+          </div>
+          <div style="flex-shrink:0; padding:15px; border-top:1px solid #e2e8f0; display:flex; gap:10px; justify-content:flex-end;">
+              <button class="btn btn-view" onclick="closeGlobalMistakeReviewModal()">关闭</button>
+              <button class="btn btn-start" id="btnGlobalMistakeReviewStart" onclick="startGlobalMistakeReview()">错题回顾</button>
+          </div>
+      </div>
+  </div>
+
+  <!-- 任务错题回顾弹窗（任务内按钮） -->
+  <div id="taskMistakeReviewModal" class="modal-overlay" style="z-index:2000; display:none;">
+      <div class="modal-card" style="display:flex; flex-direction:column; width:80%; max-height:85vh;">
+          <div style="flex-shrink:0; padding:15px; border-bottom:1px solid #e2e8f0;">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <h2 id="taskMistakeReviewTitle" style="color:#1e293b; font-size:18px;">📝 任务错题回顾</h2>
+                  <button onclick="closeTaskMistakeReviewModal()" style="background:none; border:none; font-size:24px; cursor:pointer;">×</button>
+              </div>
+              <div style="display:flex; gap:20px; margin-top:10px; align-items:center;">
+                  <span id="taskMistakeCountText" style="color:#64748b;">病例: 0</span>
+                  <div style="margin-left:auto; display:flex; gap:10px;">
+                      <button onclick="selectAllTaskMistakes()" class="btn btn-view" style="padding:5px 10px; font-size:12px;">全选</button>
+                      <button onclick="clearAllTaskSelection()" class="btn btn-view" style="padding:5px 10px; font-size:12px;">清除选择</button>
+                  </div>
               </div>
           </div>
-          <div id="mistakeReviewFooter" style="flex-shrink:0; padding:15px; border-top:1px solid #e2e8f0; display:flex; gap:10px; justify-content:flex-end;">
-              <button class="btn btn-view" onclick="closeMistakeReviewModal()">关闭</button>
-              <button class="btn btn-start" id="btnMistakeReviewStart" onclick="startMistakeReview()">错题回顾</button>
+          <div id="taskMistakeReviewContent" style="flex:1; overflow-y:auto; padding:15px;">
+          </div>
+          <div style="flex-shrink:0; padding:15px; border-top:1px solid #e2e8f0; display:flex; gap:10px; justify-content:flex-end;">
+              <button class="btn btn-view" onclick="closeTaskMistakeReviewModal()">关闭</button>
+              <button class="btn btn-start" id="btnTaskMistakeReviewStart" onclick="startTaskMistakeReview()">错题回顾</button>
           </div>
       </div>
   </div>
@@ -301,7 +323,7 @@ async function fetchEduTasks() {
                                 ${reviewBtnText}
                             </button>
                             ${allDone ? `<button class="btn btn-view" style="width:180px;white-space:nowrap; margin-top:5px;" onclick="openResultModal('${t.submission_id}', '${t.request_name}', null, '${t.submission_id}')">查看报告</button>` : ''}
-                            ${allDone ? `<button class="btn btn-view" style="width:180px;white-space:nowrap; margin-top:5px; background:#fef3c7; color:#92400e;" onclick="openTaskMistakeReview('${t.submission_id}', '${t.request_name}')">错题复诊</button>` : ''}
+                            ${allDone ? `<button class="btn btn-view" style="width:180px;white-space:nowrap; margin-top:5px; background:#fef3c7; color:#92400e;" onclick="openTaskMistakeReviewModal('${t.submission_id}', '${t.request_name}')">错题复诊</button>` : ''}
                         </div>
                     `;
                 } else if (isDualStage) {
@@ -326,7 +348,7 @@ async function fetchEduTasks() {
                                 ${assistDone ? '✅ 已完成' : (singleDone ? 'AI辅助诊断' : '⚠️ AI辅助诊断')}
                             </button>
                             ${bothDone ? `<button class="btn btn-view" style="width:180px;white-space:nowrap; margin-top:5px;" onclick="openResultModal('${t.submission_id}', '${t.request_name}', null, '${t.submission_id}')">查看报告</button>` : ''}
-                            ${bothDone ? `<button class="btn btn-view" style="width:180px;white-space:nowrap; margin-top:5px; background:#fef3c7; color:#92400e;" onclick="openTaskMistakeReview('${t.submission_id}', '${t.request_name}')">错题复诊</button>` : ''}
+                            ${bothDone ? `<button class="btn btn-view" style="width:180px;white-space:nowrap; margin-top:5px; background:#fef3c7; color:#92400e;" onclick="openTaskMistakeReviewModal('${t.submission_id}', '${t.request_name}')">错题复诊</button>` : ''}
                         </div>
                     `;
                 } else {
@@ -1362,18 +1384,18 @@ function showTripleStageReport(parentId, name, singleData, assistData, reviewDat
   </script>
   
   <script>
-  let currentMistakeData = { accessible_mistakes: [], expired_mistakes: [] };
-  let selectedMistakeIds = [];
+  // ========== 全局错题回顾（右上角按钮） ==========
+  let globalMistakeData = { accessible_mistakes: [], expired_mistakes: [] };
+  let globalSelectedMistakeIds = [];
 
-  async function openMistakeReviewModal() {
+  async function openGlobalMistakeReviewModal() {
       if (!currentUser || !currentUser.username) {
           alert('请先登录');
           return;
       }
       
-      const modal = document.getElementById('mistakeReviewModal');
-      const content = document.getElementById('mistakeReviewContent');
-      const header = document.getElementById('mistakeReviewHeader');
+      const modal = document.getElementById('globalMistakeReviewModal');
+      const content = document.getElementById('globalMistakeReviewContent');
       
       content.innerHTML = '<div style="text-align:center; padding:40px;"><div style="font-size:48px; animation: spin 1s linear infinite;">⚙️</div></div>';
       modal.style.display = 'flex';
@@ -1382,55 +1404,53 @@ function showTripleStageReport(parentId, name, singleData, assistData, reviewDat
           const r = await fetch(`/api/edu/mistakes/${encodeURIComponent(currentUser.username)}`);
           if (!r.ok) throw new Error('获取错题失败');
           
-          currentMistakeData = await r.json();
-          selectedMistakeIds = [];
+          globalMistakeData = await r.json();
+          globalSelectedMistakeIds = [];
           
-          renderMistakeReviewModal();
-          updateSelectAllButton();
+          renderGlobalMistakeReviewModal();
       } catch (e) {
           content.innerHTML = `<div style="text-align:center; padding:40px;"><p style="color:#ef4444;">❌ 加载失败: ${e.message}</p></div>`;
       }
   }
 
-  function renderMistakeReviewModal() {
-      const content = document.getElementById('mistakeReviewContent');
-      const header = document.getElementById('mistakeReviewHeader');
-      const countText = document.getElementById('mistakeCountText');
-      const startBtn = document.getElementById('btnMistakeReviewStart');
+  function renderGlobalMistakeReviewModal() {
+      const content = document.getElementById('globalMistakeReviewContent');
+      const countText = document.getElementById('globalMistakeCountText');
+      const startBtn = document.getElementById('btnGlobalMistakeReviewStart');
       
-      const accessible = currentMistakeData.accessible_mistakes || [];
-      const expired = currentMistakeData.expired_mistakes || [];
+      const accessible = globalMistakeData.accessible_mistakes || [];
+      const expired = globalMistakeData.expired_mistakes || [];
       
       countText.textContent = `可访问: ${accessible.length} | 已失效: ${expired.length}`;
       
-      // 分离错题和正确题
-      const wrongMistakes = accessible.filter(m => !m.is_retried || m.retry_result !== 'correct');
-      const correctMistakes = accessible.filter(m => m.is_retried && m.retry_result === 'correct');
+      // 分离未纠正和已纠正病例
+      const notCorrectedMistakes = accessible.filter(m => !m.is_retried || m.retry_result !== 'correct');
+      const correctedMistakes = accessible.filter(m => m.is_retried && m.retry_result === 'correct');
       
       let html = '';
       
-      // 错误病例区域（可点击选择）
+      // 未纠正病例区域（可点击选择）
       html += `
           <div style="margin-bottom:15px;">
-              <div class="mistake-section-header" onclick="toggleMistakeSection('wrong')" style="cursor:pointer; padding:10px; background:#fef2f2; border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
-                  <span style="font-weight:600; color:#991b1b;">❌ 错误病例 (${wrongMistakes.length}个)</span>
+              <div onclick="toggleGlobalMistakeSection('wrong')" style="cursor:pointer; padding:10px; background:#fef2f2; border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
+                  <span style="font-weight:600; color:#991b1b;">❌ 未纠正病例 (${notCorrectedMistakes.length}个)</span>
                   <span id="wrongSectionArrow" style="transition:transform 0.2s;">▼</span>
               </div>
               <div id="wrongSectionContent" style="max-height:300px; overflow-y:auto; margin-top:10px;">
       `;
       
-      if (wrongMistakes.length === 0) {
-          html += '<p style="text-align:center; color:#94a3b8; padding:20px;">暂无错误病例</p>';
+      if (notCorrectedMistakes.length === 0) {
+          html += '<p style="text-align:center; color:#94a3b8; padding:20px;">暂无未纠正病例</p>';
       } else {
-          wrongMistakes.forEach(m => {
-              const isSelected = selectedMistakeIds.includes(m.id);
-              const retryStatus = m.is_retried ? (m.retry_result === 'correct' ? '✅ 已重做正确' : '❌ 已重做仍错') : '⏳ 未重做';
+          notCorrectedMistakes.forEach(m => {
+              const isSelected = globalSelectedMistakeIds.includes(m.id);
+              const statusText = m.is_retried ? '❌ 已重做仍错' : '⏳ 未重做';
               html += `
-                  <div class="mistake-item ${isSelected ? 'selected' : ''}" data-id="${m.id}" onclick="handleMistakeClick('${m.id}', this)" 
+                  <div data-id="${m.id}" onclick="toggleGlobalMistakeSelection('${m.id}', this)" 
                        style="padding:12px; border:2px solid ${isSelected ? '#10b981' : '#e2e8f0'}; border-radius:8px; margin-bottom:8px; cursor:pointer; background:${isSelected ? '#ecfdf5' : 'white'}; font-weight:${isSelected ? '700' : '400'};">
                       <div style="display:flex; justify-content:space-between;">
                           <span style="font-weight:600;">${m.case_name}</span>
-                          <span style="color:${m.retry_result === 'correct' ? '#10b981' : '#ef4444'};">${retryStatus}</span>
+                          <span style="color:#ef4444;">${statusText}</span>
                       </div>
                       <div style="display:flex; gap:20px; margin-top:5px; font-size:13px; color:#64748b;">
                           <span>任务: ${m.task_name}</span>
@@ -1444,28 +1464,27 @@ function showTripleStageReport(parentId, name, singleData, assistData, reviewDat
               `;
           });
       }
-      
       html += '</div></div>';
       
-      // 正确病例区域（仅展示，不可选）
+      // 已纠正病例区域（仅展示，不可选）
       html += `
           <div style="margin-bottom:15px;">
-              <div class="mistake-section-header" onclick="toggleMistakeSection('correct')" style="cursor:pointer; padding:10px; background:#ecfdf5; border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
-                  <span style="font-weight:600; color:#065f46;">✅ 正确病例 (${correctMistakes.length}个)</span>
+              <div onclick="toggleGlobalMistakeSection('correct')" style="cursor:pointer; padding:10px; background:#ecfdf5; border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
+                  <span style="font-weight:600; color:#065f46;">✅ 已纠正病例 (${correctedMistakes.length}个)</span>
                   <span id="correctSectionArrow" style="transition:transform 0.2s;">▼</span>
               </div>
               <div id="correctSectionContent" style="max-height:200px; overflow-y:auto; margin-top:10px;">
       `;
       
-      if (correctMistakes.length === 0) {
-          html += '<p style="text-align:center; color:#94a3b8; padding:20px;">暂无已正确重做的病例</p>';
+      if (correctedMistakes.length === 0) {
+          html += '<p style="text-align:center; color:#94a3b8; padding:20px;">暂无已纠正病例</p>';
       } else {
-          correctMistakes.forEach(m => {
+          correctedMistakes.forEach(m => {
               html += `
                   <div style="padding:10px; border:1px solid #e2e8f0; border-radius:8px; margin-bottom:6px; background:#f8fafc;">
                       <div style="display:flex; justify-content:space-between;">
                           <span>${m.case_name}</span>
-                          <span style="color:#10b981;">✅ 已重做正确</span>
+                          <span style="color:#10b981;">✅ 已纠正</span>
                       </div>
                       <div style="font-size:12px; color:#64748b; margin-top:3px;">
                           ${m.task_name} | ${m.stage}
@@ -1474,20 +1493,18 @@ function showTripleStageReport(parentId, name, singleData, assistData, reviewDat
               `;
           });
       }
-      
       html += '</div></div>';
       
       // 已失效题目（默认收起）
       if (expired.length > 0) {
           html += `
               <div style="margin-bottom:15px;">
-                  <div class="mistake-section-header" onclick="toggleMistakeSection('expired')" style="cursor:pointer; padding:10px; background:#f1f5f9; border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
+                  <div onclick="toggleGlobalMistakeSection('expired')" style="cursor:pointer; padding:10px; background:#f1f5f9; border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
                       <span style="font-weight:600; color:#64748b;">⏸️ 已失效题目 (${expired.length}个)</span>
                       <span id="expiredSectionArrow" style="transition:transform 0.2s;">▶</span>
                   </div>
                   <div id="expiredSectionContent" style="display:none; max-height:150px; overflow-y:auto; margin-top:10px;">
           `;
-          
           expired.forEach(m => {
               html += `
                   <div style="padding:8px; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:4px; background:#f8fafc; opacity:0.7;">
@@ -1501,21 +1518,16 @@ function showTripleStageReport(parentId, name, singleData, assistData, reviewDat
                   </div>
               `;
           });
-          
           html += '</div></div>';
       }
       
       content.innerHTML = html;
-      
-      // 更新按钮状态
-      startBtn.disabled = selectedMistakeIds.length === 0;
-      startBtn.style.opacity = selectedMistakeIds.length === 0 ? '0.5' : '1';
+      updateGlobalButtonState();
   }
 
-  function toggleMistakeSection(section) {
+  function toggleGlobalMistakeSection(section) {
       const content = document.getElementById(section + 'SectionContent');
       const arrow = document.getElementById(section + 'SectionArrow');
-      
       if (content.style.display === 'none') {
           content.style.display = 'block';
           arrow.textContent = '▼';
@@ -1525,60 +1537,56 @@ function showTripleStageReport(parentId, name, singleData, assistData, reviewDat
       }
   }
 
-  function toggleMistakeSelection(mistakeId, element) {
-      const idx = selectedMistakeIds.indexOf(mistakeId);
+  function toggleGlobalMistakeSelection(mistakeId, element) {
+      const idx = globalSelectedMistakeIds.indexOf(mistakeId);
       if (idx >= 0) {
-          selectedMistakeIds.splice(idx, 1);
+          globalSelectedMistakeIds.splice(idx, 1);
+          element.style.borderColor = '#e2e8f0';
+          element.style.background = 'white';
+          element.style.fontWeight = '400';
       } else {
-          selectedMistakeIds.push(mistakeId);
+          globalSelectedMistakeIds.push(mistakeId);
+          element.style.borderColor = '#10b981';
+          element.style.background = '#ecfdf5';
+          element.style.fontWeight = '700';
       }
-      if (element) {
-          const isSelected = selectedMistakeIds.includes(mistakeId);
-          element.style.borderColor = isSelected ? '#10b981' : '#e2e8f0';
-          element.style.background = isSelected ? '#ecfdf5' : 'white';
-          element.style.fontWeight = isSelected ? '700' : '400';
-          element.classList.toggle('selected', isSelected);
-      }
-      updateSelectAllButton();
+      updateGlobalButtonState();
   }
 
-  function handleMistakeClick(mistakeId, element) {
-      toggleMistakeSelection(mistakeId, element);
+  function updateGlobalButtonState() {
+      const startBtn = document.getElementById('btnGlobalMistakeReviewStart');
+      startBtn.disabled = globalSelectedMistakeIds.length === 0;
+      startBtn.style.opacity = globalSelectedMistakeIds.length === 0 ? '0.5' : '1';
   }
 
-  function updateAllMistakeItemsUI() {
-      document.querySelectorAll('.mistake-item').forEach(item => {
+  function selectAllGlobalMistakes() {
+      const accessible = globalMistakeData.accessible_mistakes || [];
+      const notCorrected = accessible.filter(m => !m.is_retried || m.retry_result !== 'correct');
+      globalSelectedMistakeIds = notCorrected.map(m => m.id);
+      document.querySelectorAll('#globalMistakeReviewContent > div > div[data-id]').forEach(item => {
           const id = item.getAttribute('data-id');
-          const isSelected = selectedMistakeIds.includes(id);
-          item.style.borderColor = isSelected ? '#10b981' : '#e2e8f0';
-          item.style.background = isSelected ? '#ecfdf5' : 'white';
-          item.style.fontWeight = isSelected ? '700' : '400';
-          item.classList.toggle('selected', isSelected);
+          if (globalSelectedMistakeIds.includes(id)) {
+              item.style.borderColor = '#10b981';
+              item.style.background = '#ecfdf5';
+              item.style.fontWeight = '700';
+          }
       });
-      updateSelectAllButton();
+      updateGlobalButtonState();
   }
 
-  function updateSelectAllButton() {
-      const startBtn = document.getElementById('btnMistakeReviewStart');
-      startBtn.disabled = selectedMistakeIds.length === 0;
-      startBtn.style.opacity = selectedMistakeIds.length === 0 ? '0.5' : '1';
+  function clearAllGlobalSelection() {
+      globalSelectedMistakeIds = [];
+      document.querySelectorAll('#globalMistakeReviewContent > div > div[data-id]').forEach(item => {
+          item.style.borderColor = '#e2e8f0';
+          item.style.background = 'white';
+          item.style.fontWeight = '400';
+      });
+      updateGlobalButtonState();
   }
 
-  function selectAllMistakes() {
-      const accessible = currentMistakeData.accessible_mistakes || [];
-      const wrongMistakes = accessible.filter(m => !m.is_retried || m.retry_result !== 'correct');
-      selectedMistakeIds = wrongMistakes.map(m => m.id);
-      updateAllMistakeItemsUI();
-  }
-
-  function clearAllSelection() {
-      selectedMistakeIds = [];
-      updateAllMistakeItemsUI();
-  }
-
-  async function deleteExpiredMistakes() {
+  async function deleteGlobalExpiredMistakes() {
       if (!currentUser || !currentUser.username) return;
-      const expired = currentMistakeData.expired_mistakes || [];
+      const expired = globalMistakeData.expired_mistakes || [];
       if (expired.length === 0) {
           alert('没有失效题目需要删除');
           return;
@@ -1592,17 +1600,16 @@ function showTripleStageReport(parentId, name, singleData, assistData, reviewDat
               body: JSON.stringify({ username: currentUser.username })
           });
       }
-      // 重新加载
-      openMistakeReviewModal();
+      openGlobalMistakeReviewModal();
   }
 
-  async function startMistakeReview() {
-      if (selectedMistakeIds.length === 0) {
+  async function startGlobalMistakeReview() {
+      if (globalSelectedMistakeIds.length === 0) {
           alert('请先选择要回顾的病例');
           return;
       }
       
-      const startBtn = document.getElementById('btnMistakeReviewStart');
+      const startBtn = document.getElementById('btnGlobalMistakeReviewStart');
       startBtn.disabled = true;
       startBtn.textContent = '创建中...';
       
@@ -1612,7 +1619,7 @@ function showTripleStageReport(parentId, name, singleData, assistData, reviewDat
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                   username: currentUser.username,
-                  mistake_ids: selectedMistakeIds
+                  mistake_ids: globalSelectedMistakeIds
               })
           });
           
@@ -1625,12 +1632,10 @@ function showTripleStageReport(parentId, name, singleData, assistData, reviewDat
           
           if (result.has_expired) {
               alert(`部分病例已失效（${result.expired_count}个），无法创建临时任务`);
-              // 重新加载错题列表
-              openMistakeReviewModal();
+              openGlobalMistakeReviewModal();
               return;
           }
           
-          // 存储错题会话数据到 sessionStorage
           const mistakeSessionData = {
               mistake_session_id: result.mistake_session_id,
               cases: result.cases,
@@ -1640,11 +1645,10 @@ function showTripleStageReport(parentId, name, singleData, assistData, reviewDat
           };
           sessionStorage.setItem('mistakeReviewSession', JSON.stringify(mistakeSessionData));
           
-          alert('错题回顾准备成功，正在跳转到诊断页面...');
-          closeMistakeReviewModal();
+          console.log('✅ 错题回顾准备成功，跳转至诊断页面...');
+          closeGlobalMistakeReviewModal();
           
-          // 跳转到 diagnosis 页面，传递特殊参数
-          window.location.href = `/diagnosis?username=${encodeURIComponent(currentUser.username)}&task=${encodeURIComponent(result.mistake_session_id)}&taskName=${encodeURIComponent('错题回顾')}&mode=edu&eduSubMode=single&force_start=true&mistake_review=true`;
+          window.location.href = `/diagnosis?username=${encodeURIComponent(currentUser.username)}&task=${encodeURIComponent(result.mistake_session_id)}&taskName=${encodeURIComponent('错题回顾')}&mode=edu&eduSubMode=assist&force_start=true&mistake_review=true`;
           
       } catch (e) {
           alert('创建临时任务失败: ' + e.message);
@@ -1654,23 +1658,28 @@ function showTripleStageReport(parentId, name, singleData, assistData, reviewDat
       }
   }
 
-  function closeMistakeReviewModal() {
-      const modal = document.getElementById('mistakeReviewModal');
+  function closeGlobalMistakeReviewModal() {
+      const modal = document.getElementById('globalMistakeReviewModal');
       modal.style.display = 'none';
-      currentMistakeData = { accessible_mistakes: [], expired_mistakes: [] };
-      selectedMistakeIds = [];
+      globalMistakeData = { accessible_mistakes: [], expired_mistakes: [] };
+      globalSelectedMistakeIds = [];
   }
 
-  async function openTaskMistakeReview(submissionId, taskName) {
+  // ========== 任务错题回顾（任务内按钮） ==========
+  let taskMistakeData = { accessible_mistakes: [], task_name: '', submission_id: '' };
+  let taskSelectedMistakeIds = [];
+
+  async function openTaskMistakeReviewModal(submissionId, taskName) {
       if (!currentUser || !currentUser.username) {
           alert('请先登录');
           return;
       }
       
-      const modal = document.getElementById('mistakeReviewModal');
-      const content = document.getElementById('mistakeReviewContent');
-      const header = document.getElementById('mistakeReviewHeader');
+      const modal = document.getElementById('taskMistakeReviewModal');
+      const content = document.getElementById('taskMistakeReviewContent');
+      const title = document.getElementById('taskMistakeReviewTitle');
       
+      title.textContent = `📝 ${taskName} - 错题复诊`;
       content.innerHTML = '<div style="text-align:center; padding:40px;"><div style="font-size:48px; animation: spin 1s linear infinite;">⚙️</div></div>';
       modal.style.display = 'flex';
       
@@ -1680,24 +1689,170 @@ function showTripleStageReport(parentId, name, singleData, assistData, reviewDat
           
           const data = await r.json();
           
-          // 筛选出属于这个任务的错题
+          // 筛选出属于这个任务的错题（任务内显示所有可访问的病例）
           const taskMistakes = (data.accessible_mistakes || []).filter(m => m.submission_id === submissionId);
-          const taskExpiredMistakes = (data.expired_mistakes || []).filter(m => m.submission_id === submissionId);
           
-          currentMistakeData = {
+          taskMistakeData = {
               accessible_mistakes: taskMistakes,
-              expired_mistakes: taskExpiredMistakes
+              task_name: taskName,
+              submission_id: submissionId
           };
-          selectedMistakeIds = [];
+          taskSelectedMistakeIds = [];
           
-          // 更新标题
-          document.querySelector('#mistakeReviewHeader h2').textContent = `📝 ${taskName} - 错题复诊`;
-          
-          renderMistakeReviewModal();
-          updateSelectAllButton();
+          renderTaskMistakeReviewModal();
       } catch (e) {
           content.innerHTML = `<div style="text-align:center; padding:40px;"><p style="color:#ef4444;">❌ 加载失败: ${e.message}</p></div>`;
       }
+  }
+
+  function renderTaskMistakeReviewModal() {
+      const content = document.getElementById('taskMistakeReviewContent');
+      const countText = document.getElementById('taskMistakeCountText');
+      const startBtn = document.getElementById('btnTaskMistakeReviewStart');
+      
+      const accessible = taskMistakeData.accessible_mistakes || [];
+      
+      // 任务内显示所有病例，不区分是否已纠正
+      countText.textContent = `病例: ${accessible.length}`;
+      
+      let html = '';
+      
+      if (accessible.length === 0) {
+          html = '<p style="text-align:center; color:#94a3b8; padding:40px;">该任务暂无病例数据</p>';
+      } else {
+          accessible.forEach(m => {
+              const isSelected = taskSelectedMistakeIds.includes(m.id);
+              const statusText = m.is_retried ? (m.retry_result === 'correct' ? '✅ 已纠正' : '❌ 仍错误') : '⏳ 未重做';
+              const statusColor = m.is_retried ? (m.retry_result === 'correct' ? '#10b981' : '#ef4444') : '#64748b';
+              html += `
+                  <div data-id="${m.id}" onclick="toggleTaskMistakeSelection('${m.id}', this)" 
+                       style="padding:12px; border:2px solid ${isSelected ? '#10b981' : '#e2e8f0'}; border-radius:8px; margin-bottom:8px; cursor:pointer; background:${isSelected ? '#ecfdf5' : 'white'}; font-weight:${isSelected ? '700' : '400'};">
+                      <div style="display:flex; justify-content:space-between;">
+                          <span style="font-weight:600;">${m.case_name}</span>
+                          <span style="color:${statusColor};">${statusText}</span>
+                      </div>
+                      <div style="display:flex; gap:20px; margin-top:5px; font-size:13px; color:#64748b;">
+                          <span>阶段: ${m.stage}</span>
+                      </div>
+                      <div style="display:flex; gap:20px; margin-top:5px; font-size:13px;">
+                          <span>已选: <span style="color:#ef4444;">${m.user_wrong_choice}</span></span>
+                          <span>正确: <span style="color:#10b981;">${m.correct_category}</span></span>
+                      </div>
+                  </div>
+              `;
+          });
+      }
+      
+      content.innerHTML = html;
+      updateTaskButtonState();
+  }
+
+  function toggleTaskMistakeSelection(mistakeId, element) {
+      const idx = taskSelectedMistakeIds.indexOf(mistakeId);
+      if (idx >= 0) {
+          taskSelectedMistakeIds.splice(idx, 1);
+          element.style.borderColor = '#e2e8f0';
+          element.style.background = 'white';
+          element.style.fontWeight = '400';
+      } else {
+          taskSelectedMistakeIds.push(mistakeId);
+          element.style.borderColor = '#10b981';
+          element.style.background = '#ecfdf5';
+          element.style.fontWeight = '700';
+      }
+      updateTaskButtonState();
+  }
+
+  function updateTaskButtonState() {
+      const startBtn = document.getElementById('btnTaskMistakeReviewStart');
+      startBtn.disabled = taskSelectedMistakeIds.length === 0;
+      startBtn.style.opacity = taskSelectedMistakeIds.length === 0 ? '0.5' : '1';
+  }
+
+  function selectAllTaskMistakes() {
+      const accessible = taskMistakeData.accessible_mistakes || [];
+      taskSelectedMistakeIds = accessible.map(m => m.id);
+      document.querySelectorAll('#taskMistakeReviewContent > div[data-id]').forEach(item => {
+          const id = item.getAttribute('data-id');
+          if (taskSelectedMistakeIds.includes(id)) {
+              item.style.borderColor = '#10b981';
+              item.style.background = '#ecfdf5';
+              item.style.fontWeight = '700';
+          }
+      });
+      updateTaskButtonState();
+  }
+
+  function clearAllTaskSelection() {
+      taskSelectedMistakeIds = [];
+      document.querySelectorAll('#taskMistakeReviewContent > div[data-id]').forEach(item => {
+          item.style.borderColor = '#e2e8f0';
+          item.style.background = 'white';
+          item.style.fontWeight = '400';
+      });
+      updateTaskButtonState();
+  }
+
+  async function startTaskMistakeReview() {
+      if (taskSelectedMistakeIds.length === 0) {
+          alert('请先选择要回顾的病例');
+          return;
+      }
+      
+      const startBtn = document.getElementById('btnTaskMistakeReviewStart');
+      startBtn.disabled = true;
+      startBtn.textContent = '创建中...';
+      
+      try {
+          const r = await fetch('/api/edu/mistakes/prepare', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                  username: currentUser.username,
+                  mistake_ids: taskSelectedMistakeIds
+              })
+          });
+          
+          if (!r.ok) {
+              const err = await r.json();
+              throw new Error(err.detail || '创建临时任务失败');
+          }
+          
+          const result = await r.json();
+          
+          if (result.has_expired) {
+              alert(`部分病例已失效（${result.expired_count}个），无法创建临时任务`);
+              openTaskMistakeReviewModal(taskMistakeData.submission_id, taskMistakeData.task_name);
+              return;
+          }
+          
+          const mistakeSessionData = {
+              mistake_session_id: result.mistake_session_id,
+              cases: result.cases,
+              display_order: result.display_order,
+              mistake_ids: result.mistake_ids,
+              is_mistake_review: true
+          };
+          sessionStorage.setItem('mistakeReviewSession', JSON.stringify(mistakeSessionData));
+          
+          console.log('✅ 错题回顾准备成功，跳转至诊断页面...');
+          closeTaskMistakeReviewModal();
+          
+          window.location.href = `/diagnosis?username=${encodeURIComponent(currentUser.username)}&task=${encodeURIComponent(result.mistake_session_id)}&taskName=${encodeURIComponent(taskMistakeData.task_name + ' - 错题复诊')}&mode=edu&eduSubMode=assist&force_start=true&mistake_review=true`;
+          
+      } catch (e) {
+          alert('创建临时任务失败: ' + e.message);
+      } finally {
+          startBtn.disabled = false;
+          startBtn.textContent = '错题回顾';
+      }
+  }
+
+  function closeTaskMistakeReviewModal() {
+      const modal = document.getElementById('taskMistakeReviewModal');
+      modal.style.display = 'none';
+      taskMistakeData = { accessible_mistakes: [], task_name: '', submission_id: '' };
+      taskSelectedMistakeIds = [];
   }
   </script>
 </body>

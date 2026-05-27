@@ -2430,6 +2430,191 @@ if task_info_path.exists():
 
 ---
 
+## 十三、错题回顾系统 (2026年5月)
+
+### 13.1 功能概述
+
+错题回顾系统允许用户对之前诊断错误的病例进行重新练习，通过对比首次诊断和重新诊断的结果来评估学习效果。
+
+### 13.2 系统架构
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     错题回顾流程                                  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  1. 用户完成诊断练习                                             │
+│     └── 系统自动记录错题到 mistake_task_{username}.json           │
+│                      │                                           │
+│                      ▼                                           │
+│  2. 用户打开错题回顾弹窗 (edu_status.html)                       │
+│     ├── 全局错题回顾: 右上角"错题回顾"按钮                        │
+│     └── 任务错题回顾: 任务卡片内"错题复诊"按钮                    │
+│                      │                                           │
+│                      ▼                                           │
+│  3. 用户选择要回顾的病例                                         │
+│     └── 调用 /api/edu/mistakes/prepare 准备数据                   │
+│                      │                                           │
+│                      ▼                                           │
+│  4. 跳转到诊断页面 (diagnosis.html)                              │
+│     └── 模式: edu, eduSubMode: assist, mistake_review: true      │
+│                      │                                           │
+│                      ▼                                           │
+│  5. 用户进行重新诊断                                             │
+│     └── 调用 /api/edu/mistakes/submit 提交结果                   │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 13.3 错题回顾弹窗
+
+系统提供两个独立的错题回顾弹窗：
+
+#### 全局错题回顾弹窗 (`globalMistakeReviewModal`)
+
+| 属性 | 说明 |
+|------|------|
+| 入口 | 右上角"错题回顾"按钮 |
+| 左上角标题 | "📝 错题回顾" (无具体任务名) |
+| 内容分类 | ❌ 未纠正病例 / ✅ 已纠正病例 |
+| 操作按钮 | 全选、清除选择、删除失效、错题回顾 |
+
+#### 任务错题回顾弹窗 (`taskMistakeReviewModal`)
+
+| 属性 | 说明 |
+|------|------|
+| 入口 | 任务卡片的"错题复诊"按钮 |
+| 左上角标题 | "📝 {任务名} - 错题复诊" |
+| 内容分类 | 该任务所有病例（正确+错误混合显示） |
+| 操作按钮 | 全选、清除选择、错题回顾 |
+| 特殊 | 无"删除失效"按钮（任务内不存在失效概念） |
+
+### 13.4 新增API接口
+
+| 接口 | 方法 | 位置 | 功能 |
+|------|------|------|------|
+| /api/edu/mistakes/{username} | GET | routes_oridata.py | 获取用户错题列表 |
+| /api/edu/mistakes/prepare | POST | routes_oridata.py | 准备错题回顾数据 |
+| /api/edu/mistakes/submit | POST | routes_oridata.py | 提交错题回顾结果 |
+| /api/edu/mistakes/{mistake_id} | PUT | routes_oridata.py | 更新错题状态 |
+| /api/edu/mistakes/{mistake_id} | DELETE | routes_oridata.py | 删除错题记录 |
+
+### 13.5 数据结构
+
+#### 错题记录 (mistake_task_{username}.json)
+
+```json
+{
+  "username": "doctor1",
+  "mistakes": [
+    {
+      "id": "mistake_20260527_001",
+      "submission_id": "20260423104938_602276",
+      "task_name": "测试批次",
+      "stage": "assist",
+      "case_name": "20210830_1",
+      "user_wrong_choice": "VSD",
+      "correct_category": "Normal",
+      "is_retried": false,
+      "last_choice": null,
+      "retry_result": null,
+      "added_time": "2026-05-27T10:30:00"
+    }
+  ]
+}
+```
+
+### 13.6 核心文件修改
+
+| 文件 | 修改内容 |
+|------|----------|
+| routes_oridata.py | 新增错题API、修复删除任务路径 |
+| edu_status.html | 重构错题回顾弹窗、分裂为两个独立弹窗 |
+| diagnosis.html | 修复错题模式提交逻辑、移除阻塞alert |
+| main.py | 添加防重复触发LLM分析、数据路径回退复制 |
+
+---
+
+## 十四、近期修复与优化 (2026年5月)
+
+### 14.1 修复重复调用大模型分析
+
+**问题**：当用户多次提交同一阶段时，会重复触发 `analyze_with_llm` 调用。
+
+**修复位置**：`main.py`
+
+**修复内容**：
+1. `submit_diagnosis` 函数中添加状态检查
+```python
+# 检查是否已经触发过分析（防止重复调用）
+existing_analysis = llm_analysis.get("triple", {})
+if existing_analysis.get("status") in ("pending", "completed"):
+    print(f"🔔 三阶段AI分析已在进行中或已完成，跳过重复触发")
+else:
+    asyncio.create_task(analyze_with_llm(...))
+```
+
+2. `analyze_with_llm` 函数开头添加防重入检查
+```python
+# 防重入检查：如果状态已是 pending 或 completed，直接跳过
+existing_status = llm_analysis.get(stage, {}).get("status")
+if existing_status in ("pending", "completed"):
+    print(f"🔔 [AI分析] {stage} 阶段状态已是 {existing_status}，跳过重复执行")
+    return
+```
+
+### 14.2 修复错题回顾提交失败
+
+**问题**：错题回顾模式下也会调用 `/api/diagnosis/submit-json`，导致 404 错误。
+
+**修复位置**：`diagnosis.html`
+
+**修复内容**：当 `taskInfo.mistake_review === true` 时，跳过普通诊断提交，直接调用 `/api/edu/mistakes/submit`。
+
+### 14.3 修复取消发布时清理不完整
+
+**问题**：`unpublish_edu_task` 函数删除任务数据时路径错误。
+
+**修复位置**：`routes_oridata.py:1228`
+
+**修复前**：
+```python
+shutil.rmtree(SYSTEM_EDU_DIR / submission_id, ignore_errors=True)  # 错误路径
+```
+
+**修复后**：
+```python
+shutil.rmtree(SYSTEM_EDU_DIR / "oridata" / submission_id, ignore_errors=True)  # 正确路径
+```
+
+### 14.4 修复数据路径回退复制
+
+**问题**：旧数据位于 `edu_data/{submission_id}` 而非 `edu_data/oridata/{submission_id}`，导致读取失败。
+
+**修复位置**：`main.py` 第1340-1357行
+
+**修复内容**：使用 `shutil.copytree(fallback_path, correct_dir, dirs_exist_ok=True)` 替代逐项复制。
+
+### 14.5 修复错题回顾弹窗交互
+
+**问题**：点击一个病例选中所有，且只有一个病例能进入判读。
+
+**修复位置**：`edu_status.html`
+
+**修复内容**：
+1. 将 `toggleMistakeSelection` 函数回滚到简单实现
+2. 分裂为两个独立的弹窗函数和状态变量
+
+### 14.6 修复错题回顾模态权限
+
+**问题**：错题回顾使用 `eduSubMode=single`，导致 heatmap/bbox 按钮被禁用。
+
+**修复位置**：`edu_status.html` 第1651行、1841行
+
+**修复后**：错题回顾使用 `eduSubMode=assist`，允许使用所有模态。
+
+---
+
 ## 📋 待修复问题 (Known Issues)
 
 ### [TODO] 后端接受返回绑定显示名而非内部名的 Bug
@@ -2464,5 +2649,56 @@ if task_info_path.exists():
 - AI 分析逻辑 - 需要确认如何处理缺失的诊断数据
 
 **待实现**：定义未判读病例的默认诊断值（如 `-1` 表示未判读）或从 UI/UX 层面禁止用户跳过这些病例。
+
+---
+
+### [TODO] 错题回顾提交后 cases 和 mistake_ids 映射问题
+
+**问题描述**：在 `submit_mistake_review` 函数中，`mistake_to_case` 的映射逻辑假设 `mistake_ids[i]` 对应 `cases[i].id`，但这个假设在某些情况下可能不成立。
+
+**问题代码** (`routes_oridata.py:1954-1959`)：
+```python
+mistake_to_case = {}
+for i, m_id in enumerate(mistake_ids):
+    if i < len(cases):
+        mistake_to_case[m_id] = cases[i].get("id")
+```
+
+**根因**：当 `prepare` 接口中某个病例目录不存在被跳过时，`cases` 数组会比 `mistake_ids` 短，导致映射错误。
+
+**涉及文件**：
+- `routes_oridata.py` - `submit_mistake_review` 函数
+
+---
+
+### [TODO] 错题回顾任务内弹窗的"删除失效"按钮隐藏
+
+**问题描述**：根据需求，任务内错题回顾弹窗不应显示"删除失效"按钮（因为任务内不存在失效概念）。
+
+**当前状态**：已在 UI 实现中分离两个弹窗，但需确认功能正确。
+
+**涉及文件**：
+- `edu_status.html` - `taskMistakeReviewModal` 弹窗
+
+---
+
+### [TODO] 三阶段教育模式的 AI 分析触发逻辑
+
+**问题描述**：三阶段任务完成后触发 AI 综合分析的逻辑需要进一步测试验证。
+
+**涉及文件**：
+- `main.py` - `submit_diagnosis` 函数中 `triple_done` 判断逻辑
+
+---
+
+### [TODO] 数据路径不一致的长期解决方案
+
+**问题描述**：旧数据位于 `edu_data/{submission_id}` 而非 `edu_data/oridata/{submission_id}`，当前通过回退复制机制临时解决。
+
+**建议**：设计数据迁移脚本，将旧数据迁移到正确位置，从根本上解决问题。
+
+**涉及文件**：
+- `main.py` - `record_mistakes_from_stats`、`submit_diagnosis`
+- `routes_oridata.py` - `unpublish_edu_task`
 
 ---
