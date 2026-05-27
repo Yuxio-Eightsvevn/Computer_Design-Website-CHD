@@ -1484,7 +1484,13 @@
             taskInfo.username = urlParams.get('username');
             taskInfo.taskFolder = urlParams.get('task');
             taskInfo.taskName = urlParams.get('taskName') || '诊断任务';
-
+            
+            // [新增] 解析错题回顾模式
+            taskInfo.mistake_review = urlParams.get('mistake_review') === 'true';
+            if (taskInfo.mistake_review) {
+                console.log('📝 错题回顾模式已启用');
+            }
+            
             // [新增] 解析重做模式参数
             taskInfo.forceStart = urlParams.get('force_start') === 'true';
             taskInfo.rerunMode = urlParams.get('rerun') === 'true';
@@ -1543,8 +1549,8 @@
                 return;
             }
             
-            // 检查任务状态是否仍然有效（教育模式）
-            if (currentMode === 'edu') {
+            // 检查任务状态是否仍然有效（教育模式，但错题回顾模式跳过检查）
+            if (currentMode === 'edu' && !taskInfo.mistake_review) {
                 try {
                     const statusCheck = await fetch(`/api/edu/check-task-status/${taskInfo.taskFolder}`);
                     const statusData = await statusCheck.json();
@@ -3001,7 +3007,7 @@ function selectOption(element, group) {
                         });
                         
                         // 调用错题专用提交端点
-                        const response = await fetch('/api/edu/mistakes/submit', {
+                        const mistakeResponse = await fetch('/api/edu/mistakes/submit', {
                             method: 'POST',
                             headers: {'Content-Type': 'application/json'},
                             body: JSON.stringify({
@@ -3011,11 +3017,11 @@ function selectOption(element, group) {
                             })
                         });
                         
-                        if (!response.ok) {
+                        if (!mistakeResponse.ok) {
                             throw new Error('错题提交失败');
                         }
                         
-                        const result = await response.json();
+                        const mistakeResult = await mistakeResponse.json();
                         alert('错题回顾已完成！');
                         
                         // 清除 sessionStorage
@@ -3026,19 +3032,19 @@ function selectOption(element, group) {
                     }
                     
                     // 正常提交流程
-                    const response = await fetch('/api/diagnosis/submit-json', {
+                    const submitResponse = await fetch('/api/diagnosis/submit-json', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify(diagnosisData)
                     });
                     
-                    if (!response.ok) {
+                    if (!submitResponse.ok) {
                         throw new Error('提交失败');
                     }
                     
-                    const result = await response.json();
+                    const submitResult = await submitResponse.json();
                     alert('诊断结果已提交并保存！');
-                    console.log('提交成功:', result);
+                    console.log('提交成功:', submitResult);
                     
                     // 提交成功后清除草稿
                     clearDraft();

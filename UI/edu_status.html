@@ -1644,7 +1644,7 @@ function showTripleStageReport(parentId, name, singleData, assistData, reviewDat
           closeMistakeReviewModal();
           
           // 跳转到 diagnosis 页面，传递特殊参数
-          window.location.href = `/diagnosis?username=${encodeURIComponent(currentUser.username)}&task=${encodeURIComponent(result.mistake_session_id)}&taskName=${encodeURIComponent('错题回顾')} &mode=edu&eduSubMode=single&force_start=true&mistake_review=true`;
+          window.location.href = `/diagnosis?username=${encodeURIComponent(currentUser.username)}&task=${encodeURIComponent(result.mistake_session_id)}&taskName=${encodeURIComponent('错题回顾')}&mode=edu&eduSubMode=single&force_start=true&mistake_review=true`;
           
       } catch (e) {
           alert('创建临时任务失败: ' + e.message);
