@@ -1386,6 +1386,7 @@ function showTripleStageReport(parentId, name, singleData, assistData, reviewDat
           selectedMistakeIds = [];
           
           renderMistakeReviewModal();
+          updateSelectAllButton();
       } catch (e) {
           content.innerHTML = `<div style="text-align:center; padding:40px;"><p style="color:#ef4444;">❌ 加载失败: ${e.message}</p></div>`;
       }
@@ -1425,7 +1426,7 @@ function showTripleStageReport(parentId, name, singleData, assistData, reviewDat
               const isSelected = selectedMistakeIds.includes(m.id);
               const retryStatus = m.is_retried ? (m.retry_result === 'correct' ? '✅ 已重做正确' : '❌ 已重做仍错') : '⏳ 未重做';
               html += `
-                  <div class="mistake-item ${isSelected ? 'selected' : ''}" data-id="${m.id}" onclick="toggleMistakeSelection('${m.id}')" 
+                  <div class="mistake-item ${isSelected ? 'selected' : ''}" data-id="${m.id}" onclick="handleMistakeClick('${m.id}', this)" 
                        style="padding:12px; border:2px solid ${isSelected ? '#10b981' : '#e2e8f0'}; border-radius:8px; margin-bottom:8px; cursor:pointer; background:${isSelected ? '#ecfdf5' : 'white'}; font-weight:${isSelected ? '700' : '400'};">
                       <div style="display:flex; justify-content:space-between;">
                           <span style="font-weight:600;">${m.case_name}</span>
@@ -1524,25 +1525,25 @@ function showTripleStageReport(parentId, name, singleData, assistData, reviewDat
       }
   }
 
-  function toggleMistakeSelection(mistakeId) {
+  function toggleMistakeSelection(mistakeId, element) {
       const idx = selectedMistakeIds.indexOf(mistakeId);
       if (idx >= 0) {
           selectedMistakeIds.splice(idx, 1);
       } else {
           selectedMistakeIds.push(mistakeId);
       }
-      updateSingleMistakeItemUI(mistakeId);
+      if (element) {
+          const isSelected = selectedMistakeIds.includes(mistakeId);
+          element.style.borderColor = isSelected ? '#10b981' : '#e2e8f0';
+          element.style.background = isSelected ? '#ecfdf5' : 'white';
+          element.style.fontWeight = isSelected ? '700' : '400';
+          element.classList.toggle('selected', isSelected);
+      }
       updateSelectAllButton();
   }
 
-  function updateSingleMistakeItemUI(mistakeId) {
-      const item = document.querySelector(`.mistake-item[data-id='${mistakeId}']`);
-      if (!item) return;
-      const isSelected = selectedMistakeIds.includes(mistakeId);
-      item.style.borderColor = isSelected ? '#10b981' : '#e2e8f0';
-      item.style.background = isSelected ? '#ecfdf5' : 'white';
-      item.style.fontWeight = isSelected ? '700' : '400';
-      item.classList.toggle('selected', isSelected);
+  function handleMistakeClick(mistakeId, element) {
+      toggleMistakeSelection(mistakeId, element);
   }
 
   function updateAllMistakeItemsUI() {
@@ -1687,6 +1688,7 @@ function showTripleStageReport(parentId, name, singleData, assistData, reviewDat
           document.querySelector('#mistakeReviewHeader h2').textContent = `📝 ${taskName} - 错题复诊`;
           
           renderMistakeReviewModal();
+          updateSelectAllButton();
       } catch (e) {
           content.innerHTML = `<div style="text-align:center; padding:40px;"><p style="color:#ef4444;">❌ 加载失败: ${e.message}</p></div>`;
       }

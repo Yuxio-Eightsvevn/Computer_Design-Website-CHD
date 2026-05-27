@@ -1323,19 +1323,19 @@ def record_mistakes_from_stats(username: str, parent_id: str, stats: Dict[str, A
         except Exception as e:
             print(f"⚠️ 读取任务索引失败: {e}")
     
-    # 获取病例名映射（从 epoch_data.json）
-    epoch_path = SYSTEM_EDU_DIR / "oridata" / parent_id / "epoch_data.json"
-    case_name_map = {}
+    # 获取病例名映射（从 epoch_data.json）- epoch_data.json 在 processed 目录的任务根目录
+    epoch_path = SYSTEM_EDU_DIR / "processed" / parent_id / "epoch_data.json"
     case_ids = []
     if epoch_path.exists():
         try:
             with open(epoch_path, "r", encoding="utf-8") as f:
                 epoch_data = json.load(f)
-            for patient_id, info in epoch_data.items():
-                case_name_map[patient_id] = info.get("display_name", patient_id)
-                case_ids.append(patient_id)
+            case_ids = list(epoch_data.keys())  # epoch_data 的 key 就是 case_id
         except Exception as e:
             print(f"⚠️ 读取 epoch_data.json 失败: {e}")
+    
+    print(f"🔍 [错题记录] epoch_data.json 路径: {epoch_path}, exists: {epoch_path.exists()}")
+    print(f"🔍 [错题记录] case_ids: {case_ids}")
     
     # 收集所有错题，用 case_id 作为 key，同 case_id 会被后面的阶段覆盖（保留最后阶段）
     all_mistakes = {}  # key: patient_id (case_id), value: mistake dict

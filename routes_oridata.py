@@ -1558,12 +1558,15 @@ async def create_mistake_review_task(request: Request):
                 sub_id = mistake["submission_id"]
                 case_id = mistake.get("case_name", "")  # case_name 就是 case_id
                 
+                print(f"🔍 [错题创建] sub_id={sub_id}, case_id={case_id}")
+                
                 if not case_id:
                     link_failed = True
                     link_error_msg = f"病例ID为空"
                     break
                 
                 source_path = source_root / sub_id / case_id
+                print(f"🔍 [错题创建] source_path={source_path}, exists={source_path.exists()}")
                 target_path = temp_root / case_id
                 
                 if not source_path.exists():
