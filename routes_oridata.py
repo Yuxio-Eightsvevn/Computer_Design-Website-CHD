@@ -1890,3 +1890,92 @@ async def prepare_mistake_review(request: Request):
     except Exception as e:
         print(f"❌ 准备错题回顾失败: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/api/edu/mistakes/submit")
+async def submit_mistake_review(request: Request):
+    """提交错题回顾结果，只更新错题状态，不保存诊断记录"""
+    try:
+        body = await request.json()
+        username = body.get("username", "")
+        mistake_session_data = body.get("mistake_session_data", {})
+        
+        if not username or not mistake_session_data:
+            raise HTTPException(status_code=400, detail="参数不完整")
+        
+        mistake_ids = mistake_session_data.get("mistake_ids", [])
+        cases = mistake_session_data.get("cases", [])
+        records = body.get("records", [])  # 诊断记录 {patientId, diagnosis}
+        
+        if not mistake_ids or not records:
+            raise HTTPException(status_code=400, detail="参数不完整")
+        
+        # 建立 patientId -> diagnosis 映射
+        record_map = {r.get("patientId"): r.get("diagnosis") for r in records}
+        
+        # 获取文件锁
+        mistake_file = SYSTEM_EDU_DIR / "mistake_task" / f"mistake_task_{username}.json"
+        lock_path = mistake_file.with_suffix('.json.lock')
+        acquired = False
+        for _ in range(50):
+            try:
+                with open(lock_path, "x") as _: pass
+                acquired = True; break
+            except FileExistsError: time.sleep(0.1)
+        if not acquired:
+            raise HTTPException(status_code=503, detail="系统繁忙，请稍后重试")
+        
+        try:
+            mistake_data = {"username": username, "mistakes": []}
+            if mistake_file.exists():
+                try:
+                    with open(mistake_file, "r", encoding="utf-8") as f:
+                        content = f.read().strip()
+                        if content:
+                            mistake_data = json.loads(content)
+                except: pass
+            
+            # 建立 mistake_id -> case_id 映射
+            # cases[i] 的 id 对应 mistake_ids[i]
+            mistake_to_case = {}
+            for i, m_id in enumerate(mistake_ids):
+                if i < len(cases):
+                    mistake_to_case[m_id] = cases[i].get("id")
+            
+            # 更新错题状态
+            updated_count = 0
+            for mistake in mistake_data.get("mistakes", []):
+                m_id = mistake.get("id")
+                if m_id in mistake_to_case:
+                    case_id = mistake_to_case[m_id]
+                    user_diagnosis = record_map.get(case_id)
+                    
+                    if user_diagnosis:
+                        # 判断是否正确（需要获取正确答案）
+                        correct_category = mistake.get("correct_category", "")
+                        is_correct = (user_diagnosis == correct_category or 
+                                   (user_diagnosis == "正常" and correct_category == "Normal") or
+                                   (user_diagnosis == "Normal" and correct_category == "正常"))
+                        
+                        mistake["is_retried"] = True
+                        mistake["last_choice"] = user_diagnosis
+                        mistake["retry_result"] = "correct" if is_correct else "wrong"
+                        updated_count += 1
+            
+            if updated_count > 0:
+                with open(mistake_file, "w", encoding="utf-8") as f:
+                    json.dump(mistake_data, f, ensure_ascii=False, indent=2)
+            
+            return {
+                "message": f"已更新 {updated_count} 条错题记录",
+                "updated_count": updated_count
+            }
+        
+        finally:
+            if lock_path.exists(): lock_path.unlink()
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ 提交错题回顾失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
