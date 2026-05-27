@@ -1546,8 +1546,8 @@ async def create_mistake_review_task(request: Request):
             # 创建 .processing 标记
             (temp_root / ".processing").touch()
             
-            # 获取源目录根路径
-            source_root = SYSTEM_EDU_DIR / "oridata"
+            # 获取源目录根路径（processed 目录存放视频）
+            source_root = SYSTEM_EDU_DIR / "processed"
             
             # 创建软链接
             created_cases = []
@@ -1556,23 +1556,12 @@ async def create_mistake_review_task(request: Request):
             
             for mistake in accessible_mistakes:
                 sub_id = mistake["submission_id"]
-                case_name = mistake.get("case_name", "")
-                # 找到对应的 case_id
-                case_id = None
-                # 从 epoch_data.json 获取 case_id
-                epoch_path = source_root / sub_id / "epoch_data.json"
-                if epoch_path.exists():
-                    try:
-                        with open(epoch_path, "r", encoding="utf-8") as f:
-                            epoch_data = json.load(f)
-                        for pid, info in epoch_data.items():
-                            if info.get("display_name") == case_name:
-                                case_id = pid
-                                break
-                    except: pass
+                case_id = mistake.get("case_name", "")  # case_name 就是 case_id
                 
                 if not case_id:
-                    case_id = case_name  # 降级处理
+                    link_failed = True
+                    link_error_msg = f"病例ID为空"
+                    break
                 
                 source_path = source_root / sub_id / case_id
                 target_path = temp_root / case_id

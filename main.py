@@ -1337,8 +1337,9 @@ def record_mistakes_from_stats(username: str, parent_id: str, stats: Dict[str, A
         except Exception as e:
             print(f"⚠️ 读取 epoch_data.json 失败: {e}")
     
-    # 遍历三个阶段，记录错题
-    new_mistake_count = 0
+    # 收集所有错题，用 case_id 作为 key，同 case_id 会被后面的阶段覆盖（保留最后阶段）
+    all_mistakes = {}  # key: patient_id (case_id), value: mistake dict
+    
     for stage_name in ["single", "assist", "review"]:
         stage_stats = stats.get(stage_name, {})
         if not stage_stats:
@@ -1350,12 +1351,12 @@ def record_mistakes_from_stats(username: str, parent_id: str, stats: Dict[str, A
         for i, (gt, user) in enumerate(zip(gt_labels, user_labels)):
             if gt != user:  # 诊断错误
                 patient_id = case_ids[i] if i < len(case_ids) else f"case_{i}"
-                mistake = {
-                    "id": f"mistake_{datetime.now().strftime('%Y%m%d%H%M%S')}_{new_mistake_count}",
+                all_mistakes[patient_id] = {
+                    "id": f"mistake_{datetime.now().strftime('%Y%m%d%H%M%S')}_{len(all_mistakes)}",
                     "submission_id": parent_id,
                     "task_name": task_name,
                     "stage": stage_name,
-                    "case_name": case_name_map.get(patient_id, patient_id),
+                    "case_name": patient_id,  # 直接使用 patient_id 作为显示名
                     "user_wrong_choice": user,
                     "correct_category": gt,
                     "is_retried": False,
@@ -1363,8 +1364,12 @@ def record_mistakes_from_stats(username: str, parent_id: str, stats: Dict[str, A
                     "retry_result": None,
                     "added_time": datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
                 }
-                mistake_data["mistakes"].append(mistake)
-                new_mistake_count += 1
+    
+    # 将 all_mistakes 转换为列表
+    new_mistake_count = 0
+    for mistake in all_mistakes.values():
+        mistake_data["mistakes"].append(mistake)
+        new_mistake_count += 1
     
     # 写入文件（需要锁）
     lock_path = mistake_file.with_suffix('.json.lock')

@@ -104,8 +104,13 @@
                   <h2 style="color:#1e293b; font-size:18px;">📝 错题回顾</h2>
                   <button onclick="closeMistakeReviewModal()" style="background:none; border:none; font-size:24px; cursor:pointer;">×</button>
               </div>
-              <div style="display:flex; gap:20px; margin-top:10px;">
+              <div style="display:flex; gap:20px; margin-top:10px; align-items:center;">
                   <span id="mistakeCountText" style="color:#64748b;">可访问: 0 | 已失效: 0</span>
+                  <div style="margin-left:auto; display:flex; gap:10px;">
+                      <button onclick="selectAllMistakes()" class="btn btn-view" style="padding:5px 10px; font-size:12px;">全选</button>
+                      <button onclick="clearAllSelection()" class="btn btn-view" style="padding:5px 10px; font-size:12px;">清除选择</button>
+                      <button onclick="deleteExpiredMistakes()" class="btn btn-view" style="padding:5px 10px; font-size:12px; color:#ef4444;">删除失效</button>
+                  </div>
               </div>
           </div>
           <div id="mistakeReviewContent" style="flex:1; overflow-y:auto; padding:15px;">
@@ -1420,7 +1425,7 @@ function showTripleStageReport(parentId, name, singleData, assistData, reviewDat
               const isSelected = selectedMistakeIds.includes(m.id);
               const retryStatus = m.is_retried ? (m.retry_result === 'correct' ? '✅ 已重做正确' : '❌ 已重做仍错') : '⏳ 未重做';
               html += `
-                  <div class="mistake-item ${isSelected ? 'selected' : ''}" onclick="toggleMistakeSelection('${m.id}')" 
+                  <div class="mistake-item ${isSelected ? 'selected' : ''}" data-id="${m.id}" onclick="toggleMistakeSelection('${m.id}')" 
                        style="padding:12px; border:2px solid ${isSelected ? '#10b981' : '#e2e8f0'}; border-radius:8px; margin-bottom:8px; cursor:pointer; background:${isSelected ? '#ecfdf5' : 'white'}; font-weight:${isSelected ? '700' : '400'};">
                       <div style="display:flex; justify-content:space-between;">
                           <span style="font-weight:600;">${m.case_name}</span>
@@ -1526,7 +1531,68 @@ function showTripleStageReport(parentId, name, singleData, assistData, reviewDat
       } else {
           selectedMistakeIds.push(mistakeId);
       }
-      renderMistakeReviewModal();
+      updateSingleMistakeItemUI(mistakeId);
+      updateSelectAllButton();
+  }
+
+  function updateSingleMistakeItemUI(mistakeId) {
+      const item = document.querySelector(`.mistake-item[data-id='${mistakeId}']`);
+      if (!item) return;
+      const isSelected = selectedMistakeIds.includes(mistakeId);
+      item.style.borderColor = isSelected ? '#10b981' : '#e2e8f0';
+      item.style.background = isSelected ? '#ecfdf5' : 'white';
+      item.style.fontWeight = isSelected ? '700' : '400';
+      item.classList.toggle('selected', isSelected);
+  }
+
+  function updateAllMistakeItemsUI() {
+      document.querySelectorAll('.mistake-item').forEach(item => {
+          const id = item.getAttribute('data-id');
+          const isSelected = selectedMistakeIds.includes(id);
+          item.style.borderColor = isSelected ? '#10b981' : '#e2e8f0';
+          item.style.background = isSelected ? '#ecfdf5' : 'white';
+          item.style.fontWeight = isSelected ? '700' : '400';
+          item.classList.toggle('selected', isSelected);
+      });
+      updateSelectAllButton();
+  }
+
+  function updateSelectAllButton() {
+      const startBtn = document.getElementById('btnMistakeReviewStart');
+      startBtn.disabled = selectedMistakeIds.length === 0;
+      startBtn.style.opacity = selectedMistakeIds.length === 0 ? '0.5' : '1';
+  }
+
+  function selectAllMistakes() {
+      const accessible = currentMistakeData.accessible_mistakes || [];
+      const wrongMistakes = accessible.filter(m => !m.is_retried || m.retry_result !== 'correct');
+      selectedMistakeIds = wrongMistakes.map(m => m.id);
+      updateAllMistakeItemsUI();
+  }
+
+  function clearAllSelection() {
+      selectedMistakeIds = [];
+      updateAllMistakeItemsUI();
+  }
+
+  async function deleteExpiredMistakes() {
+      if (!currentUser || !currentUser.username) return;
+      const expired = currentMistakeData.expired_mistakes || [];
+      if (expired.length === 0) {
+          alert('没有失效题目需要删除');
+          return;
+      }
+      if (!confirm(`确定删除 ${expired.length} 个失效题目吗？`)) return;
+      
+      for (const m of expired) {
+          await fetch(`/api/edu/mistakes/${m.id}`, {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ username: currentUser.username })
+          });
+      }
+      // 重新加载
+      openMistakeReviewModal();
   }
 
   async function startMistakeReview() {
