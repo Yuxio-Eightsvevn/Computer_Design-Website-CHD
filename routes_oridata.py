@@ -1,5 +1,5 @@
 # routes_oridata.py
-from fastapi import APIRouter, UploadFile, File, HTTPException, Form, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, HTTPException, Form, BackgroundTasks, Request
 from typing import List, Dict
 from pathlib import Path, PurePosixPath
 import datetime
@@ -897,51 +897,65 @@ async def get_edu_task_detail_status(submission_id: str):
 async def unpublish_edu_task(submission_id: str = Form(...)):
     """取消发布任务：清空所有用户成绩并更新状态为未发布"""
     index_path = SYSTEM_EDU_DIR / "data.json"
-    if not index_path.exists():
-        raise HTTPException(status_code=404, detail="任务索引文件不存在")
+    lock_path = SYSTEM_EDU_DIR / "data.json.lock"
     
-    with open(index_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
+    # 获取文件锁
+    acquired = False
+    for _ in range(50):
+        try:
+            with open(lock_path, "x") as _: pass
+            acquired = True; break
+        except FileExistsError: time.sleep(0.1)
+    if not acquired: raise HTTPException(status_code=503, detail="系统繁忙，请稍后重试")
     
-    task = next((t for t in data.get("tasks", []) if t["submission_id"] == submission_id), None)
-    if not task:
-        raise HTTPException(status_code=404, detail="任务不存在")
-    
-    if task.get("status") != "published":
-        raise HTTPException(status_code=400, detail="任务未发布，无法取消发布")
-    
-    target_users = task.get("target_users", [])
-    is_dual_stage = task.get("is_dual_stage", False)
-    
-    for username in target_users:
-        result_file = EDU_RESULTS_DIR / f"{username}.json"
-        if result_file.exists():
-            try:
-                with open(result_file, "r", encoding="utf-8") as f:
-                    user_data = json.load(f)
-                # 新格式：直接删除父键（包含stages嵌套结构，三阶段也适用）
-                if submission_id in user_data:
-                    del user_data[submission_id]
-                # 旧格式后缀结构（兼容旧数据）
-                if f"{submission_id}_SINGLE" in user_data:
-                    del user_data[f"{submission_id}_SINGLE"]
-                if f"{submission_id}_AI-ASSIST" in user_data:
-                    del user_data[f"{submission_id}_AI-ASSIST"]
-                if f"{submission_id}_REVIEW" in user_data:
-                    del user_data[f"{submission_id}_REVIEW"]
-                with open(result_file, "w", encoding="utf-8") as f:
-                    json.dump(user_data, f, ensure_ascii=False, indent=2)
-            except Exception as e:
-                print(f"清空用户 {username} 成绩失败: {e}")
-    
-    task["status"] = "unreleased"
-    if "target_users" in task:
-        del task["target_users"]
-    
-    with open(index_path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-    
-    return {"message": "任务已取消发布，成绩已清空"}
+    try:
+        if not index_path.exists():
+            raise HTTPException(status_code=404, detail="任务索引文件不存在")
+        
+        with open(index_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        
+        task = next((t for t in data.get("tasks", []) if t["submission_id"] == submission_id), None)
+        if not task:
+            raise HTTPException(status_code=404, detail="任务不存在")
+        
+        if task.get("status") != "published":
+            raise HTTPException(status_code=400, detail="任务未发布，无法取消发布")
+        
+        target_users = task.get("target_users", [])
+        is_dual_stage = task.get("is_dual_stage", False)
+        
+        for username in target_users:
+            result_file = EDU_RESULTS_DIR / f"{username}.json"
+            if result_file.exists():
+                try:
+                    with open(result_file, "r", encoding="utf-8") as f:
+                        user_data = json.load(f)
+                    # 新格式：直接删除父键（包含stages嵌套结构，三阶段也适用）
+                    if submission_id in user_data:
+                        del user_data[submission_id]
+                    # 旧格式后缀结构（兼容旧数据）
+                    if f"{submission_id}_SINGLE" in user_data:
+                        del user_data[f"{submission_id}_SINGLE"]
+                    if f"{submission_id}_AI-ASSIST" in user_data:
+                        del user_data[f"{submission_id}_AI-ASSIST"]
+                    if f"{submission_id}_REVIEW" in user_data:
+                        del user_data[f"{submission_id}_REVIEW"]
+                    with open(result_file, "w", encoding="utf-8") as f:
+                        json.dump(user_data, f, ensure_ascii=False, indent=2)
+                except Exception as e:
+                    print(f"清空用户 {username} 成绩失败: {e}")
+        
+        task["status"] = "unreleased"
+        if "target_users" in task:
+            del task["target_users"]
+        
+        with open(index_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        
+        return {"message": "任务已取消发布，成绩已清空"}
+    finally:
+        if lock_path.exists(): lock_path.unlink()
 
 
 @router.get("/api/edu/user/tasks/{username}")
@@ -1397,3 +1411,334 @@ async def clear_stuck_edu_tasks():
         "deleted_folders": deleted_folders,
         "orphans_cleaned": orphans_cleaned
     }
+
+
+# ========== 错题相关 API ==========
+
+@router.get("/api/edu/mistakes/{username}")
+async def get_user_mistakes(username: str):
+    """获取用户的错题列表，分类为可访问和已失效"""
+    mistake_file = SYSTEM_EDU_DIR / "mistake_task" / f"mistake_task_{username}.json"
+    
+    # 读取错题文件
+    mistake_data = {"username": username, "mistakes": []}
+    if mistake_file.exists():
+        try:
+            with open(mistake_file, "r", encoding="utf-8") as f:
+                content = f.read().strip()
+                if content:
+                    mistake_data = json.loads(content)
+        except Exception as e:
+            print(f"⚠️ 读取错题文件失败: {e}")
+    
+    # 读取 data.json 获取任务状态
+    index_path = SYSTEM_EDU_DIR / "data.json"
+    task_status_map = {}
+    if index_path.exists():
+        try:
+            with open(index_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            for t in data.get("tasks", []):
+                task_status_map[t["submission_id"]] = t.get("status", "unknown")
+        except Exception as e:
+            print(f"⚠️ 读取任务索引失败: {e}")
+    
+    # 分类错题
+    accessible_mistakes = []
+    expired_mistakes = []
+    
+    for mistake in mistake_data.get("mistakes", []):
+        sub_id = mistake.get("submission_id", "")
+        if sub_id in task_status_map and task_status_map[sub_id] == "published":
+            accessible_mistakes.append(mistake)
+        else:
+            expired_mistakes.append(mistake)
+    
+    # 按重做状态排序：未重做的在上，已重做的在下
+    def sort_key(m):
+        return (m.get("is_retried", False), m.get("added_time", ""))
+    
+    accessible_mistakes.sort(key=sort_key)
+    expired_mistakes.sort(key=sort_key)
+    
+    return {
+        "accessible_mistakes": accessible_mistakes,
+        "expired_mistakes": expired_mistakes
+    }
+
+
+@router.post("/api/edu/mistakes/review")
+async def create_mistake_review_task(request: Request):
+    """创建临时错题任务"""
+    try:
+        body = await request.json()
+        mistake_ids = body.get("mistake_ids", [])
+        username = body.get("username", "")
+        
+        if not mistake_ids or not username:
+            raise HTTPException(status_code=400, detail="参数不完整")
+        
+        # 获取文件锁
+        lock_path = SYSTEM_EDU_DIR / "data.json.lock"
+        acquired = False
+        for _ in range(50):
+            try:
+                with open(lock_path, "x") as _: pass
+                acquired = True; break
+            except FileExistsError: time.sleep(0.1)
+        if not acquired:
+            raise HTTPException(status_code=503, detail="系统繁忙，请稍后重试")
+        
+        try:
+            # 读取 data.json 获取任务路径映射
+            index_path = SYSTEM_EDU_DIR / "data.json"
+            if not index_path.exists():
+                raise HTTPException(status_code=404, detail="任务索引文件不存在")
+            
+            with open(index_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            
+            task_map = {t["submission_id"]: t for t in data.get("tasks", [])}
+            
+            # 读取错题文件获取详细信息
+            mistake_file = SYSTEM_EDU_DIR / "mistake_task" / f"mistake_task_{username}.json"
+            mistake_data = {"mistakes": []}
+            if mistake_file.exists():
+                try:
+                    with open(mistake_file, "r", encoding="utf-8") as f:
+                        content = f.read().strip()
+                        if content:
+                            mistake_data = json.loads(content)
+                except: pass
+            
+            mistake_map = {m["id"]: m for m in mistake_data.get("mistakes", [])}
+            
+            # 分类错题
+            accessible_mistakes = []
+            expired_mistakes = []
+            
+            for mid in mistake_ids:
+                if mid not in mistake_map:
+                    continue
+                mistake = mistake_map[mid]
+                sub_id = mistake.get("submission_id", "")
+                
+                if sub_id in task_map and task_map[sub_id].get("status") == "published":
+                    accessible_mistakes.append(mistake)
+                else:
+                    expired_mistakes.append(mistake)
+            
+            # 如果有失效题目，返回提示
+            if expired_mistakes:
+                return {
+                    "has_expired": True,
+                    "accessible_count": len(accessible_mistakes),
+                    "expired_count": len(expired_mistakes),
+                    "expired_mistakes": expired_mistakes
+                }
+            
+            # 创建临时任务目录
+            import datetime as dt
+            temp_id = f"temp_{dt.datetime.now().strftime('%Y%m%d%H%M%S')}"
+            temp_root = SYSTEM_EDU_DIR / "mistake_temp" / temp_id
+            temp_root.mkdir(parents=True, exist_ok=True)
+            
+            # 创建 .processing 标记
+            (temp_root / ".processing").touch()
+            
+            # 获取源目录根路径
+            source_root = SYSTEM_EDU_DIR / "oridata"
+            
+            # 创建软链接
+            created_cases = []
+            link_failed = False
+            link_error_msg = ""
+            
+            for mistake in accessible_mistakes:
+                sub_id = mistake["submission_id"]
+                case_name = mistake.get("case_name", "")
+                # 找到对应的 case_id
+                case_id = None
+                # 从 epoch_data.json 获取 case_id
+                epoch_path = source_root / sub_id / "epoch_data.json"
+                if epoch_path.exists():
+                    try:
+                        with open(epoch_path, "r", encoding="utf-8") as f:
+                            epoch_data = json.load(f)
+                        for pid, info in epoch_data.items():
+                            if info.get("display_name") == case_name:
+                                case_id = pid
+                                break
+                    except: pass
+                
+                if not case_id:
+                    case_id = case_name  # 降级处理
+                
+                source_path = source_root / sub_id / case_id
+                target_path = temp_root / case_id
+                
+                if not source_path.exists():
+                    link_failed = True
+                    link_error_msg = f"病例源目录不存在: {source_path}"
+                    break
+                
+                try:
+                    # 跨平台创建软链接
+                    if target_path.exists() or target_path.is_symlink():
+                        target_path.unlink()
+                    target_path.symlink_to(source_path)
+                    created_cases.append(case_id)
+                except OSError as e:
+                    if e.winerror == 1314:  # Windows 权限不足
+                        link_failed = True
+                        link_error_msg = "创建软链接失败，请检查系统权限设置（需要管理员权限或启用开发者模式）"
+                    else:
+                        link_failed = True
+                        link_error_msg = f"创建软链接失败: {str(e)}"
+                    break
+            
+            # 清理失败的临时目录
+            if link_failed:
+                if temp_root.exists():
+                    import shutil
+                    shutil.rmtree(temp_root)
+                raise HTTPException(status_code=500, detail=link_error_msg)
+            
+            # 创建索引文件
+            index_data = {
+                "temp_id": temp_id,
+                "created_at": dt.datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+                "username": username,
+                "mistake_ids": mistake_ids,
+                "case_ids": created_cases,
+                "case_names": [m.get("case_name", "") for m in accessible_mistakes]
+            }
+            with open(temp_root / "data.json", "w", encoding="utf-8") as f:
+                json.dump(index_data, f, ensure_ascii=False, indent=2)
+            
+            # 删除 .processing 标记
+            (temp_root / ".processing").unlink()
+            
+            return {
+                "has_expired": False,
+                "temp_task_id": temp_id,
+                "accessible_count": len(accessible_mistakes),
+                "case_ids": created_cases
+            }
+        
+        finally:
+            if lock_path.exists(): lock_path.unlink()
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ 创建临时错题任务失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/api/edu/mistakes/{mistake_id}")
+async def delete_mistake_record(request: Request, mistake_id: str):
+    """删除指定的错题记录"""
+    try:
+        body = await request.json()
+        username = body.get("username", "")
+        
+        if not username:
+            raise HTTPException(status_code=400, detail="参数不完整")
+        
+        mistake_file = SYSTEM_EDU_DIR / "mistake_task" / f"mistake_task_{username}.json"
+        
+        # 获取文件锁
+        lock_path = mistake_file.with_suffix('.json.lock')
+        acquired = False
+        for _ in range(50):
+            try:
+                with open(lock_path, "x") as _: pass
+                acquired = True; break
+            except FileExistsError: time.sleep(0.1)
+        if not acquired:
+            raise HTTPException(status_code=503, detail="系统繁忙，请稍后重试")
+        
+        try:
+            mistake_data = {"username": username, "mistakes": []}
+            if mistake_file.exists():
+                try:
+                    with open(mistake_file, "r", encoding="utf-8") as f:
+                        content = f.read().strip()
+                        if content:
+                            mistake_data = json.loads(content)
+                except: pass
+            
+            # 过滤掉要删除的错题
+            original_count = len(mistake_data.get("mistakes", []))
+            mistake_data["mistakes"] = [m for m in mistake_data.get("mistakes", []) if m.get("id") != mistake_id]
+            deleted_count = original_count - len(mistake_data["mistakes"])
+            
+            if deleted_count > 0:
+                with open(mistake_file, "w", encoding="utf-8") as f:
+                    json.dump(mistake_data, f, ensure_ascii=False, indent=2)
+            
+            return {"message": f"已删除 {deleted_count} 条错题记录"}
+        finally:
+            if lock_path.exists(): lock_path.unlink()
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ 删除错题记录失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/api/edu/mistakes/{mistake_id}")
+async def update_mistake_record(request: Request, mistake_id: str):
+    """更新错题记录（如标记为已重做）"""
+    try:
+        body = await request.json()
+        username = body.get("username", "")
+        updates = body.get("updates", {})
+        
+        if not username:
+            raise HTTPException(status_code=400, detail="参数不完整")
+        
+        mistake_file = SYSTEM_EDU_DIR / "mistake_task" / f"mistake_task_{username}.json"
+        
+        # 获取文件锁
+        lock_path = mistake_file.with_suffix('.json.lock')
+        acquired = False
+        for _ in range(50):
+            try:
+                with open(lock_path, "x") as _: pass
+                acquired = True; break
+            except FileExistsError: time.sleep(0.1)
+        if not acquired:
+            raise HTTPException(status_code=503, detail="系统繁忙，请稍后重试")
+        
+        try:
+            mistake_data = {"username": username, "mistakes": []}
+            if mistake_file.exists():
+                try:
+                    with open(mistake_file, "r", encoding="utf-8") as f:
+                        content = f.read().strip()
+                        if content:
+                            mistake_data = json.loads(content)
+                except: pass
+            
+            # 找到并更新错题
+            updated = False
+            for mistake in mistake_data.get("mistakes", []):
+                if mistake.get("id") == mistake_id:
+                    mistake.update(updates)
+                    updated = True
+                    break
+            
+            if updated:
+                with open(mistake_file, "w", encoding="utf-8") as f:
+                    json.dump(mistake_data, f, ensure_ascii=False, indent=2)
+            
+            return {"message": "更新成功" if updated else "未找到错题记录"}
+        finally:
+            if lock_path.exists(): lock_path.unlink()
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ 更新错题记录失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

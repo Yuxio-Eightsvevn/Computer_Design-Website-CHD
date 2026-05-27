@@ -1305,6 +1305,7 @@
         let currentModality = 'original'; // 当前选择的模态：original, heatmap, bbox
         let isNegativeDiagnosis = false; // 标记当前病例是否为阴性（AI判别为Normal）
         let patients = [];
+        let displayOrder = [];  // 存储原始 display_order，用于提交时按原始顺序排列
         let diagnosisRecords = {}; // 存储所有病人的诊断记录 {patientId: {diagnosis, severity}}
         let taskInfo = {
             username: '',
@@ -1475,7 +1476,7 @@
                 } else if (currentMode === 'edu' && eduSubMode === 'single') {
                     shuffleEnabled = false;
                 } else {
-                    shuffleEnabled = true; // assist 或 review
+                    shuffleEnabled = false; // assist 或 review (暂时禁用)
                 }
             }
             console.log('🎲 shuffleEnabled =', shuffleEnabled);
@@ -1652,6 +1653,7 @@
                 }
                 
                 patients = result.data;
+                displayOrder = result.display_order || [];  // 保存 display_order 用于提交时排序
                 console.log('病人列表:', patients);
                 console.log('病人数量:', patients ? patients.length : 0);
                 
@@ -2921,12 +2923,22 @@ function selectOption(element, group) {
                             formatted: formattedTime
                         },
                         patientCount: Object.keys(diagnosisRecords).length,
-                        records: Object.values(diagnosisRecords).map(record => ({
-                            patientId: record.patientId,
-                            diagnosis: record.diagnosis,
-                            severity: record.severity,
-                            viewTime: patientViewTimes[record.patientId] || 0
-                        })),
+                        records: (() => {
+                            // 按 display_order 排序后的 patientId 列表
+                            const orderedPatientIds = displayOrder.length > 0
+                                ? [...patients].sort((a, b) => displayOrder.indexOf(a.id) - displayOrder.indexOf(b.id)).map(p => p.id)
+                                : patients.map(p => p.id);
+                            // 按排序后的顺序构建 records
+                            return orderedPatientIds.map(patientId => {
+                                const record = diagnosisRecords[patientId];
+                                return {
+                                    patientId: record.patientId,
+                                    diagnosis: record.diagnosis,
+                                    severity: record.severity,
+                                    viewTime: patientViewTimes[patientId] || 0
+                                };
+                            });
+                        })(),
                         skip_llm: taskInfo.rerunMode || false
                     };
                     

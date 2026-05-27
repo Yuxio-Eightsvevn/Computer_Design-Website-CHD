@@ -427,13 +427,14 @@ async def get_task_patients(username: str, task_folder: str):
     user_proc_root = Path(DATA_BATCH_STORAGE) / username / "processed"
     user_root_root = Path(DATA_BATCH_STORAGE) / username
     system_edu_root = Path(DATA_BATCH_STORAGE) / "SYSTEM" / "edu_data" / "processed"
+    system_mistake_temp_root = Path(DATA_BATCH_STORAGE) / "SYSTEM" / "edu_data" / "mistake_temp"
 
     task_path = None
     final_task_id = task_folder 
     # 用于动态构造 URL 的路径前缀
     base_prefix = "" 
 
-    # 智慧寻址优先级：私有结果 > 私有根目录 > 系统教育目录
+    # 智慧寻址优先级：私有结果 > 私有根目录 > 系统教育目录 > 临时错题任务
     if (user_proc_root / task_folder).exists():
         task_path = user_proc_root / task_folder
         base_prefix = f"{username}/processed"
@@ -444,6 +445,10 @@ async def get_task_patients(username: str, task_folder: str):
         task_path = system_edu_root / task_folder
         base_prefix = "SYSTEM/edu_data/processed"
         print(f"🎓 教育模式：已定位到系统公共资源库 {task_folder}")
+    elif (system_mistake_temp_root / task_folder).exists():
+        task_path = system_mistake_temp_root / task_folder
+        base_prefix = "SYSTEM/edu_data/mistake_temp"
+        print(f"📝 临时错题任务：已定位到 {task_folder}")
     # 模糊匹配逻辑 (仅针对私有目录，保持原文)
     elif user_proc_root.exists():
         print(f"🔍 正在执行长短名模糊匹配: 目标是 {task_folder}")
@@ -1280,6 +1285,111 @@ async def submit_diagnosis_json(request: DiagnosisSubmitJsonRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def record_mistakes_from_stats(username: str, parent_id: str, stats: Dict[str, Any]):
+    """
+    从 stats 中分析并记录错题
+    仅在三阶段综合分析完成时调用
+    """
+    from pathlib import Path as Path2
+    import time
+    
+    SYSTEM_EDU_DIR = Path2(DATA_BATCH_STORAGE) / "SYSTEM" / "edu_data"
+    mistake_dir = SYSTEM_EDU_DIR / "mistake_task"
+    mistake_dir.mkdir(parents=True, exist_ok=True)
+    mistake_file = mistake_dir / f"mistake_task_{username}.json"
+    
+    # 读取现有数据
+    mistake_data = {"username": username, "mistakes": []}
+    if mistake_file.exists():
+        try:
+            with open(mistake_file, "r", encoding="utf-8") as f:
+                content = f.read().strip()
+                if content:
+                    mistake_data = json.loads(content)
+        except Exception as e:
+            print(f"⚠️ 读取错题文件失败: {e}")
+    
+    # 获取任务信息（用于task_name）
+    task_name = parent_id
+    index_path = SYSTEM_EDU_DIR / "data.json"
+    if index_path.exists():
+        try:
+            with open(index_path, "r", encoding="utf-8") as f:
+                index_data = json.load(f)
+            for t in index_data.get("tasks", []):
+                if t.get("submission_id") == parent_id:
+                    task_name = t.get("request_name", parent_id)
+                    break
+        except Exception as e:
+            print(f"⚠️ 读取任务索引失败: {e}")
+    
+    # 获取病例名映射（从 epoch_data.json）
+    epoch_path = SYSTEM_EDU_DIR / "oridata" / parent_id / "epoch_data.json"
+    case_name_map = {}
+    case_ids = []
+    if epoch_path.exists():
+        try:
+            with open(epoch_path, "r", encoding="utf-8") as f:
+                epoch_data = json.load(f)
+            for patient_id, info in epoch_data.items():
+                case_name_map[patient_id] = info.get("display_name", patient_id)
+                case_ids.append(patient_id)
+        except Exception as e:
+            print(f"⚠️ 读取 epoch_data.json 失败: {e}")
+    
+    # 遍历三个阶段，记录错题
+    new_mistake_count = 0
+    for stage_name in ["single", "assist", "review"]:
+        stage_stats = stats.get(stage_name, {})
+        if not stage_stats:
+            continue
+        
+        gt_labels = stage_stats.get("ground_truth_labels", [])
+        user_labels = stage_stats.get("user_labels", [])
+        
+        for i, (gt, user) in enumerate(zip(gt_labels, user_labels)):
+            if gt != user:  # 诊断错误
+                patient_id = case_ids[i] if i < len(case_ids) else f"case_{i}"
+                mistake = {
+                    "id": f"mistake_{datetime.now().strftime('%Y%m%d%H%M%S')}_{new_mistake_count}",
+                    "submission_id": parent_id,
+                    "task_name": task_name,
+                    "stage": stage_name,
+                    "case_name": case_name_map.get(patient_id, patient_id),
+                    "user_wrong_choice": user,
+                    "correct_category": gt,
+                    "is_retried": False,
+                    "last_choice": None,
+                    "retry_result": None,
+                    "added_time": datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+                }
+                mistake_data["mistakes"].append(mistake)
+                new_mistake_count += 1
+    
+    # 写入文件（需要锁）
+    lock_path = mistake_file.with_suffix('.json.lock')
+    acquired = False
+    for _ in range(50):
+        try:
+            with open(lock_path, "x") as _: pass
+            acquired = True; break
+        except FileExistsError: time.sleep(0.1)
+    
+    if not acquired:
+        print(f"⚠️ 无法获取错题文件锁，跳过记录")
+        return 0
+    
+    try:
+        if new_mistake_count > 0:
+            with open(mistake_file, "w", encoding="utf-8") as f:
+                json.dump(mistake_data, f, ensure_ascii=False, indent=2)
+            print(f"📝 记录了 {new_mistake_count} 条新错题到 {mistake_file}")
+    finally:
+        if lock_path.exists(): lock_path.unlink()
+    
+    return new_mistake_count
+
+
 async def analyze_with_llm(username: str, parent_id: str, stage: str, stats: Dict[str, Any]):
     """
     异步调用大模型分析
@@ -1362,6 +1472,11 @@ async def analyze_with_llm(username: str, parent_id: str, stage: str, stats: Dic
                     json.dump(user_data, f, ensure_ascii=False, indent=2)
                 
                 print(f"✅ 大模型分析完成: {username} - {parent_id}/{stage}")
+                
+                # 三阶段综合分析完成后记录错题
+                if stage == "triple":
+                    print(f"🔍 [AI分析] 三阶段分析完成，开始记录错题...")
+                    record_mistakes_from_stats(username, parent_id, stats)
             else:
                 print(f"⚠️ [AI分析] 成绩单中未找到父任务: {parent_id}")
         else:
