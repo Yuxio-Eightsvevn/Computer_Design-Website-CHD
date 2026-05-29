@@ -1783,48 +1783,51 @@ async def get_task_download_info(username: str, submission_id: str):
 async def serve_video_3d_modal():
     return FileResponse("UI/video_3d_modal.js", media_type="application/javascript")
 
+_NO_CACHE_HEADERS = {
+    "Cache-Control": "no-cache, no-store, must-revalidate",
+    "Pragma": "no-cache",
+    "Expires": "0",
+}
+
+def html_response(path: str) -> FileResponse:
+    return FileResponse(path, headers=_NO_CACHE_HEADERS)
+
 @app.get("/login")
 async def serve_login():
-    return FileResponse("UI/login.html")
+    return html_response("UI/login.html")
 
 @app.get("/dashboard")
 async def serve_dashboard():
-    return FileResponse("UI/dashboard.html")
+    return html_response("UI/dashboard.html")
 
 @app.get("/admin")
 async def serve_admin():
-    return FileResponse("UI/admin.html")
+    return html_response("UI/admin.html")
 
 @app.get("/diagnosis")
 async def serve_diagnosis():
-    return FileResponse("UI/diagnosis.html")
+    return html_response("UI/diagnosis.html")
 
 
 @app.get("/flow")
 async def serve_flow():
-    return FileResponse("UI/flow.html")
+    return html_response("UI/flow.html")
 
 @app.get("/")
 async def root():
-    return FileResponse("UI/login.html")
+    return html_response("UI/login.html")
 
 @app.get("/task_status")
 async def serve_task_status():
-    """返回任务状态进度页面"""
-    return FileResponse("UI/task_status.html")
+    return html_response("UI/task_status.html")
 
 @app.get("/edu_status")
-async def serve_edu_status(): return FileResponse("UI/edu_status.html")
+async def serve_edu_status():
+    return html_response("UI/edu_status.html")
 
 @app.get("/edu_admin")
 async def serve_edu_admin():
-    """返回教育模式管理页面"""
-    return FileResponse("UI/edu_admin.html")
-
-@app.get("/edu_admin")
-async def serve_edu_admin():
-    """返回教育模式管理端页面"""
-    return FileResponse("UI/edu_admin.html")
+    return html_response("UI/edu_admin.html")
 
 if __name__ == "__main__":
     import uvicorn

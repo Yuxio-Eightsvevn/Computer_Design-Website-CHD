@@ -1,7 +1,8 @@
 <!DOCTYPE html>
-<html>
+<html data-i18n-title="login.page_title">
 <head>
     <title>登录 - CHD-AIDE</title>
+    <script src="/res/share/i18n.js"></script>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -396,17 +397,17 @@
     <div class="login-modal" id="loginModal">
         <div class="login-modal-card">
             <span class="close-btn" onclick="closeLoginModal()">&times;</span>
-            <h2>登录</h2>
+            <h2 data-i18n="login.modal_title">登录</h2>
             <div class="error-msg" id="loginError"></div>
             <div class="form-group">
-                <label>用户名</label>
-                <input type="text" id="loginUsername" placeholder="请输入用户名" required>
+                <label data-i18n="login.form_username_label">用户名</label>
+                <input type="text" id="loginUsername" placeholder="请输入用户名" data-i18n-placeholder="login.form_username_placeholder" required>
             </div>
             <div class="form-group">
-                <label>密码</label>
-                <input type="password" id="loginPassword" placeholder="请输入密码" required>
+                <label data-i18n="login.form_password_label">密码</label>
+                <input type="password" id="loginPassword" placeholder="请输入密码" data-i18n-placeholder="login.form_password_placeholder" required>
             </div>
-            <button class="login-btn" id="loginBtn" onclick="doLogin()">登录</button>
+            <button class="login-btn" id="loginBtn" onclick="doLogin()" data-i18n="login.btn_login">登录</button>
         </div>
     </div>
 
@@ -422,6 +423,7 @@
         var carouselInterval = null;
 
         async function loadConfig() {
+            await i18n.load('zh');
             try {
                 var resp = await fetch('UI/login_config.json');
                 config = await resp.json();
@@ -597,12 +599,12 @@
             var btn = document.getElementById('loginBtn');
 
             if (!username || !password) {
-                showLoginError('请填写用户名和密码');
+                showLoginError(i18n.t('login.err_empty'));
                 return;
             }
 
             btn.disabled = true;
-            btn.textContent = '登录中...';
+            btn.textContent = i18n.t('login.btn_logging_in');
 
             try {
                 var res = await fetch('/api/login', {
@@ -611,13 +613,13 @@
                     body: JSON.stringify({ username, password })
                 });
                 var data = await res.json();
-                if (!res.ok) throw new Error(data.detail || '登录失败');
+                if (!res.ok) throw new Error(data.detail || i18n.t('login.err_failed'));
                 localStorage.setItem('userData', JSON.stringify(data.data));
                 window.location.href = '/flow';
             } catch (e) {
                 showLoginError(e.message);
                 btn.disabled = false;
-                btn.textContent = '登录';
+                btn.textContent = i18n.t('login.btn_login');
             }
         }
 

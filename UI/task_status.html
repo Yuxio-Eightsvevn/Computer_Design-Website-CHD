@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-i18n-title="task_status.page_title">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>任务进度管理 - 儿童先心病诊断平台</title>
+  <script src="/res/share/i18n.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -119,24 +120,24 @@
 
     <div class="main">
       <div class="navbar">
-        <div style="font-weight:700; font-size:18px;">📋 已上传任务进度</div>
-        <button onclick="window.location.href='/dashboard'" class="btn btn-back">返回上传页</button>
+        <div style="font-weight:700; font-size:18px;" data-i18n="task_status.navbar_title">📋 已上传任务进度</div>
+        <button onclick="window.location.href='/dashboard'" class="btn btn-back" data-i18n="task_status.btn_back">返回上传页</button>
       </div>
 
       <div class="card">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
             <h2><span class="status-dot dot-processing"></span>处理中任务 <span id="countBox2" class="badge">0</span></h2>
-            <button class="btn btn-danger btn-sm" onclick="clearAllFailedTasks()" style="padding: 6px 12px; font-size: 13px;">删除所有失败任务</button>
+            <button class="btn btn-danger btn-sm" onclick="clearAllFailedTasks()" style="padding: 6px 12px; font-size: 13px;" data-i18n="task_status.btn_delete_failed">删除所有失败任务</button>
         </div>
         <div id="box2" class="task-list">
-            <div class="empty-hint">暂无正在处理的任务</div>
+            <div class="empty-hint" data-i18n="task_status.empty_processing">暂无正在处理的任务</div>
         </div>
       </div>
 
       <div class="card">
         <h2><span class="status-dot dot-completed"></span>已完成任务 <span id="countBox1" class="badge">0</span></h2>
         <div id="box1" class="task-list">
-            <div class="empty-hint">暂无已完成的任务记录</div>
+            <div class="empty-hint" data-i18n="task_status.empty_completed">暂无已完成的任务记录</div>
         </div>
       </div>
     </div>
@@ -150,7 +151,7 @@
         <button onclick="closeModal()" style="border:none; background:none; cursor:pointer; font-size:24px; color:#94a3b8">&times;</button>
       </div>
       <div id="modalContent"></div>
-      <button onclick="closeModal()" class="btn btn-info" style="width:100%; margin-top:10px; background:#667eea; color:white">关闭</button>
+      <button onclick="closeModal()" class="btn btn-info" style="width:100%; margin-top:10px; background:#667eea; color:white" data-i18n="common.btn_close">关闭</button>
     </div>
   </div>
 
@@ -192,6 +193,7 @@
     }
 
     async function loadUser() {
+        await i18n.load('zh');
       await loadAvatarConfig();
       try {
         const r = await fetch('/api/users/current');
@@ -245,14 +247,14 @@
     function showTaskDetail(task) {
       const content = document.getElementById('modalContent');
       content.innerHTML = `
-        <div class="detail-item"><span class="detail-label">任务名称</span><span class="detail-value">${task.request_name}</span></div>
-        <div class="detail-item"><span class="detail-label">批次ID</span><span class="detail-value" style="font-size:11px">${task.submission_id}</span></div>
-        <div class="detail-item"><span class="detail-label">上传时间</span><span class="detail-value">${task.upload_time}</span></div>
-        <div class="detail-item"><span class="detail-label">当前状态</span><span class="detail-value" style="color: ${task.is_cmp ? '#10b981' : '#3b82f6'}; font-weight:bold">${task.is_cmp ? '已完成' : '模型判读中'}</span></div>
-        ${task.is_cmp ? `<div class="detail-item"><span class="detail-label">完成时间</span><span class="detail-value">${task.cmp_time}</span></div>` : ''}
-        <div class="detail-item"><span class="detail-label">病例数量</span><span class="detail-value">${task.request_case_cnt} 个</span></div>
-        <div class="detail-item"><span class="detail-label">视频总数</span><span class="detail-value">${task.request_video_cnt} 个</span></div>
-        <div class="detail-item"><span class="detail-label">存储路径</span><span class="detail-value" style="font-size:10px; color:#94a3b8; word-break:break-all">${task.request_pos}</span></div>
+        <div class="detail-item"><span class="detail-label" data-i18n="task_status.detail_name">任务名称</span><span class="detail-value">${task.request_name}</span></div>
+        <div class="detail-item"><span class="detail-label" data-i18n="task_status.detail_id">批次ID</span><span class="detail-value" style="font-size:11px">${task.submission_id}</span></div>
+        <div class="detail-item"><span class="detail-label" data-i18n="task_status.detail_upload_time">上传时间</span><span class="detail-value">${task.upload_time}</span></div>
+        <div class="detail-item"><span class="detail-label" data-i18n="task_status.detail_status">当前状态</span><span class="detail-value" style="color: ${task.is_cmp ? '#10b981' : '#3b82f6'}; font-weight:bold">${task.is_cmp ? '已完成' : '模型判读中'}</span></div>
+        ${task.is_cmp ? `<div class="detail-item"><span class="detail-label" data-i18n="task_status.detail_finish_time">完成时间</span><span class="detail-value">${task.cmp_time}</span></div>` : ''}
+        <div class="detail-item"><span class="detail-label" data-i18n="task_status.detail_case_count">病例数量</span><span class="detail-value">${task.request_case_cnt} 个</span></div>
+        <div class="detail-item"><span class="detail-label" data-i18n="task_status.detail_video_count">视频总数</span><span class="detail-value">${task.request_video_cnt} 个</span></div>
+        <div class="detail-item"><span class="detail-label" data-i18n="task_status.detail_path">存储路径</span><span class="detail-value" style="font-size:10px; color:#94a3b8; word-break:break-all">${task.request_pos}</span></div>
       `;
       document.getElementById('modalOverlay').style.display = 'flex';
     }
@@ -272,7 +274,7 @@
             const data = await r.json();
 
             let html = `<div style="margin-bottom:20px">
-                <p class="detail-label" style="margin-bottom:10px; border-left:4px solid #10b981; padding-left:8px;">👨‍⚕️ 医师判读结论报告</p>`;
+                <p class="detail-label" style="margin-bottom:10px; border-left:4px solid #10b981; padding-left:8px;" data-i18n="task_status.section_doctor_report">👨‍⚕️ 医师判读结论报告</p>`;
             
             if (data.doctor_report) {
                 html += `<div class="row-card" style="padding:12px; margin-bottom:5px; background:#f0fdf4; border-color:#bbf7d0">
@@ -282,10 +284,10 @@
                     <a href="${data.doctor_report.url}" download class="btn btn-diag" style="text-decoration:none">下载</a>
                 </div>`;
             } else {
-                html += `<p style="font-size:13px; color:#94a3b8; padding:10px; background:#f8fafc; border-radius:8px; text-align:center;">尚未提交医师判读结论</p>`;
+                html += `<p style="font-size:13px; color:#94a3b8; padding:10px; background:#f8fafc; border-radius:8px; text-align:center;" data-i18n="task_status.empty_no_report">尚未提交医师判读结论</p>`;
             }
 
-            html += `</div><div><p class="detail-label" style="margin-bottom:10px; border-left:4px solid #6366f1; padding-left:8px;">🤖 模型处理原始数据 (ZIP)</p>
+            html += `</div><div><p class="detail-label" style="margin-bottom:10px; border-left:4px solid #6366f1; padding-left:8px;" data-i18n="task_status.section_model_data">🤖 模型处理原始数据 (ZIP)</p>
                      <div style="max-height:200px; overflow-y:auto; padding-right:5px">`;
             
             if (data.model_results && data.model_results.length > 0) {
@@ -296,7 +298,7 @@
                     </div>`;
                 });
             } else {
-                html += `<p style="font-size:13px; color:#94a3b8; text-align:center; padding:10px;">未发现模型输出包</p>`;
+                html += `<p style="font-size:13px; color:#94a3b8; text-align:center; padding:10px;" data-i18n="task_status.empty_no_model_output">未发现模型输出包</p>`;
             }
             html += `</div></div>`;
             container.innerHTML = html;

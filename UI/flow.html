@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-i18n-title="flow.page_title">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>欢迎 - 儿童先心病诊断平台</title>
+  <script src="/res/share/i18n.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -111,28 +112,28 @@
     <div class="header">
       <div id="avatar" class="avatar">U</div>
       <div class="userinfo">
-        <div id="welcomeText" class="welcome">欢迎回来，加载中...</div>
-        <div id="orgText" class="meta">机构：加载中...</div>
+        <div id="welcomeText" class="welcome" data-i18n="flow.welcome_loading">欢迎回来，加载中...</div>
+        <div id="orgText" class="meta" data-i18n="flow.org_loading">机构：加载中...</div>
       </div>
       <div style="flex:1"></div>
       <div>
-        <button id="logoutBtn" class="btn ghost">退出登录</button>
+        <button id="logoutBtn" class="btn ghost" data-i18n="flow.btn_logout">退出登录</button>
       </div>
     </div>
 
-    <div class="hint" style="font-size:18px;margin-bottom:12px;">请选择以下模式开始：</div>
+    <div class="hint" style="font-size:18px;margin-bottom:12px;" data-i18n="flow.hint_select">请选择以下模式开始：</div>
 
     <div class="buttons" role="navigation" aria-label="mode-buttons">
       <div style="display:flex;gap:24px;flex-wrap:wrap;">
-        <button id="diagnoseBtn" class="btn" data-desc-key="diagnoseBtn">诊断模式</button>
-        <button id="eduBtn" class="btn secondary" data-desc-key="eduBtn">教育模式</button>
-        <button id="tasksBtn" class="btn ghost" style="display: none;" data-desc-key="tasksBtn">任务管理</button>
-        <button id="usersBtn" class="btn ghost" style="display: none;" data-desc-key="usersBtn">用户管理</button>
+        <button id="diagnoseBtn" class="btn" data-desc-key="diagnoseBtn" data-i18n="flow.btn_diagnose">诊断模式</button>
+        <button id="eduBtn" class="btn secondary" data-desc-key="eduBtn" data-i18n="flow.btn_edu">教育模式</button>
+        <button id="tasksBtn" class="btn ghost" style="display: none;" data-desc-key="tasksBtn" data-i18n="flow.btn_tasks">任务管理</button>
+        <button id="usersBtn" class="btn ghost" style="display: none;" data-desc-key="usersBtn" data-i18n="flow.btn_users">用户管理</button>
       </div>
-      <div style="color:#6b7280;font-size:13px;white-space:nowrap;">如需切换账号，请先退出再重新登录。</div>
+      <div style="color:#6b7280;font-size:13px;white-space:nowrap;" data-i18n="flow.switch_account_hint">如需切换账号，请先退出再重新登录。</div>
     </div>
 
-    <div id="buttonDesc" style="color:#6b7280;font-size:16px;min-height:24px;margin-top:12px;">请选择需要的功能</div>
+    <div id="buttonDesc" style="color:#6b7280;font-size:16px;min-height:24px;margin-top:12px;" data-i18n="flow.btn_desc_default">请选择需要的功能</div>
   </div>
 
   <script>
@@ -149,11 +150,11 @@
       const buttonDesc = document.getElementById('buttonDesc');
       const allButtons = [diagnoseBtn, eduBtn, tasksBtn, usersBtn, logoutBtn];
       let buttonDescriptions = {
-        diagnoseBtn: '进入诊断模式，进行正式病例诊断',
-        eduBtn: '进入教育模式，进行练习和学习',
-        tasksBtn: '管理教学任务批次',
-        usersBtn: '管理系统用户账号',
-        logoutBtn: '退出当前登录账号'
+        diagnoseBtn: i18n.t('flow.btn_desc_diagnose'),
+        eduBtn: i18n.t('flow.btn_desc_edu'),
+        tasksBtn: i18n.t('flow.btn_desc_tasks'),
+        usersBtn: i18n.t('flow.btn_desc_users'),
+        logoutBtn: i18n.t('flow.btn_desc_logout')
       };
 
       function getCookieValue(name) {
@@ -208,12 +209,13 @@ async function setUserAvatar(avatarElem, username) {
             }
           });
           btn.addEventListener('mouseleave', () => {
-            buttonDesc.textContent = '请选择需要的功能';
+            buttonDesc.textContent = i18n.t('flow.btn_desc_default');
           });
         });
       }
 
       async function loadUser() {
+        await i18n.load('zh');
         await loadAvatarConfig();
         await loadButtonDescriptions();
         setupButtonHoverEvents();
@@ -249,7 +251,7 @@ async function setUserAvatar(avatarElem, username) {
         const uname = username || 'unknown';
         const displayName = doctor || uname;
         welcomeText.textContent = `欢迎回来，${displayName}`;
-        orgText.textContent = org ? `机构：${org}` : '机构：未知机构';
+        orgText.textContent = org ? `机构：${org}` : `机构：${i18n.t('common.unknown_org')}`;
         setUserAvatar(avatar, uname);
 
         // [新增] 根据权限动态显示管理按钮
@@ -270,7 +272,7 @@ async function setUserAvatar(avatarElem, username) {
 
       // 退出登录
       logoutBtn.addEventListener('click', async () => {
-        if (!confirm('确认退出登录？')) return;
+        if (!confirm(i18n.t('flow.confirm_logout'))) return;
         try {
           // 清理localStorage常见键
           ['username','user','currentUser','current_user','auth','token','access_token'].forEach(k=>{ try{ localStorage.removeItem(k);}catch(e){} });

@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-i18n-title="dashboard.page_title">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>任务批次接收 - 儿童先心病诊断平台</title>
+  <script src="/res/share/i18n.js"></script>
   <style>
     /* 样式部分完全保持不变，以维护您的 UI 外观 */
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -81,21 +82,21 @@
         </div>
         <hr style="margin:12px 0;border:none;border-top:1px solid #f0f3ff;">
         <ul style="margin-top:8px;color:#666;font-size:13px;line-height:1.6">
-          <li>每个病例最多 5 个视频。</li>
-          <li>支持文件夹拖拽与自动缩略图。</li>
+          <li data-i18n="dashboard.sidebar_hint_1">每个病例最多 5 个视频。</li>
+          <li data-i18n="dashboard.sidebar_hint_2">支持文件夹拖拽与自动缩略图。</li>
         </ul>
       </div>
     </div>
 
     <div class="main">
       <div class="navbar">
-        <div>👩‍⚕️ 任务批次接收</div>
-        <div><button id="logoutBtn" class="btn secondary">返回</button></div>
+        <div data-i18n="dashboard.navbar_title">👩‍⚕️ 任务批次接收</div>
+        <div><button id="logoutBtn" class="btn secondary" data-i18n="common.btn_back">返回</button></div>
       </div>
 
       <div class="stats-container">
-        <div class="task-count-box">已上传任务数：<span id="uploadedTaskCount" class="task-count-number">-</span></div>
-        <button id="viewTasksBtn" class="btn view-tasks">📋 查看已上传任务</button>
+        <div class="task-count-box"><span data-i18n="dashboard.stats_uploaded">已上传任务数：</span><span id="uploadedTaskCount" class="task-count-number">-</span></div>
+        <button id="viewTasksBtn" class="btn view-tasks" data-i18n="dashboard.btn_view_tasks">📋 查看已上传任务</button>
       </div>
 
       <div class="request-name-container">
@@ -104,24 +105,24 @@
       </div>
 
       <div class="card">
-        <h1>上传任务数据</h1>
+        <h1 data-i18n="dashboard.card_upload_title">上传任务数据</h1>
         <div class="controls">
-          <button id="chooseFolderBtn" class="btn secondary" style="background:#667eea">选择文件夹</button>
+          <button id="chooseFolderBtn" class="btn secondary" style="background:#667eea" data-i18n="dashboard.btn_select_folder">选择文件夹</button>
           <input id="folderInput" type="file" webkitdirectory multiple style="display:none" />
-          <button id="chooseFilesBtn" class="btn secondary" style="background:#667eea">选择视频文件</button>
+          <button id="chooseFilesBtn" class="btn secondary" style="background:#667eea" data-i18n="dashboard.btn_select_files">选择视频文件</button>
           <input id="fileInput" type="file" accept="video/*" multiple style="display:none" />
-          <button id="addCaseBtn" class="btn" style="background:#20c997">新增病例</button>
+          <button id="addCaseBtn" class="btn" style="background:#20c997" data-i18n="dashboard.btn_add_case">新增病例</button>
           <div style="flex:1"></div>
-          <div id="statusHint" class="hint">可拖拽文件夹到下方区域</div>
+          <div id="statusHint" class="hint" data-i18n="dashboard.drag_hint">可拖拽文件夹到下方区域</div>
         </div>
-        <div id="dropzone" class="dropzone">将文件或文件夹拖放到此处</div>
+        <div id="dropzone" class="dropzone" data-i18n="dashboard.dropzone_text">将文件或文件夹拖放到此处</div>
         <div id="messages"></div>
         <div id="rowsContainerWrapper" class="rows-container-wrapper">
           <div id="rowsContainer" class="rows"></div>
         </div>
         <div class="bottom-actions">
-          <button id="clearBtn" class="btn secondary" style="background:#94a3b8">清空</button>
-          <button id="uploadBtn" class="btn">确认上传</button>
+          <button id="clearBtn" class="btn secondary" style="background:#94a3b8" data-i18n="dashboard.btn_clear">清空</button>
+          <button id="uploadBtn" class="btn" data-i18n="dashboard.btn_upload">确认上传</button>
         </div>
       </div>
     </div>
@@ -197,6 +198,7 @@
       }
 
       async function loadCurrentUser() {
+        await i18n.load('zh');
         await loadAvatarConfig();
         try {
           const r = await fetch('/api/users/current');

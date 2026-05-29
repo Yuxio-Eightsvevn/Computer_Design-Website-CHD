@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-i18n-title="edu_admin.page_title">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>教育模式管理 - 儿童先心病诊断平台</title>
+  <script src="/res/share/i18n.js"></script>
   <style>
     /* [新增] 全屏加载遮罩 */
     .global-loading {
@@ -171,15 +172,15 @@
 
     <div class="main">
       <div class="navbar">
-        <div style="font-weight:700; font-size:18px;">🎓 教育模式管理后台</div>
-        <button onclick="window.location.href='/flow'" class="btn btn-ghost" style="background:rgba(255,255,255,0.2); color:white; border:1px solid rgba(255,255,255,0.3)">返回主页</button>
+        <div style="font-weight:700; font-size:18px;" data-i18n="edu_admin.navbar_title">🎓 教育模式管理后台</div>
+        <button onclick="window.location.href='/flow'" class="btn btn-ghost" style="background:rgba(255,255,255,0.2); color:white; border:1px solid rgba(255,255,255,0.3)" data-i18n="edu_admin.btn_back">返回主页</button>
       </div>
 
       <div class="card">
         <div id="dropzone" class="upload-section">
           <input type="file" id="zipInput" accept=".zip" style="display:none">
           <span class="upload-icon">📦</span>
-          <strong>点击或拖拽教育资源压缩包至此</strong>
+          <strong data-i18n="edu_admin.dropzone_title">点击或拖拽教育资源压缩包至此</strong>
           <p style="font-size:12px; color:#94a3b8; margin-top:8px;">( 必须包含 epoch_data.json 和 videos 文件夹 )</p>
         </div>
       </div>
@@ -188,7 +189,7 @@
         <div class="kanban-col">
           <div class="col-title" style="display:flex; justify-content:space-between; align-items:center;">
             <span>🔄 模型判读中 <span id="cnt-processing" style="font-weight:400; color:#94a3b8">0</span></span>
-            <button class="btn" style="padding:4px 10px; font-size:11px; background:#f97316; color:white; border:none; border-radius:4px; font-weight:600;" onclick="clearStuckEduTasks()">⚠️ 清理无效</button>
+            <button class="btn" style="padding:4px 10px; font-size:11px; background:#f97316; color:white; border:none; border-radius:4px; font-weight:600;" onclick="clearStuckEduTasks()" data-i18n="edu_admin.btn_clear_invalid">⚠️ 清理无效</button>
           </div>
           <div id="col-processing"></div>
         </div>
@@ -204,7 +205,7 @@
       
       <!-- 大模型配置卡片 -->
       <div class="card" style="margin-top: 20px;">
-        <h3 style="margin-bottom: 15px;">🤖 大模型配置</h3>
+        <h3 style="margin-bottom: 15px;" data-i18n="edu_admin.card_llm_title">🤖 大模型配置</h3>
         
         <!-- 模型选择下拉框 -->
         <div style="margin: 15px 0;">
@@ -254,7 +255,7 @@
       
       <!-- 模型推理统计卡片 -->
       <div class="card" style="margin-top: 20px;">
-        <h3 style="margin-bottom: 15px;">📊 模型推理统计</h3>
+        <h3 style="margin-bottom: 15px;" data-i18n="edu_admin.card_stats_title">📊 模型推理统计</h3>
         <div id="inferenceStats" style="display: flex; gap: 20px; justify-content: center; padding: 20px 0;">
           <div style="flex: 1; text-align: center;">
             <div style="font-size: 28px; font-weight: 700; color: #667eea;" id="totalInferenceTime">--</div>
@@ -336,8 +337,8 @@
       </div>
       
       <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:20px;">
-        <button onclick="closeModelModal()" class="btn btn-ghost">取消</button>
-        <button onclick="saveModel()" class="btn btn-primary">保存</button>
+        <button onclick="closeModelModal()" class="btn btn-ghost" data-i18n="common.btn_cancel">取消</button>
+        <button onclick="saveModel()" class="btn btn-primary" data-i18n="common.btn_save">保存</button>
       </div>
     </div>
   </div>
@@ -372,10 +373,10 @@
       <p style="font-size:12px; color:#64748b; margin-top:5px;">请选择允许参与判读的医师：</p>
       <div class="user-grid" id="userList"></div>
       <div style="display:flex; gap:10px; justify-content:space-between;">
-        <button class="btn btn-ghost" style="background:#dc3545; color:white;" onclick="deleteEduTask()">🗑️ 删除任务</button>
+        <button class="btn btn-ghost" style="background:#dc3545; color:white;" onclick="deleteEduTask()" data-i18n="edu_admin.btn_delete_task">🗑️ 删除任务</button>
         <div style="display:flex; gap:10px;">
           <button class="btn btn-ghost" onclick="closeModal('publishModal')">取消</button>
-          <button class="btn btn-primary" id="btn-final-publish" style="background:#10b981">确认发布</button>
+          <button class="btn btn-primary" id="btn-final-publish" style="background:#10b981" data-i18n="edu_admin.btn_confirm_publish">确认发布</button>
         </div>
       </div>
     </div>
@@ -407,6 +408,7 @@
     let currentModalToClose = null; // 记录当前打开的弹窗ID，用于删除后关闭
 
     async function init() {
+      await i18n.load('zh');
       fetchTasks();
       loadModels();
       loadInferenceStats();
@@ -954,7 +956,7 @@
             // 已发布任务：显示取消发布和关闭
             footer.innerHTML = `
                 <button class="btn" style="background:#dc3545; color:white; flex:1; padding:10px; border:none; border-radius:6px; cursor:pointer;" onclick="unpublishTask()">取消发布</button>
-                <button class="btn btn-primary" style="flex:1" onclick="closeModal('statusDetailModal')">关闭</button>
+                <button class="btn btn-primary" style="flex:1" onclick="closeModal('statusDetailModal')" data-i18n="common.btn_close">关闭</button>
             `;
         } else if (taskStatus === 'unreleased') {
             // 未发布任务：显示删除、确认发布、关闭（删除在最左侧）

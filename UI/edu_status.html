@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-i18n-title="edu_status.page_title">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>教育练习 - 儿童先心病诊断平台</title>
+  <script src="/res/share/i18n.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -69,19 +70,19 @@
               <div><div id="u-name" style="font-weight:700">加载中...</div><div id="currentUserOrg" style="font-size:14px;color:#666">...</div></div>
             </div>
             <hr style="margin:12px 0;border:none;border-top:1px solid #f1f5f9;">
-            <p style="font-size:14px; color:#64748b; line-height:1.6">点击“开始判读”进行练习。完成后可查收详细评估报告，包含准确率、敏感度等指标。</p>
+            <p style="font-size:14px; color:#64748b; line-height:1.6" data-i18n="edu_status.sidebar_hint">点击"开始判读"进行练习。完成后可查收详细评估报告，包含准确率、敏感度等指标。</p>
         </div>
     </div>
     <div class="main">
       <div class="navbar">
-        <div style="font-size:20px;">🎓 教育练习中心</div>
+        <div style="font-size:20px;" data-i18n="edu_status.navbar_title">🎓 教育练习中心</div>
         <div style="display:flex; gap:10px;">
-            <button onclick="window.location.href='/flow'" class="btn" style="background:rgba(255,255,255,0.2); color:white">返回</button>
+            <button onclick="window.location.href='/flow'" class="btn" style="background:rgba(255,255,255,0.2); color:white" data-i18n="common.btn_back">返回</button>
         </div>
     </div>
       <div class="stats-container">
-        <div class="task-count-box">待纠正错题：<span id="pendingMistakeCount" class="task-count-number">-</span></div>
-        <button onclick="openGlobalMistakeReviewModal()" class="btn view-tasks">📋 全部错题复诊</button>
+        <div class="task-count-box"><span data-i18n="edu_status.stats_pending">待纠正错题：</span><span id="pendingMistakeCount" class="task-count-number">-</span></div>
+        <button onclick="openGlobalMistakeReviewModal()" class="btn view-tasks" data-i18n="edu_status.btn_mistake_review">📋 全部错题复诊</button>
       </div>
       <div id="taskList" class="card">
           <p style="text-align:center; color:#94a3b8">正在拉取分发给您的教学批次...</p>
@@ -94,11 +95,11 @@
       <div class="modal-card" style="display:flex; flex-direction:column; max-height:90vh;">
           <div id="resultModalContent" class="modal-content-scroll" style="flex:1; overflow-y:auto;"></div>
           <div style="display:flex; gap:10px; margin-top:15px; flex-shrink:0;">
-              <button class="btn btn-view" style="flex:1" onclick="closeModal()">关闭</button>
-              <button class="btn btn-start" style="flex:1" id="btn-re-run">重新练习</button>
-              <button class="btn btn-start" style="flex:1; display:none;" id="btn-re-run-single">重新进行独立诊断</button>
-              <button class="btn btn-start" style="flex:1; display:none;" id="btn-re-run-assist">重新进行AI辅助诊断</button>
-              <button class="btn btn-start" style="flex:1; display:none;" id="btn-re-run-review">重新进行独立复诊</button>
+              <button class="btn btn-view" style="flex:1" onclick="closeModal()" data-i18n="common.btn_close">关闭</button>
+              <button class="btn btn-start" style="flex:1" id="btn-re-run" data-i18n="edu_status.btn_retry">重新练习</button>
+              <button class="btn btn-start" style="flex:1; display:none;" id="btn-re-run-single" data-i18n="edu_status.btn_retry_single">重新进行独立诊断</button>
+              <button class="btn btn-start" style="flex:1; display:none;" id="btn-re-run-assist" data-i18n="edu_status.btn_retry_assist">重新进行AI辅助诊断</button>
+              <button class="btn btn-start" style="flex:1; display:none;" id="btn-re-run-review" data-i18n="edu_status.btn_retry_review">重新进行独立复诊</button>
           </div>
       </div>
   </div>
@@ -108,15 +109,15 @@
       <div class="modal-card" style="display:flex; flex-direction:column; width:80%; max-height:85vh;">
           <div style="flex-shrink:0; padding:15px; border-bottom:1px solid #e2e8f0;">
               <div style="display:flex; justify-content:space-between; align-items:center;">
-                  <h2 style="color:#1e293b; font-size:18px;">📝 错题回顾</h2>
+                  <h2 style="color:#1e293b; font-size:18px;" data-i18n="edu_status.modal_mistake_title">📝 错题回顾</h2>
                   <button onclick="closeGlobalMistakeReviewModal()" style="background:none; border:none; font-size:24px; cursor:pointer;">×</button>
               </div>
               <div style="display:flex; gap:20px; margin-top:10px; align-items:center;">
                   <span id="globalMistakeCountText" style="color:#64748b;">可访问: 0 | 已失效: 0</span>
                   <div style="margin-left:auto; display:flex; gap:10px;">
-                      <button onclick="selectAllGlobalMistakes()" class="btn btn-view" style="padding:5px 10px; font-size:12px;">全选</button>
-                      <button onclick="clearAllGlobalSelection()" class="btn btn-view" style="padding:5px 10px; font-size:12px;">清除选择</button>
-                      <button onclick="deleteGlobalExpiredMistakes()" class="btn btn-view" style="padding:5px 10px; font-size:12px; color:#ef4444;">删除失效</button>
+                      <button onclick="selectAllGlobalMistakes()" class="btn btn-view" style="padding:5px 10px; font-size:12px;" data-i18n="edu_status.btn_select_all">全选</button>
+                      <button onclick="clearAllGlobalSelection()" class="btn btn-view" style="padding:5px 10px; font-size:12px;" data-i18n="edu_status.btn_clear_selection">清除选择</button>
+                      <button onclick="deleteGlobalExpiredMistakes()" class="btn btn-view" style="padding:5px 10px; font-size:12px; color:#ef4444;" data-i18n="edu_status.btn_delete_expired">删除失效</button>
                   </div>
               </div>
           </div>
@@ -124,7 +125,7 @@
           </div>
           <div style="flex-shrink:0; padding:15px; border-top:1px solid #e2e8f0; display:flex; gap:10px; justify-content:flex-end;">
               <button class="btn btn-view" onclick="closeGlobalMistakeReviewModal()">关闭</button>
-              <button class="btn btn-start" id="btnGlobalMistakeReviewStart" onclick="startGlobalMistakeReview()">错题回顾</button>
+              <button class="btn btn-start" id="btnGlobalMistakeReviewStart" onclick="startGlobalMistakeReview()" data-i18n="edu_status.btn_mistake_start">错题回顾</button>
           </div>
       </div>
   </div>
@@ -134,7 +135,7 @@
       <div class="modal-card" style="display:flex; flex-direction:column; width:80%; max-height:85vh;">
           <div style="flex-shrink:0; padding:15px; border-bottom:1px solid #e2e8f0;">
               <div style="display:flex; justify-content:space-between; align-items:center;">
-                  <h2 id="taskMistakeReviewTitle" style="color:#1e293b; font-size:18px;">📝 任务错题回顾</h2>
+                  <h2 id="taskMistakeReviewTitle" style="color:#1e293b; font-size:18px;" data-i18n="edu_status.modal_task_mistake_title">📝 任务错题回顾</h2>
                   <button onclick="closeTaskMistakeReviewModal()" style="background:none; border:none; font-size:24px; cursor:pointer;">×</button>
               </div>
               <div style="display:flex; gap:20px; margin-top:10px; align-items:center;">
@@ -181,6 +182,7 @@ async function setUserAvatar(avatarElem, username) {
 }
 
 async function loadUser() {
+        await i18n.load('zh');
     console.log("🔍 开始加载用户信息...");
     await loadAvatarConfig();
     

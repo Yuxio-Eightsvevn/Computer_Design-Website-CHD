@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-i18n-title="admin.page_title">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>用户管理 - 儿童先心病诊断平台</title>
+  <script src="/res/share/i18n.js"></script>
     <style>
         /* 省略：与原文件相同的 CSS（保持不变） */
         /* 为了便于阅读与维护，实际项目中请保留你原有的完整 CSS 样式 */
@@ -92,9 +93,9 @@
     <div id="mainContent">
         <!-- 顶部导航栏 -->
         <div class="navbar">
-            <div class="navbar-title">👥 用户管理系统</div>
+            <div class="navbar-title" data-i18n="admin.navbar_title">👥 用户管理系统</div>
             <div class="navbar-actions">
-                <a href="/flow" class="navbar-btn">返回主页</a>
+                <a href="/flow" class="navbar-btn" data-i18n="admin.btn_back">返回主页</a>
             </div>
         </div>
 
@@ -102,8 +103,8 @@
         <div class="container">
             <div class="card">
                 <div class="card-header">
-                    <h1 class="card-title">用户列表</h1>
-                    <button class="btn btn-primary" onclick="showCreateModal()">➕ 添加用户</button>
+                    <h1 class="card-title" data-i18n="admin.card_title_users">用户列表</h1>
+                    <button class="btn btn-primary" onclick="showCreateModal()" data-i18n="admin.btn_add_user">➕ 添加用户</button>
                 </div>
 
                 <div id="alertContainer"></div>
@@ -115,13 +116,13 @@
                     <table id="userTable" style="display: none;">
                         <thead>
                             <tr>
-                                <th>ID</th>
-                                <th>用户名</th>
-                                <th>医师姓名</th>
-                                <th>所属医院</th>
-                                <th>角色</th>
-                                <th>创建时间</th>
-                                <th>操作</th>
+                                <th data-i18n="admin.th_id">ID</th>
+                                <th data-i18n="admin.th_username">用户名</th>
+                                <th data-i18n="admin.th_doctor">医师姓名</th>
+                                <th data-i18n="admin.th_org">所属医院</th>
+                                <th data-i18n="admin.th_role">角色</th>
+                                <th data-i18n="admin.th_created">创建时间</th>
+                                <th data-i18n="admin.th_actions">操作</th>
                             </tr>
                         </thead>
                         <tbody id="userTableBody"></tbody>
@@ -135,30 +136,30 @@
     <div id="userModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 class="modal-title" id="modalTitle">添加用户</h2>
+                <h2 class="modal-title" id="modalTitle" data-i18n="admin.modal_create_title">添加用户</h2>
             </div>
             <form id="userForm" onsubmit="handleSubmit(event)">
                 <input type="hidden" id="userId" value="">
                 
                 <div class="form-group">
-                    <label class="form-label" for="username">用户名 *</label>
+                    <label class="form-label" for="username" data-i18n="admin.form_username_label">用户名 *</label>
                     <input type="text" class="form-control" id="username" required>
                     <div class="form-help">用户登录账号，创建后不可修改</div>
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label" for="password">密码 *</label>
+                    <label class="form-label" for="password" data-i18n="admin.form_password_label">密码 *</label>
                     <input type="password" class="form-control" id="password" required>
                     <div class="form-help" id="passwordHelp">至少6位字符</div>
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label" for="doctor">医师姓名 *</label>
+                    <label class="form-label" for="doctor" data-i18n="admin.form_doctor_label">医师姓名 *</label>
                     <input type="text" class="form-control" id="doctor" required>
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label" for="organization">所属医院 *</label>
+                    <label class="form-label" for="organization" data-i18n="admin.form_org_label">所属医院 *</label>
                     <input type="text" class="form-control" id="organization" required>
                 </div>
 
@@ -171,8 +172,8 @@
                 </div>
 
                 <div class="form-footer">
-                    <button type="button" class="btn btn-secondary" onclick="closeModal()">取消</button>
-                    <button type="submit" class="btn btn-success" id="submitBtn">保存</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()" data-i18n="common.btn_cancel">取消</button>
+                    <button type="submit" class="btn btn-success" id="submitBtn" data-i18n="common.btn_save">保存</button>
                 </div>
             </form>
         </div>
@@ -248,7 +249,7 @@
             </div>
 
             <div class="form-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeDownloadModal()">关闭</button>
+                <button type="button" class="btn btn-secondary" onclick="closeDownloadModal()" data-i18n="common.btn_close">关闭</button>
             </div>
         </div>
     </div>
@@ -331,6 +332,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
         // 加载用户列表
         async function loadUsers() {
+        await i18n.load('zh');
             try {
                 const response = await fetch('/api/users');
                 const result = await response.json();
@@ -390,13 +392,13 @@ window.addEventListener('DOMContentLoaded', () => {
         // 显示创建用户模态框
         function showCreateModal() {
             isEditMode = false;
-            document.getElementById('modalTitle').textContent = '添加用户';
+            document.getElementById('modalTitle').textContent = i18n.t('admin.modal_create_title');
             document.getElementById('userForm').reset();
             document.getElementById('userId').value = '';
             document.getElementById('username').disabled = false;
             document.getElementById('password').required = true;
-            document.getElementById('passwordHelp').textContent = '至少6位字符';
-            document.getElementById('submitBtn').textContent = '创建';
+            document.getElementById('passwordHelp').textContent = i18n.t('admin.form_password_help_create');
+            document.getElementById('submitBtn').textContent = i18n.t('admin.btn_create');
             document.getElementById('userModal').classList.add('show');
         }
 
@@ -406,17 +408,17 @@ window.addEventListener('DOMContentLoaded', () => {
             const user = users.find(u => u.id === userId);
             if (!user) return;
 
-            document.getElementById('modalTitle').textContent = '编辑用户';
+            document.getElementById('modalTitle').textContent = i18n.t('admin.modal_edit_title');
             document.getElementById('userId').value = user.id;
             document.getElementById('username').value = user.username;
             document.getElementById('username').disabled = true;
             document.getElementById('password').value = '';
             document.getElementById('password').required = false;
-            document.getElementById('passwordHelp').textContent = '留空则不修改密码';
+            document.getElementById('passwordHelp').textContent = i18n.t('admin.form_password_help_edit');
             document.getElementById('doctor').value = user.doctor;
             document.getElementById('organization').value = user.organization;
             document.getElementById('isAdmin').checked = user.is_admin === true;
-            document.getElementById('submitBtn').textContent = '更新';
+            document.getElementById('submitBtn').textContent = i18n.t('admin.btn_update');
             document.getElementById('userModal').classList.add('show');
         }
 
@@ -452,35 +454,35 @@ window.addEventListener('DOMContentLoaded', () => {
                 }
 
                 if (response.ok) {
-                    showAlert(isEditMode ? '用户更新成功' : '用户创建成功', 'success');
+                    showAlert(isEditMode ? i18n.t('admin.alert_user_updated') : i18n.t('admin.alert_user_created'), 'success');
                     closeModal();
                     await loadUsers();
                 } else {
                     const error = await response.json();
-                    showAlert(error.detail || '操作失败', 'danger');
+                    showAlert(error.detail || i18n.t('admin.alert_op_failed'), 'danger');
                 }
             } catch (error) {
                 console.error('操作失败:', error);
-                showAlert('操作失败，请稍后重试', 'danger');
+                showAlert(i18n.t('admin.alert_op_failed_retry'), 'danger');
             }
         }
 
         // 删除用户
         async function deleteUser(userId, username) {
-            if (!confirm(`确定要删除用户 "${username}" 吗？\n此操作不可恢复！`)) return;
+            if (!confirm(i18n.t('admin.confirm_delete_user').replace('{username}', username))) return;
 
             try {
                 const response = await fetch(`/api/users/${userId}`, { method: 'DELETE' });
                 if (response.ok) {
-                    showAlert('用户删除成功', 'success');
+                    showAlert(i18n.t('admin.alert_user_deleted'), 'success');
                     await loadUsers();
                 } else {
                     const error = await response.json();
-                    showAlert(error.detail || '删除失败', 'danger');
+                    showAlert(error.detail || i18n.t('admin.alert_delete_failed'), 'danger');
                 }
             } catch (error) {
                 console.error('删除失败:', error);
-                showAlert('删除失败，请稍后重试', 'danger');
+                showAlert(i18n.t('admin.alert_delete_failed_retry'), 'danger');
             }
         }
 

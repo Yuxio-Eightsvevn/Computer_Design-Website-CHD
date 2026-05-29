@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>诊断界面 - 儿童先心病诊断平台</title>
+    <script src="/res/share/i18n.js"></script>
     <style>
         * {
             margin: 0;
@@ -1245,19 +1246,14 @@
         </div>
     </div>
 
-    <!-- 教育模式完成弹窗 -->
+    <!-- 提交完成弹窗（内容由 showEduCompleteModal 动态填充） -->
     <div class="modal-overlay" id="eduCompleteModal" style="display: none;">
         <div class="modal-card" style="max-width: 500px; text-align: center; animation: slideUp 0.3s ease;">
             <div style="font-size: 48px; margin-bottom: 20px;">🎉</div>
-            <h2 style="color: #1e293b; margin-bottom: 15px;">诊断已完成！</h2>
-            <p style="color: #64748b; font-size: 14px; line-height: 1.6; margin-bottom: 20px;">
-                您的诊断结果已提交成功。<br><br>
-                系统正在生成AI分析报告，请稍后在<br>
-                <strong style="color: #667eea;">教育练习中心 → 点击"查看报告"</strong><br>
-                查看详细评估结果。
-            </p>
+            <h2 id="completeModalTitle" style="color: #1e293b; margin-bottom: 15px;">诊断已完成！</h2>
+            <p id="completeModalDesc" style="color: #64748b; font-size: 14px; line-height: 1.6; margin-bottom: 20px;"></p>
             <button class="btn btn-primary" id="completeModalBtn" style="width: 100%; padding: 12px; font-size: 14px; font-weight: 600; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; cursor: pointer;">
-                查看报告
+                返回
             </button>
         </div>
     </div>
@@ -1460,6 +1456,7 @@
 
         // 页面加载
         window.addEventListener('DOMContentLoaded', async () => {
+            await i18n.load('zh');
             // 获取URL参数
             const urlParams = new URLSearchParams(window.location.search);
             currentMode = urlParams.get('mode') || 'diag'; // 默认为判读模式
@@ -3094,22 +3091,46 @@ function selectOption(element, group) {
             }
         }
 
-        // 显示教育模式完成提示弹窗
+        // 显示提交完成弹窗，根据模式动态填充内容
         function showEduCompleteModal(mode) {
             const modal = document.getElementById('eduCompleteModal');
+            const titleEl = document.getElementById('completeModalTitle');
+            const descEl = document.getElementById('completeModalDesc');
             const btn = document.getElementById('completeModalBtn');
-            if (modal) {
-                modal.style.display = 'flex';
+
+            // 确定标题和正文
+            let titleKey, descKey;
+            if (mode !== 'edu') {
+                titleKey = 'diagnosis.modal_title_done';
+                descKey  = 'diagnosis.modal_desc_diag';
+            } else if (taskInfo && taskInfo.mistake_review) {
+                titleKey = 'diagnosis.modal_title_mistake';
+                descKey  = 'diagnosis.modal_desc_mistake';
+            } else if (eduSubMode === 'single') {
+                titleKey = 'diagnosis.modal_title_single';
+                descKey  = 'diagnosis.modal_desc_single';
+            } else if (eduSubMode === 'review') {
+                titleKey = 'diagnosis.modal_title_review';
+                descKey  = 'diagnosis.modal_desc_review';
+            } else {
+                titleKey = 'diagnosis.modal_title_assist';
+                descKey  = 'diagnosis.modal_desc_assist';
             }
+
+            if (titleEl) titleEl.textContent = i18n.t(titleKey);
+            if (descEl)  descEl.textContent  = i18n.t(descKey);
+
+            if (modal) modal.style.display = 'flex';
+
             if (btn) {
                 if (mode === 'edu') {
-                    btn.textContent = '返回教育练习中心';
+                    btn.textContent = i18n.t('diagnosis.btn_back_edu');
                     btn.onclick = () => {
                         modal.style.display = 'none';
                         window.location.href = '/edu_status';
                     };
                 } else {
-                    btn.textContent = '返回诊断任务列表';
+                    btn.textContent = i18n.t('diagnosis.btn_back_task');
                     btn.onclick = () => {
                         modal.style.display = 'none';
                         window.location.href = '/task_status';
