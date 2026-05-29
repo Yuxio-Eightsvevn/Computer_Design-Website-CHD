@@ -380,6 +380,10 @@ def zip_directory(directory_path, zip_path):
                 zipf.write(file_path, arcname)
 
 
+_cached_models = None
+_cached_baselines = None
+_cached_multi_model = None
+
 def diagnose(target_dir: str, output_dir: str, save_videos: bool = True) -> dict:
     """
     处理诊断请求
@@ -390,9 +394,13 @@ def diagnose(target_dir: str, output_dir: str, save_videos: bool = True) -> dict
         v2.Normalize(mean=[0.48145466, 0.4578275, 0.40821073], std=[0.26862954, 0.26130258, 0.27577711])
     ])
     
-    # 加载模型
-    models, baselines = load_single_models()
-    multi_model = load_multi_model()
+    # 加载模型（首次加载后缓存，后续调用复用）
+    global _cached_models, _cached_baselines, _cached_multi_model
+    if _cached_models is None:
+        _cached_models, _cached_baselines = load_single_models()
+        _cached_multi_model = load_multi_model()
+        print("✅ [模型缓存] 模型首次加载完成，后续调用将复用")
+    models, baselines, multi_model = _cached_models, _cached_baselines, _cached_multi_model
     
     request_name = os.path.basename(os.path.abspath(target_dir))
     output_request_dir = os.path.join(output_dir, request_name)

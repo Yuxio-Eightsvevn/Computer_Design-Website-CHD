@@ -94,7 +94,32 @@ async def generate_thumbnail_ffmpeg(video_path: Path, thumb_path: Path, seek_tim
         return False
 
 # --- [重点修复] 浏览器兼容性转码函数 ---
-async def transcode_to_h264(video_path: Path):
+async def get_video_fps(video_path: Path):
+    """用 ffprobe 读取视频帧率，返回 float 或 None。"""
+    try:
+        cmd = (f'ffprobe -v error -select_streams v:0 '
+               f'-show_entries stream=r_frame_rate '
+               f'-of default=noprint_wrappers=1:nokey=1 '
+               f'"{video_path.absolute()}"')
+        proc = await asyncio.create_subprocess_shell(
+            cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, _ = await proc.communicate()
+        if proc.returncode == 0:
+            raw = stdout.decode('utf-8', errors='ignore').strip()
+            if '/' in raw:
+                num, den = raw.split('/')
+                if float(den) != 0:
+                    return float(num) / float(den)
+            else:
+                return float(raw)
+    except Exception:
+        pass
+    return None
+
+async def transcode_to_h264(video_path: Path, fps=None):
     """
     将视频转换为 H.264 编码。采用 Shell 模式和绝对路径，彻底解决 WinError 2。
     """
@@ -105,9 +130,10 @@ async def transcode_to_h264(video_path: Path):
     output_str = f'"{temp_output.absolute()}"'
     
     # [已修正] 移除括号，确保 -crf 23 参数正确
+    fps_flag = f'-r {fps:.3f} ' if fps else ''
     cmd = (
         f'ffmpeg -y -i {input_str} '
-        f'-vcodec libx264 -pix_fmt yuv420p '
+        f'{fps_flag}-vcodec libx264 -pix_fmt yuv420p '
         f'-preset fast -crf 23 '
         f'-acodec aac {output_str}'
     )
@@ -290,7 +316,10 @@ async def run_model_inference_wrapper(request_path: Path, output_root: Path, req
         processed_task_dir = output_root / submission_id
         if processed_task_dir.exists():
             for mp4_file in processed_task_dir.glob("**/output_videos/*.mp4"):
-                await transcode_to_h264(mp4_file)
+                case_id = mp4_file.parent.parent.name
+                src_videos = list(request_path.glob(f"{case_id}/*.mp4"))
+                fps = await get_video_fps(src_videos[0]) if src_videos else None
+                await transcode_to_h264(mp4_file, fps=fps)
         
         # 3. 更新索引状态 (分流更新用户索引或系统教育索引)
         if is_system:
@@ -1883,7 +1912,7 @@ async def prepare_mistake_review(request: Request):
                     })
                 
                 if videos_list:
-                    cases.append({'id': case_id, 'videos': videos_list})
+                    cases.append({'id': case_id, 'mistake_id': mistake["id"], 'videos': videos_list})
                     display_order.append(case_id)
             
             # 生成错题会话ID
@@ -1951,32 +1980,36 @@ async def submit_mistake_review(request: Request):
                             mistake_data = json.loads(content)
                 except: pass
             
-            # 建立 mistake_id -> case_id 映射
-            # cases[i] 的 id 对应 mistake_ids[i]
-            mistake_to_case = {}
-            for i, m_id in enumerate(mistake_ids):
-                if i < len(cases):
-                    mistake_to_case[m_id] = cases[i].get("id")
+            # 从 cases 直接建立 case_id -> mistake_id 映射，不依赖位置索引
+            case_to_mistake_id = {}
+            for case in cases:
+                c_id = case.get("id")
+                m_id = case.get("mistake_id")
+                if c_id and m_id:
+                    case_to_mistake_id[c_id] = m_id
             
-            # 更新错题状态
+            # 更新错题状态：以 record_map 为主，通过 case_id 找对应 mistake
             updated_count = 0
-            for mistake in mistake_data.get("mistakes", []):
-                m_id = mistake.get("id")
-                if m_id in mistake_to_case:
-                    case_id = mistake_to_case[m_id]
-                    user_diagnosis = record_map.get(case_id)
-                    
-                    if user_diagnosis:
-                        # 判断是否正确（需要获取正确答案）
-                        correct_category = mistake.get("correct_category", "")
-                        is_correct = (user_diagnosis == correct_category or 
-                                   (user_diagnosis == "正常" and correct_category == "Normal") or
-                                   (user_diagnosis == "Normal" and correct_category == "正常"))
-                        
-                        mistake["is_retried"] = True
-                        mistake["last_choice"] = user_diagnosis
-                        mistake["retry_result"] = "correct" if is_correct else "wrong"
-                        updated_count += 1
+            mistake_map = {m["id"]: m for m in mistake_data.get("mistakes", [])}
+
+            for case_id, user_diagnosis in record_map.items():
+                m_id = case_to_mistake_id.get(case_id)
+                if not m_id or m_id not in mistake_map:
+                    continue
+
+                mistake = mistake_map[m_id]
+                if not user_diagnosis:
+                    continue
+
+                correct_category = mistake.get("correct_category", "")
+                is_correct = (user_diagnosis == correct_category or
+                              (user_diagnosis == "正常" and correct_category == "Normal") or
+                              (user_diagnosis == "Normal" and correct_category == "正常"))
+
+                mistake["is_retried"] = True
+                mistake["last_choice"] = user_diagnosis
+                mistake["retry_result"] = "correct" if is_correct else "wrong"
+                updated_count += 1
             
             if updated_count > 0:
                 with open(mistake_file, "w", encoding="utf-8") as f:

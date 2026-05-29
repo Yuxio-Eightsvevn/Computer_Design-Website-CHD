@@ -14,6 +14,7 @@ from datetime import datetime
 import shutil
 import zipfile
 import re  # 确保正则模块可用
+import uuid
 from fastapi.responses import JSONResponse
 from llm_analyzer import LLMAnalyzer, test_connection
 import asyncio
@@ -1408,7 +1409,7 @@ def record_mistakes_from_stats(username: str, parent_id: str, stats: Dict[str, A
                     print(f"🔄 [错题记录] 更新已存在错题: {key}")
                 else:
                     all_mistakes[patient_id] = {
-                        "id": f"mistake_{datetime.now().strftime('%Y%m%d%H%M%S')}_{len(all_mistakes)}",
+                        "id": f"mistake_{uuid.uuid4().hex}",
                         "submission_id": parent_id,
                         "task_name": task_name,
                         "stage": stage_name,

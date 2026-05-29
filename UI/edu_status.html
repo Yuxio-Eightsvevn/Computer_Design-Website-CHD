@@ -49,6 +49,10 @@
     .title-overlay { position: fixed; top: 20px; left: 30px; z-index: -1; pointer-events: none; }
     .title-overlay h1 { font-size: 28px; color: #1e293b; text-shadow: 2px 2px 4px rgba(255,255,255,0.8); margin: 0; }
     .title-overlay p { font-size: 14px; color: #64748b; margin: 5px 0 0 0; }
+    .stats-container { background: white; border-radius: 12px; padding: 16px 20px; margin-top: 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.04); border: 1px solid #eef2f7; }
+    .task-count-box { font-size: 16px; font-weight: 700; color: #4b5563; }
+    .task-count-number { color: #10b981; font-size: 20px; margin: 0 4px; }
+    .btn.view-tasks { background: #10b981; color: white; }
   </style>
 </head>
 <body>
@@ -72,10 +76,13 @@
       <div class="navbar">
         <div style="font-size:20px;">🎓 教育练习中心</div>
         <div style="display:flex; gap:10px;">
-            <button onclick="openGlobalMistakeReviewModal()" class="btn" style="background:rgba(255,255,255,0.2); color:white;">错题回顾</button>
             <button onclick="window.location.href='/flow'" class="btn" style="background:rgba(255,255,255,0.2); color:white">返回</button>
         </div>
     </div>
+      <div class="stats-container">
+        <div class="task-count-box">待纠正错题：<span id="pendingMistakeCount" class="task-count-number">-</span></div>
+        <button onclick="openGlobalMistakeReviewModal()" class="btn view-tasks">📋 全部错题复诊</button>
+      </div>
       <div id="taskList" class="card">
           <p style="text-align:center; color:#94a3b8">正在拉取分发给您的教学批次...</p>
       </div>
@@ -206,6 +213,7 @@ async function loadUser() {
                 
                 // 加载任务列表
                 fetchEduTasks();
+                loadPendingMistakeCount();
                 console.log("✅ 任务列表加载完成");
                 return;
             }
@@ -1385,6 +1393,19 @@ function showTripleStageReport(parentId, name, singleData, assistData, reviewDat
   
   <script>
   // ========== 全局错题回顾（右上角按钮） ==========
+
+  async function loadPendingMistakeCount() {
+      if (!currentUser || !currentUser.username) return;
+      try {
+          const r = await fetch(`/api/edu/mistakes/${encodeURIComponent(currentUser.username)}`);
+          if (!r.ok) return;
+          const data = await r.json();
+          const pending = (data.accessible_mistakes || []).filter(m => !m.is_retried || m.retry_result !== 'correct').length;
+          const el = document.getElementById('pendingMistakeCount');
+          if (el) el.textContent = pending;
+      } catch (e) { /* 静默失败，不影响主流程 */ }
+  }
+
   let globalMistakeData = { accessible_mistakes: [], expired_mistakes: [] };
   let globalSelectedMistakeIds = [];
 
@@ -1446,7 +1467,7 @@ function showTripleStageReport(parentId, name, singleData, assistData, reviewDat
               const isSelected = globalSelectedMistakeIds.includes(m.id);
               const statusText = m.is_retried ? '❌ 已重做仍错' : '⏳ 未重做';
               html += `
-                  <div data-id="${m.id}" onclick="toggleGlobalMistakeSelection('${m.id}', this)" 
+                  <div data-id="${m.id}" onclick="event.stopPropagation(); toggleGlobalMistakeSelection('${m.id}', this)"
                        style="padding:12px; border:2px solid ${isSelected ? '#10b981' : '#e2e8f0'}; border-radius:8px; margin-bottom:8px; cursor:pointer; background:${isSelected ? '#ecfdf5' : 'white'}; font-weight:${isSelected ? '700' : '400'};">
                       <div style="display:flex; justify-content:space-between;">
                           <span style="font-weight:600;">${m.case_name}</span>
@@ -1481,7 +1502,8 @@ function showTripleStageReport(parentId, name, singleData, assistData, reviewDat
       } else {
           correctedMistakes.forEach(m => {
               html += `
-                  <div style="padding:10px; border:1px solid #e2e8f0; border-radius:8px; margin-bottom:6px; background:#f8fafc;">
+                  <div data-id="${m.id}" onclick="event.stopPropagation(); toggleGlobalMistakeSelection('${m.id}', this)"
+                       style="padding:10px; border:2px solid #e2e8f0; border-radius:8px; margin-bottom:6px; cursor:pointer; background:white;">
                       <div style="display:flex; justify-content:space-between;">
                           <span>${m.case_name}</span>
                           <span style="color:#10b981;">✅ 已纠正</span>
@@ -1563,7 +1585,7 @@ function showTripleStageReport(parentId, name, singleData, assistData, reviewDat
       const accessible = globalMistakeData.accessible_mistakes || [];
       const notCorrected = accessible.filter(m => !m.is_retried || m.retry_result !== 'correct');
       globalSelectedMistakeIds = notCorrected.map(m => m.id);
-      document.querySelectorAll('#globalMistakeReviewContent > div > div[data-id]').forEach(item => {
+      document.querySelectorAll('#globalMistakeReviewContent div[data-id]').forEach(item => {
           const id = item.getAttribute('data-id');
           if (globalSelectedMistakeIds.includes(id)) {
               item.style.borderColor = '#10b981';
@@ -1576,7 +1598,7 @@ function showTripleStageReport(parentId, name, singleData, assistData, reviewDat
 
   function clearAllGlobalSelection() {
       globalSelectedMistakeIds = [];
-      document.querySelectorAll('#globalMistakeReviewContent > div > div[data-id]').forEach(item => {
+      document.querySelectorAll('#globalMistakeReviewContent div[data-id]').forEach(item => {
           item.style.borderColor = '#e2e8f0';
           item.style.background = 'white';
           item.style.fontWeight = '400';
@@ -1648,7 +1670,7 @@ function showTripleStageReport(parentId, name, singleData, assistData, reviewDat
           console.log('✅ 错题回顾准备成功，跳转至诊断页面...');
           closeGlobalMistakeReviewModal();
           
-          window.location.href = `/diagnosis?username=${encodeURIComponent(currentUser.username)}&task=${encodeURIComponent(result.mistake_session_id)}&taskName=${encodeURIComponent('错题回顾')}&mode=edu&eduSubMode=assist&force_start=true&mistake_review=true`;
+          window.location.href = `/diagnosis?username=${encodeURIComponent(currentUser.username)}&task=${encodeURIComponent(result.mistake_session_id)}&taskName=${encodeURIComponent('错题回顾')}&mode=edu&eduSubMode=assist&force_start=true&mistake_review=true&shuffle=true`;
           
       } catch (e) {
           alert('创建临时任务失败: ' + e.message);
@@ -1725,7 +1747,7 @@ function showTripleStageReport(parentId, name, singleData, assistData, reviewDat
               const statusText = m.is_retried ? (m.retry_result === 'correct' ? '✅ 已纠正' : '❌ 仍错误') : '⏳ 未重做';
               const statusColor = m.is_retried ? (m.retry_result === 'correct' ? '#10b981' : '#ef4444') : '#64748b';
               html += `
-                  <div data-id="${m.id}" onclick="toggleTaskMistakeSelection('${m.id}', this)" 
+                  <div data-id="${m.id}" onclick="event.stopPropagation(); toggleTaskMistakeSelection('${m.id}', this)"
                        style="padding:12px; border:2px solid ${isSelected ? '#10b981' : '#e2e8f0'}; border-radius:8px; margin-bottom:8px; cursor:pointer; background:${isSelected ? '#ecfdf5' : 'white'}; font-weight:${isSelected ? '700' : '400'};">
                       <div style="display:flex; justify-content:space-between;">
                           <span style="font-weight:600;">${m.case_name}</span>
@@ -1838,7 +1860,7 @@ function showTripleStageReport(parentId, name, singleData, assistData, reviewDat
           console.log('✅ 错题回顾准备成功，跳转至诊断页面...');
           closeTaskMistakeReviewModal();
           
-          window.location.href = `/diagnosis?username=${encodeURIComponent(currentUser.username)}&task=${encodeURIComponent(result.mistake_session_id)}&taskName=${encodeURIComponent(taskMistakeData.task_name + ' - 错题复诊')}&mode=edu&eduSubMode=assist&force_start=true&mistake_review=true`;
+          window.location.href = `/diagnosis?username=${encodeURIComponent(currentUser.username)}&task=${encodeURIComponent(result.mistake_session_id)}&taskName=${encodeURIComponent(taskMistakeData.task_name + ' - 错题复诊')}&mode=edu&eduSubMode=assist&force_start=true&mistake_review=true&shuffle=true`;
           
       } catch (e) {
           alert('创建临时任务失败: ' + e.message);

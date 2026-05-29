@@ -1484,257 +1484,6 @@ if (currentMode === 'edu' && eduSubMode === 'single') {
 
 ---
 
-### 12.16 三阶段教育系统重构计划 (Plan A - 嵌套结构)
-
-**重构目标**: 将使用后缀的成绩存储改为嵌套结构，便于扩展第三阶段。
-
-#### 12.16.1 新数据结构
-
-**成绩单** (SYSTEM/edu_data/Doctor_Diag_Result/{username}.json)
-
-```json
-{
-  "task123": {
-    "stages": {
-      "single": {
-        "accuracy": 0.85,
-        "sensitivity": 0.80,
-        "specificity": 0.90,
-        "edu_sub_mode": "single",
-        "total_duration": 120.5,
-        "category_stats": {...},
-        "ai_dependency": {...},
-        "completed_at": "2026-04-21T10:30:00"
-      },
-      "assist": {
-        "accuracy": 0.92,
-        "sensitivity": 0.88,
-        "specificity": 0.95,
-        "edu_sub_mode": "assist",
-        "total_duration": 95.3,
-        "category_stats": {...},
-        "ai_dependency": {...},
-        "completed_at": "2026-04-21T10:35:00"
-      }
-    },
-    "llm_analysis": {
-      "single": { "status": "completed", "report": "..." },
-      "assist": { "status": "pending" }
-    }
-  }
-}
-```
-
-#### 12.16.2 代码更改计划
-
-##### Step 1: main.py - 保存逻辑重构
-
-**文件**: `main.py`
-**行号**: 1025-1045
-
-**修改前**:
-```python
-save_key = request.taskFolder
-if request.eduSubMode:
-    if request.eduSubMode == 'single':
-        save_key = f"{request.taskFolder}_SINGLE"
-    elif request.eduSubMode == 'assist':
-        save_key = f"{request.taskFolder}_AI-ASSIST"
-user_data[save_key] = stats
-```
-
-**修改后**:
-```python
-parent_id = re.sub(r'_SINGLE|_AI-ASSIST$', '', request.taskFolder)
-if parent_id not in user_data:
-    user_data[parent_id] = {"stages": {}, "llm_analysis": {}}
-if "stages" not in user_data[parent_id]:
-    user_data[parent_id] = {"stages": {}, "llm_analysis": {}}
-user_data[parent_id]["stages"][request.eduSubMode] = stats
-```
-
-##### Step 2: main.py - AI分析触发
-
-**文件**: `main.py`
-**行号**: 1049-1051
-
-**修改后**:
-```python
-asyncio.create_task(analyze_with_llm(
-    request.username,
-    parent_id,  # 使用父任务ID
-    request.eduSubMode,  # 传递阶段参数
-    stats
-))
-```
-
-##### Step 3: main.py - analyze_with_llm 函数
-
-**文件**: `main.py`
-**行号**: 1078
-
-**函数签名修改**:
-```python
-async def analyze_with_llm(username: str, task_folder: str, stage: str, stats: Dict):
-    # 修改保存逻辑
-    user_data[parent_id]["llm_analysis"][stage] = {"status": "completed", "report": llm_report}
-```
-
-##### Step 4: routes_oridata.py - 读取逻辑
-
-**文件**: `routes_oridata.py`
-**行号**: 793-812
-
-**修改后**:
-```python
-if is_dual_stage:
-    parent_id = submission_id
-    single_data = res_data.get(parent_id, {}).get("stages", {}).get("single")
-    assist_data = res_data.get(parent_id, {}).get("stages", {}).get("assist")
-    user_info["completed"] = single_data is not None and assist_data is not None
-```
-
-##### Step 5: routes_oridata.py - 获取用户任务
-
-**文件**: `routes_oridata.py`
-**行号**: 896-913
-
-**修改后**:
-```python
-if is_dual:
-    single_id = f"{sub_id}_SINGLE"  # 仍用于URL跳转
-    assist_id = f"{sub_id}_AI-ASSIST"
-    single_done = single_id in user_results
-    assist_done = assist_id in user_results
-    # 但保存时使用嵌套结构
-```
-
-##### Step 6: edu_status.html - 任务列表
-
-**文件**: `edu_status.html`
-**行号**: 193-216
-
-**URL保持不变**（用于传递阶段信息）:
-```javascript
-handleTask('${t.submission_id}_SINGLE', '${t.request_name}_SINGLE', singleDone, 'single', '${t.submission_id}')
-```
-
-##### Step 7: edu_status.html - 成绩读取
-
-**文件**: `edu_status.html`
-**行号**: 294-302
-
-**修改后**:
-```javascript
-const rSingle = await fetch(`/api/edu/user/result/${username}/${taskParentId}?stage=single`);
-const rAssist = await fetch(`/api/edu/user/result/${username}/${taskParentId}?stage=assist`);
-```
-
-##### Step 8: diagnosis.html - 提交逻辑
-
-**文件**: `diagnosis.html`
-**行号**: 2830-2835
-
-**保持不变**，因为 `eduSubMode` 已经在 URL 参数中
-
----
-
-#### 12.16.3 API更改
-
-##### 新增: 获取指定阶段成绩
-
-**接口**: `GET /api/edu/user/result/{username}/{taskId}?stage={stage}`
-
-**返回**:
-```json
-{
-  "stage": "single",
-  "accuracy": 0.85,
-  "sensitivity": 0.80,
-  ...
-}
-```
-
----
-
-#### 12.16.4 影响范围
-
-| 文件 | 改动量 | 说明 |
-|------|--------|------|
-| main.py | 中 | 保存逻辑、AI分析函数 |
-| routes_oridata.py | 小 | 读取逻辑 |
-| edu_status.html | 小 | 成绩读取 |
-| diagnosis.html | 无 | 无需改动 |
-| edu_admin.html | 小 | 管理员查看报告 |
-
----
-
-#### 12.16.5 向后兼容
-
-**已有数据迁移**: 可以写一个一次性脚本将旧格式转换为新格式
-
-```python
-# 迁移脚本逻辑
-for username in users:
-    old_data = read_json(f"{username}.json.old")
-    new_data = {}
-    for key, value in old_data.items():
-        if key.endswith("_SINGLE"):
-            parent = key.replace("_SINGLE", "")
-            new_data[parent]["stages"]["single"] = value
-        elif key.endswith("_AI-ASSIST"):
-            parent = key.replace("_AI-ASSIST", "")
-            new_data[parent]["stages"]["assist"] = value
-        else:
-            new_data[key] = value
-    write_json(f"{username}.json", new_data)
-```
-
----
-
-#### 12.16.6 第三阶段扩展
-
-新结构便于添加第三阶段，只需：
-
-1. 在 `publish_mode` 添加 `"triple"` 选项
-2. 在 `stages` 中添加 `"review"` 阶段
-3. 前端添加第三个按钮
-
-```json
-{
-  "task123": {
-    "stages": {
-      "single": {...},
-      "assist": {...},
-      "review": {...}  // 第三阶段
-    }
-  }
-}
-```
-
-**相关文件**:
-| 文件 | 修改内容 |
-|------|----------|
-| flow.html | 卡片、按钮、字体尺寸全面放大，按钮hover效果 |
-| diagnosis.html | 置信度标签、临床判断按钮、option-btn样式 |
-| edu_status.html | 导航栏、任务卡片、按钮、侧边栏、指标标签，按钮hover效果 |
-| edu_admin.html | 按钮hover效果 |
-| task_status.html | 按钮hover效果 |
-| dashboard.html | 按钮hover效果 |
-| admin.html | 按钮hover效果 |
-| login.html | 登录按钮hover效果，介绍文字间距 |
-
-**按钮hover效果已应用到的页面**:
-- admin.html ✅
-- dashboard.html ✅
-- edu_admin.html ✅
-- edu_status.html ✅
-- flow.html ✅
-- task_status.html ✅
-- login.html (login-btn-title, login-btn) ✅
-
----
-
 ### 12.14 login.html 登录页面布局重构
 
 **更新内容**:
@@ -2186,8 +1935,8 @@ print(f"🔔 当前阶段: {request.eduSubMode}，跳过LLM分析（仅在三阶
 
 ---
 
-*文档版本: 2026-04-22*
-*最后更新: 2026-04-22 - 清空任务时间戳检测修复*
+*文档版本: 2026-05-28*
+*最后更新: 2026-05-28 - 错题回顾弹窗交互修复*
 
 ### 12.23 清空任务时间戳检测修复 (2026-04-22)
 
@@ -2359,31 +2108,6 @@ if task_info_path.exists():
 ```
 
 ---
----
-
-## 📋 待修复问题 (Known Issues)
-
-### [TODO] 后端接受返回绑定显示名而非内部名的 Bug
-
-**问题描述**：系统存在前后端标签名不一致的问题：
-- **前端显示**：`正常`、`VSD`、`ASD`、`PDA`
-- **后端期望**：内部名 `Normal`、`VSD`、`ASD`、`PDA`
-- **已修复**：当前 `LABEL_MAP` 已临时改为 `"正常": 0` 等，临时兼容前端
-
-**根本修复方案（待实施）**：
-
-| 方案 | 描述 | 优点 | 缺点 |
-|------|------|------|------|
-| A. 前后端统一用内部名 | 前端按钮文字改为 `Normal` 等 | 后端无需改 | 用户界面显示英文 |
-| B. 后端全面支持显示名 | 后端同时支持 `正常`/`Normal` | 用户体验好 | 需要改多处代码 |
-| C. 建立映射层 | 前端传内部名，后端转显示名 | 最规范 | 改动较大 |
-
-**建议**：采用方案 A（统一用内部名），对用户更专业，且避免乱码风险。
-
-**涉及文件**：
-- `UI/diagnosis.html` - 诊断按钮文字（第1172-1175行）
-- `main.py` - `LABEL_MAP`/`LABEL_REVERSE_MAP`（第850-851行）
-
 ---
 ### 12.29 display_order 字段与诊断顺序控制 (2026-05-16)
 
@@ -2615,6 +2339,52 @@ shutil.rmtree(SYSTEM_EDU_DIR / "oridata" / submission_id, ignore_errors=True)  #
 
 ---
 
+## 十五、错题回顾弹窗修复 (2026-05-28)
+
+### 15.1 问题描述
+
+错题回顾弹窗存在以下异常交互：
+1. 点击一个病例后可正常取消，但点击第二个病例时不亮起且按钮变灰
+2. 无论选多少个病例，进入 diagnosis.html 后只显示1个病例
+3. 提交结果后只有第1条错题状态被更新，其余不变
+
+### 15.2 根本原因
+
+**Bug A — 错题 id 大量重复（根本原因）**
+
+`main.py` 中错题 id 生成逻辑为：
+
+```python
+"id": f"mistake_{datetime.now().strftime('%Y%m%d%H%M%S')}_{len(all_mistakes)}"
+```
+
+`all_mistakes` 是以 `patient_id` 为 key 的 dict，同一病例在多阶段均错时走覆盖路径，`len()` 不增加，导致同批次多条记录生成相同 id。前端 `indexOf` 误判"已选中"后立刻取消，表现为点击第二个病例后按钮变灰。
+
+**Bug B — `submit` 接口映射依赖位置索引**
+
+`routes_oridata.py` 的 `submit_mistake_review` 用 `cases[i]` 对应 `mistake_ids[i]`，但 `cases` 是过滤掉目录不存在条目后的列表，与 `mistake_ids` 的顺序和长度不能保证一致，导致映射错位。
+
+**Bug C — `prepare` 接口未显式绑定 case 与 mistake 的对应关系**
+
+`prepare` 返回的 `cases` 和 `mistake_ids` 是两个平行数组，没有显式关联，`submit` 只能靠位置猜测对应关系。
+
+### 15.3 修复内容
+
+| 文件 | 位置 | 修改内容 |
+|------|------|---------|
+| `main.py` | 顶部 import | 新增 `import uuid` |
+| `main.py` | 1412 | id 生成改为 `f"mistake_{uuid.uuid4().hex}"`，彻底消除碰撞 |
+| `routes_oridata.py` | 1886 | `prepare` 接口每个 case 对象附带 `mistake_id` 字段，显式绑定 |
+| `routes_oridata.py` | 1954-1983 | `submit` 接口从 `cases` 的 `mistake_id` 字段建立 `case_id → mistake_id` 映射，不再依赖位置索引 |
+| `edu_status.html` | 1449、1728 | 病例卡片 onclick 加 `event.stopPropagation()`，阻止冒泡触发折叠头 |
+| `edu_status.html` | 1566、1579 | 全选/清除选择的 querySelector 改为后代选择器 `div[data-id]` |
+
+### 15.4 存量脏数据修复
+
+`mistake_task_admin.json` 中已有的6条重复 id 记录已通过脚本补全唯一 uuid，存量数据一次性修复完毕。
+
+---
+
 ## 📋 待修复问题 (Known Issues)
 
 ### [TODO] 后端接受返回绑定显示名而非内部名的 Bug
@@ -2702,3 +2472,52 @@ for i, m_id in enumerate(mistake_ids):
 - `routes_oridata.py` - `unpublish_edu_task`
 
 ---
+
+## 十六、UI与推理性能更新 (2026-05-28)
+
+### 16.1 教育模式"全部错题复诊"UI改版 (edu_status.html)
+
+**更新内容**：
+
+- 从 navbar 删除"错题回顾"按钮
+- 在 navbar 和 taskList 之间新增独立 `.stats-container` 栏：
+  - 左侧：**待纠正错题：N**（调用 `/api/edu/mistakes/{username}` 统计未纠正条目数）
+  - 右侧：**📋 全部错题复诊** 按钮（绿色 `#10b981`，复用 dashboard 的 `.btn.view-tasks`）
+- 新增 `loadPendingMistakeCount()` JS 函数，在 `currentUser` 加载完成后自动调用
+
+| 文件 | 修改内容 |
+|------|----------|
+| `UI/edu_status.html` | navbar改动、stats栏HTML、CSS新增、JS函数新增 |
+
+---
+
+### 16.2 heatmap/bbox 视频帧率修复 (routes_oridata.py)
+
+**问题**：`model/heart_diagnosis.py` 的 `cv2.VideoWriter` 写死 30fps，原始视频帧率可能不同。不修改模型文件，只在后处理阶段修复。
+
+**方案**：用 ffprobe 读取原始视频帧率，通过 ffmpeg `-r` 参数将输出视频对齐到原始帧率。
+
+| 位置 | 修改内容 |
+|------|----------|
+| 新增 `get_video_fps(video_path)` | ffprobe 读帧率，支持分数格式（如 `30000/1001`），失败返回 `None` |
+| `transcode_to_h264(video_path, fps=None)` | 新增 `fps` 可选参数，有值时在 ffmpeg 命令加 `-r {fps:.3f}` |
+| `run_model_inference_wrapper` 转码循环 | 反推原始视频路径读帧率，传入 `transcode_to_h264` |
+
+---
+
+### 16.3 模型推理缓存优化 (heart_diagnosis.py)
+
+**问题**：每次调用 `diagnose()` 都重新加载5个模型权重，连续推理时造成大量重复开销。
+
+**方案**：模块顶层声明全局缓存变量，`diagnose()` 首次调用时加载并缓存，后续调用直接复用。
+
+| 文件 | 修改内容 |
+|------|----------|
+| `model/heart_diagnosis.py` | 模块顶层新增 `_cached_models/baselines/multi_model`，`diagnose()` 改为条件加载 |
+
+**预期收益**：首次推理时间不变，后续推理节省模型加载时间（通常占总时间的 30-60%）。
+
+---
+
+*文档版本: 2026-05-28*
+*最后更新: 2026-05-28 - UI改版、帧率修复、模型推理缓存优化*
