@@ -292,8 +292,8 @@ async def run_model_inference_wrapper(request_path: Path, output_root: Path, req
     if is_system:
         task_root = SYSTEM_EDU_DIR / "oridata"  # 系统任务的原始数据在 oridata 下
     else:
-        task_root = BASE_DATA_DIR / username
-    
+        task_root = BASE_DATA_DIR / username / ORIDATA_DIRNAME  # 与状态检查路径一致
+
     processing_flag = task_root / submission_id / ".processing"
     failed_flag = task_root / submission_id / ".failed"
     
