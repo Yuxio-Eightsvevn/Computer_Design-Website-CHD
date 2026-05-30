@@ -67,8 +67,8 @@ def init_database():
     if count == 0:
         # [改动] 初始化时，明确指定 is_admin 的值 (1 为是，0 为否)
         initial_users = [
-            ('admin', hash_password('123456'), '管理员', '深圳大学', 1),
-            ('doctor1', hash_password('123456'), '张医生', '深圳大学附属医院', 0)
+            ('admin', hash_password('123456'), '管理员', '示例机构', 1),
+            ('doctor1', hash_password('123456'), '测试医生', '示例医院', 0)
         ]
 
         cursor.executemany('''

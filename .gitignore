@@ -10,8 +10,8 @@ __pycache__/
 *.log
 app.log
 
-# 数据库文件（users.db 需要推送到 Git）
-# *.db
+# 数据库文件
+users.db
 
 # 数据存储目录
 data_batch_storage/
@@ -42,3 +42,6 @@ model/**/*.pt
 !model/singleview/.gitkeep
 诊断平台网页使用指南.pdf
 诊断平台网页使用指南_v2.md
+
+# 敏感配置（含API密钥）
+config/llm_models.json
