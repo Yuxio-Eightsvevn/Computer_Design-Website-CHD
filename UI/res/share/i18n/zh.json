@@ -137,7 +137,7 @@
     "dropzone_text": "将文件或文件夹拖放到此处",
     "btn_clear": "清空",
     "btn_upload": "确认上传",
-    "sidebar_hint_1": "每个病例最多 5 个视频。",
+    "sidebar_hint_1": "拖动病例时只能一次拖入一个病例，每个病例最多 5 个视频。",
     "sidebar_hint_2": "支持文件夹拖拽与自动缩略图。",
     "case_name_label": "病例名：",
     "drag_video_hint": "拖拽视频到此处",

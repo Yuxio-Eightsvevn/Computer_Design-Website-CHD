@@ -3174,7 +3174,387 @@ function selectOption(element, group) {
                 }
             } catch (e) { console.warn('背景配置加载失败:', e); }
         })();
+
+        // ========== 隐藏导入结果功能 ==========
+        let _importPending = null; // 待确认的导入数据
+        let _pairStep = 0;         // 逐个配对当前步骤索引
+
+        // Levenshtein 编辑距离
+        function _editDistance(a, b) {
+            const m = a.length, n = b.length;
+            const dp = Array.from({length: m+1}, (_, i) => Array.from({length: n+1}, (_, j) => i === 0 ? j : j === 0 ? i : 0));
+            for (let i = 1; i <= m; i++)
+                for (let j = 1; j <= n; j++)
+                    dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+            return dp[m][n];
+        }
+
+        // 按编辑距离对 candidates 排序（相对于 target）
+        function _sortByDistance(target, candidates) {
+            return [...candidates].sort((a, b) => _editDistance(target, a) - _editDistance(target, b));
+        }
+
+        (async function initImportFeature() {
+            try {
+                const r = await fetch('/res/share/deploy_config.json', { cache: 'no-cache' });
+                const cfg = await r.json();
+                if (!cfg.importResultsEnabled) return;
+
+                document.getElementById('importHint').style.display = 'block';
+
+                document.body.addEventListener('dragover', function(e) {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'copy';
+                });
+
+                document.body.addEventListener('drop', function(e) {
+                    e.preventDefault();
+                    const file = e.dataTransfer.files[0];
+                    if (!file || !file.name.endsWith('.json')) {
+                        alert('请拖入 .json 格式的文件');
+                        return;
+                    }
+                    const reader = new FileReader();
+                    reader.onload = function(ev) {
+                        try {
+                            const data = JSON.parse(ev.target.result);
+                            prepareImport(data);
+                        } catch (err) {
+                            alert('JSON 解析失败：' + err.message);
+                        }
+                    };
+                    reader.readAsText(file, 'utf-8');
+                });
+            } catch (e) { /* deploy_config 不存在时静默忽略 */ }
+        })();
+
+        const _diagMap = { 'Normal': '正常', 'VSD': 'VSD', 'ASD': 'ASD', 'PDA': 'PDA',
+                           '正常': '正常', 'normal': '正常' };
+
+        function prepareImport(jsonData) {
+            const batchKey = Object.keys(jsonData)[0];
+            if (!batchKey) { alert('JSON 格式错误：无顶层 key'); return; }
+            const records = jsonData[batchKey];
+            if (!Array.isArray(records)) { alert('JSON 格式错误：值不是数组'); return; }
+
+            const jsonMap = {};
+            records.forEach(r => { if (r.Case_ID) jsonMap[r.Case_ID] = r; });
+
+            const matched = [], unmatched = [], extra = [];
+            patients.forEach(p => {
+                if (jsonMap[p.id]) matched.push(p.id);
+                else unmatched.push(p.id);
+            });
+            Object.keys(jsonMap).forEach(id => {
+                if (!patients.find(p => p.id === id)) extra.push(id);
+            });
+
+            const matchRate = patients.length > 0 ? matched.length / patients.length : 0;
+            if (matchRate < 0.5) {
+                alert(`匹配率不足（${matched.length}/${patients.length}，${Math.round(matchRate*100)}%），需要至少 50% 才能导入。`);
+                return;
+            }
+
+            _importPending = { jsonMap, matched, unmatched, extra, batchKey, manualPairs: {} };
+            _renderImportModal();
+            document.getElementById('importModal').style.display = 'flex';
+        }
+
+        function _renderImportModal() {
+            const { jsonMap, matched, unmatched, extra, batchKey, manualPairs } = _importPending;
+            const matchRate = patients.length > 0 ? matched.length / patients.length : 0;
+            const pairedCount = Object.keys(manualPairs).length;
+
+            document.getElementById('importSummary').textContent =
+                `批次：${batchKey}　自动匹配 ${matched.length}/${patients.length}（${Math.round(matchRate*100)}%）` +
+                (pairedCount ? `　手动配对 ${pairedCount} 个` : '');
+
+            let html = '';
+            if (matched.length) {
+                html += `<div style="margin-bottom:10px;"><span style="color:#10b981;font-weight:700;">✅ 自动匹配（${matched.length}个）</span><div style="margin-top:4px; color:#334155;">`;
+                matched.forEach(id => {
+                    const r = jsonMap[id];
+                    const diag = _diagMap[r.Doctor_Diagnosis] || r.Doctor_Diagnosis;
+                    html += `<span style="display:inline-block; margin:2px 6px 2px 0; background:#ecfdf5; padding:2px 8px; border-radius:4px;">${id} → ${diag}（${r.Confidence_Score}级）</span>`;
+                });
+                html += '</div></div>';
+            }
+            if (pairedCount) {
+                html += `<div style="margin-bottom:10px;"><span style="color:#3b82f6;font-weight:700;">🔗 手动配对（${pairedCount}个）</span><div style="margin-top:4px; color:#334155;">`;
+                Object.entries(manualPairs).forEach(([taskId, jsonId]) => {
+                    const r = jsonMap[jsonId];
+                    const diag = _diagMap[r.Doctor_Diagnosis] || r.Doctor_Diagnosis;
+                    html += `<span style="display:inline-block; margin:2px 6px 2px 0; background:#eff6ff; padding:2px 8px; border-radius:4px;">${taskId} ← ${jsonId} → ${diag}（${r.Confidence_Score}级）</span>`;
+                });
+                html += '</div></div>';
+            }
+            const stillUnmatched = unmatched.filter(id => !manualPairs[id]);
+            if (stillUnmatched.length) {
+                html += `<div style="margin-bottom:10px;"><span style="color:#94a3b8;font-weight:700;">⬜ 未覆盖（${stillUnmatched.length}个，保持空白）</span>`;
+                if (extra.length > 0) {
+                    html += `<div style="margin-top:8px; display:flex; gap:8px;">
+                        <button onclick="_startOverviewPair()" style="padding:5px 12px; border-radius:6px; border:none; background:#e0f2fe; color:#0369a1; font-size:12px; font-weight:600; cursor:pointer;">📋 总览配对</button>
+                        <button onclick="_startStepPair()" style="padding:5px 12px; border-radius:6px; border:none; background:#f0fdf4; color:#15803d; font-size:12px; font-weight:600; cursor:pointer;">➡️ 逐个配对</button>
+                    </div>`;
+                }
+                html += `<div style="margin-top:4px; color:#94a3b8;">`;
+                stillUnmatched.forEach(id => { html += `<span style="display:inline-block; margin:2px 6px 2px 0;">${id}</span>`; });
+                html += '</div></div>';
+            }
+            if (extra.length) {
+                html += `<div><span style="color:#f59e0b;font-weight:700;">⚠️ JSON 多余（${extra.length}个，不导入）</span><div style="margin-top:4px; color:#f59e0b;">`;
+                extra.forEach(id => { html += `<span style="display:inline-block; margin:2px 6px 2px 0;">${id}</span>`; });
+                html += '</div></div>';
+            }
+            document.getElementById('importBody').innerHTML = html;
+        }
+
+        // ---- 总览配对模式 ----
+        let _overviewSelectedTask = null;
+
+        function _startOverviewPair() {
+            const { unmatched, extra, manualPairs } = _importPending;
+            const taskIds = unmatched.filter(id => !manualPairs[id]);
+            const jsonIds = extra.filter(id => !Object.values(manualPairs).includes(id));
+            _overviewSelectedTask = null;
+            _renderOverviewPair(taskIds, jsonIds);
+        }
+
+        function _renderOverviewPair(taskIds, jsonIds) {
+            const sortedJson = _overviewSelectedTask
+                ? _sortByDistance(_overviewSelectedTask, jsonIds)
+                : jsonIds;
+
+            let html = `<div style="font-weight:700; color:#1e293b; margin-bottom:10px;">📋 总览配对 — 点击左侧选中，再点击右侧配对</div>
+            <div style="display:flex; gap:12px;">
+                <div style="flex:1;">
+                    <div style="font-size:12px; color:#64748b; margin-bottom:6px;">任务独有（${taskIds.length}个）</div>`;
+            taskIds.forEach(id => {
+                const sel = id === _overviewSelectedTask;
+                html += `<div onclick="_overviewSelectTask('${id}')" style="padding:6px 10px; margin-bottom:4px; border-radius:6px; cursor:pointer; border:2px solid ${sel ? '#3b82f6' : '#e2e8f0'}; background:${sel ? '#eff6ff' : 'white'}; font-size:13px;">${id}</div>`;
+            });
+            html += `</div><div style="flex:1;">
+                    <div style="font-size:12px; color:#64748b; margin-bottom:6px;">JSON 独有（${sortedJson.length}个）${_overviewSelectedTask ? ' — 按相似度排序' : ''}</div>`;
+            sortedJson.forEach(id => {
+                const dist = _overviewSelectedTask ? _editDistance(_overviewSelectedTask, id) : null;
+                html += `<div onclick="_overviewPairWith('${id}')" style="padding:6px 10px; margin-bottom:4px; border-radius:6px; cursor:pointer; border:2px solid #e2e8f0; background:white; font-size:13px; display:flex; justify-content:space-between;">
+                    <span>${id}</span>${dist !== null ? `<span style="color:#94a3b8; font-size:11px;">距离 ${dist}</span>` : ''}
+                </div>`;
+            });
+            html += `</div></div>
+            <button onclick="_renderImportModal()" style="margin-top:12px; padding:6px 14px; border-radius:6px; border:none; background:#f1f5f9; color:#475569; font-size:12px; cursor:pointer;">← 返回预览</button>`;
+            document.getElementById('importBody').innerHTML = html;
+        }
+
+        function _overviewSelectTask(id) {
+            _overviewSelectedTask = id;
+            const { unmatched, extra, manualPairs } = _importPending;
+            const taskIds = unmatched.filter(t => !manualPairs[t]);
+            const jsonIds = extra.filter(j => !Object.values(manualPairs).includes(j));
+            _renderOverviewPair(taskIds, jsonIds);
+        }
+
+        function _overviewPairWith(jsonId) {
+            if (!_overviewSelectedTask) { alert('请先点击左侧选择一个任务 ID'); return; }
+            _importPending.manualPairs[_overviewSelectedTask] = jsonId;
+            _overviewSelectedTask = null;
+            const { unmatched, extra, manualPairs } = _importPending;
+            const taskIds = unmatched.filter(t => !manualPairs[t]);
+            const jsonIds = extra.filter(j => !Object.values(manualPairs).includes(j));
+            if (taskIds.length === 0 || jsonIds.length === 0) {
+                _renderImportModal();
+            } else {
+                _renderOverviewPair(taskIds, jsonIds);
+            }
+        }
+
+        // ---- 逐个配对模式 ----
+        function _startStepPair() {
+            _pairStep = 0;
+            _renderStepPair();
+        }
+
+        function _renderStepPair() {
+            const { unmatched, extra, manualPairs } = _importPending;
+            const taskIds = unmatched.filter(id => !manualPairs[id]);
+            const jsonIds = extra.filter(id => !Object.values(manualPairs).includes(id));
+            if (_pairStep >= taskIds.length || jsonIds.length === 0) {
+                _renderImportModal();
+                return;
+            }
+            const currentTask = taskIds[_pairStep];
+            const sorted = _sortByDistance(currentTask, jsonIds);
+
+            let html = `<div style="font-weight:700; color:#1e293b; margin-bottom:6px;">➡️ 逐个配对 — 第 ${_pairStep+1} / ${taskIds.length} 个</div>
+            <div style="background:#eff6ff; border-radius:8px; padding:10px 14px; margin-bottom:12px; font-size:15px; font-weight:700; color:#1d4ed8;">任务 ID：${currentTask}</div>
+            <div style="font-size:12px; color:#64748b; margin-bottom:6px;">从 JSON 中选择对应项（按相似度排序）：</div>`;
+            sorted.forEach(id => {
+                const dist = _editDistance(currentTask, id);
+                html += `<div onclick="_stepPairWith('${id}')" style="padding:8px 12px; margin-bottom:4px; border-radius:6px; cursor:pointer; border:2px solid #e2e8f0; background:white; font-size:13px; display:flex; justify-content:space-between; align-items:center;">
+                    <span>${id}</span><span style="color:#94a3b8; font-size:11px;">编辑距离 ${dist}</span>
+                </div>`;
+            });
+            html += `<div style="display:flex; gap:8px; margin-top:10px;">
+                <button onclick="_stepSkip()" style="flex:1; padding:7px; border-radius:6px; border:none; background:#fef3c7; color:#92400e; font-size:12px; font-weight:600; cursor:pointer;">跳过（不导入此项）</button>
+                <button onclick="_renderImportModal()" style="flex:1; padding:7px; border-radius:6px; border:none; background:#f1f5f9; color:#475569; font-size:12px; cursor:pointer;">← 返回预览</button>
+            </div>`;
+            document.getElementById('importBody').innerHTML = html;
+        }
+
+        function _stepPairWith(jsonId) {
+            const { unmatched, manualPairs } = _importPending;
+            const taskIds = unmatched.filter(id => !manualPairs[id]);
+            _importPending.manualPairs[taskIds[_pairStep]] = jsonId;
+            _pairStep++;
+            _renderStepPair();
+        }
+
+        function _stepSkip() {
+            _pairStep++;
+            _renderStepPair();
+        }
+
+        function cancelImport() {
+            _importPending = null;
+            document.getElementById('importModal').style.display = 'none';
+        }
+
+        function confirmImport() {
+            if (!_importPending) return;
+            _showAccuracyPreview();
+        }
+
+        function _showAccuracyPreview() {
+            const { jsonMap, matched, manualPairs } = _importPending;
+
+            // 收集所有将要导入的条目（taskId → record）
+            const toImport = [];
+            matched.forEach(id => toImport.push({ taskId: id, rec: jsonMap[id] }));
+            Object.entries(manualPairs).forEach(([taskId, jsonId]) => toImport.push({ taskId, rec: jsonMap[jsonId] }));
+
+            const correct = [], wrong = [];
+            toImport.forEach(({ taskId, rec }) => {
+                const trueLabel = _diagMap[rec.True_Label] || rec.True_Label;
+                const doctorDiag = _diagMap[rec.Doctor_Diagnosis] || rec.Doctor_Diagnosis;
+                if (trueLabel === doctorDiag) correct.push({ taskId, diag: doctorDiag });
+                else wrong.push({ taskId, doctor: doctorDiag, truth: trueLabel });
+            });
+
+            const total = toImport.length;
+            const pct = total > 0 ? Math.round(correct.length / total * 100) : 0;
+            document.getElementById('importAccuracySummary').textContent =
+                `正确率：${correct.length} / ${total}（${pct}%）`;
+
+            let html = '';
+            if (correct.length) {
+                html += `<div style="margin-bottom:10px;"><span style="color:#10b981;font-weight:700;">✅ 正确（${correct.length}个）</span><div style="margin-top:4px;">`;
+                correct.forEach(({ taskId, diag }) => {
+                    html += `<span style="display:inline-block; margin:2px 6px 2px 0; background:#ecfdf5; padding:2px 8px; border-radius:4px; font-size:12px;">${taskId} → ${diag}</span>`;
+                });
+                html += '</div></div>';
+            }
+            if (wrong.length) {
+                html += `<div><span style="color:#ef4444;font-weight:700;">❌ 错误（${wrong.length}个）</span><div style="margin-top:4px;">`;
+                wrong.forEach(({ taskId, doctor, truth }) => {
+                    html += `<div style="margin:3px 0; background:#fef2f2; padding:4px 10px; border-radius:4px; font-size:12px; color:#334155;">
+                        <span style="font-weight:600;">${taskId}</span>：医师选 <span style="color:#ef4444;">${doctor}</span>，标准答案 <span style="color:#10b981;">${truth}</span>
+                    </div>`;
+                });
+                html += '</div></div>';
+            }
+            document.getElementById('importAccuracyBody').innerHTML = html;
+            document.getElementById('importAccuracyModal').style.display = 'flex';
+        }
+
+        function _cancelAccuracy() {
+            document.getElementById('importAccuracyModal').style.display = 'none';
+        }
+
+        function _doConfirmImport() {
+            if (!_importPending) return;
+            document.getElementById('importAccuracyModal').style.display = 'none';
+
+            const { jsonMap, matched, manualPairs } = _importPending;
+
+            // 自动匹配
+            matched.forEach(id => {
+                const r = jsonMap[id];
+                diagnosisRecords[id] = {
+                    patientId: id,
+                    diagnosis: _diagMap[r.Doctor_Diagnosis] || r.Doctor_Diagnosis,
+                    severity: (typeof r.Confidence_Score === 'number') ? r.Confidence_Score : null
+                };
+                patientViewTimes[id] = Math.round(r.Average_Diagnostic_Time_Per_Case || 0);
+            });
+
+            // 手动配对
+            Object.entries(manualPairs).forEach(([taskId, jsonId]) => {
+                const r = jsonMap[jsonId];
+                diagnosisRecords[taskId] = {
+                    patientId: taskId,
+                    diagnosis: _diagMap[r.Doctor_Diagnosis] || r.Doctor_Diagnosis,
+                    severity: (typeof r.Confidence_Score === 'number') ? r.Confidence_Score : null
+                };
+                patientViewTimes[taskId] = Math.round(r.Average_Diagnostic_Time_Per_Case || 0);
+            });
+
+            // 更新总计时
+            const allImported = [...matched, ...Object.keys(manualPairs)];
+            if (allImported.length > 0) {
+                const firstRec = jsonMap[matched[0]] || jsonMap[Object.values(manualPairs)[0]];
+                timerSeconds = Math.round(allImported.length * (firstRec.Average_Diagnostic_Time_Per_Case || 0));
+            }
+
+            // 调整显示顺序：已导入排前，未覆盖排后
+            const importedSet = new Set(allImported);
+            patients.sort((a, b) => {
+                const aM = importedSet.has(a.id) ? 0 : 1;
+                const bM = importedSet.has(b.id) ? 0 : 1;
+                return aM - bM;
+            });
+
+            document.getElementById('importModal').style.display = 'none';
+            _importPending = null;
+
+            loadPatientVideos(0);
+            updateProgressText();
+            saveDraft('import');
+            console.log(`✅ [导入] 自动 ${matched.length} + 手动 ${Object.keys(manualPairs).length} 条`);
+        }
+        // ========== 导入功能结束 ==========
     </script>
+
+    <!-- 导入结果功能：悬浮提示条 -->
+    <div id="importHint" style="display:none; position:fixed; bottom:20px; right:20px; background:rgba(30,41,59,0.85); color:white; padding:10px 16px; border-radius:10px; font-size:13px; z-index:3000; pointer-events:none; backdrop-filter:blur(4px);">
+        📂 可拖入结果 JSON
+    </div>
+
+    <!-- 导入结果确认弹窗 -->
+    <div id="importModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:3001; align-items:center; justify-content:center;">
+        <div style="background:white; border-radius:16px; padding:28px; width:90%; max-width:560px; max-height:80vh; display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+            <h2 style="color:#1e293b; margin:0 0 6px 0; font-size:18px;">📥 导入结果预览</h2>
+            <p id="importSummary" style="color:#64748b; font-size:13px; margin:0 0 16px 0;"></p>
+            <div id="importBody" style="flex:1; overflow-y:auto; font-size:13px; line-height:1.8;"></div>
+            <div style="display:flex; gap:10px; margin-top:18px; flex-shrink:0;">
+                <button onclick="cancelImport()" style="flex:1; padding:10px; border-radius:8px; border:none; background:#f1f5f9; color:#475569; font-weight:600; cursor:pointer;">取消</button>
+                <button id="confirmImportBtn" onclick="confirmImport()" style="flex:1; padding:10px; border-radius:8px; border:none; background:#10b981; color:white; font-weight:600; cursor:pointer;">确认导入</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 导入正确率预览弹窗 -->
+    <div id="importAccuracyModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:3002; align-items:center; justify-content:center;">
+        <div style="background:white; border-radius:16px; padding:28px; width:90%; max-width:560px; max-height:80vh; display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+            <h2 style="color:#1e293b; margin:0 0 6px 0; font-size:18px;">📊 导入正确率预览</h2>
+            <p id="importAccuracySummary" style="color:#64748b; font-size:14px; font-weight:700; margin:0 0 14px 0;"></p>
+            <div id="importAccuracyBody" style="flex:1; overflow-y:auto; font-size:13px; line-height:1.8;"></div>
+            <div style="display:flex; gap:10px; margin-top:18px; flex-shrink:0;">
+                <button onclick="_cancelAccuracy()" style="flex:1; padding:10px; border-radius:8px; border:none; background:#f1f5f9; color:#475569; font-weight:600; cursor:pointer;">返回</button>
+                <button onclick="_doConfirmImport()" style="flex:1; padding:10px; border-radius:8px; border:none; background:#10b981; color:white; font-weight:600; cursor:pointer;">确认导入</button>
+            </div>
+        </div>
+    </div>
+
 </body>
 </html>
 
