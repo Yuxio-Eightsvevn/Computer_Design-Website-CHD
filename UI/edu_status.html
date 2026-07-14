@@ -318,9 +318,9 @@ async function fetchEduTasks() {
                     const reviewDone = t.review_done;
                     const allDone = singleDone && assistDone && reviewDone;
 
-                    let singleBtnText = singleDone ? (allDone ? '🔄 重新独立诊断' : '✅ 已完成') : '独立诊断';
-                    let assistBtnText = assistDone ? (allDone ? '🔄 重新AI辅助诊断' : '✅ 已完成') : (singleDone ? 'AI辅助诊断' : '⚠️ AI辅助诊断');
-                    let reviewBtnText = reviewDone ? (allDone ? '🔄 重新独立复诊' : '✅ 已完成') : (assistDone ? '独立复诊' : '⚠️ 独立复诊');
+                    let singleBtnText = singleDone ? (allDone ? '🔄 重新第一阶段：独立诊断' : '✅ 第一阶段：已完成') : '第一阶段：独立诊断';
+                    let assistBtnText = assistDone ? (allDone ? '🔄 重新第二阶段：AI辅助诊断' : '✅ 第二阶段：已完成') : (singleDone ? '第二阶段：AI辅助诊断' : '⚠️ 第二阶段：AI辅助诊断');
+                    let reviewBtnText = reviewDone ? (allDone ? '🔄 重新第三阶段：独立复诊' : '✅ 第三阶段：已完成') : (assistDone ? '第三阶段：独立复诊' : '⚠️ 第三阶段：独立复诊');
 
                     let singleBtnClass = singleDone ? 'btn-view' : 'btn-start';
                     let assistBtnClass = assistDone ? 'btn-view' : 'btn-start';
@@ -353,17 +353,17 @@ async function fetchEduTasks() {
                             </div>
                         </div>
                         <div style="display:flex; flex-direction:column; gap:8px; align-items:center;">
-                            <button class="btn ${singleBtnClass}" style="width:180px;white-space:nowrap;" onclick="${handleSingleClick}">
+                            <button class="btn ${singleBtnClass}" style="width:240px;white-space:nowrap;" onclick="${handleSingleClick}">
                                 ${singleBtnText}
                             </button>
-                            <button class="btn ${assistBtnClass}" style="width:180px;white-space:nowrap; ${assistOpacity}" ${assistDisabled} onclick="${handleAssistClick}">
+                            <button class="btn ${assistBtnClass}" style="width:240px;white-space:nowrap; ${assistOpacity}" ${assistDisabled} onclick="${handleAssistClick}">
                                 ${assistBtnText}
                             </button>
-                            <button class="btn ${reviewBtnClass}" style="width:180px;white-space:nowrap; ${reviewOpacity}" ${reviewDisabled} onclick="${handleReviewClick}">
+                            <button class="btn ${reviewBtnClass}" style="width:240px;white-space:nowrap; ${reviewOpacity}" ${reviewDisabled} onclick="${handleReviewClick}">
                                 ${reviewBtnText}
                             </button>
-                            ${allDone ? `<button class="btn btn-view" style="width:180px;white-space:nowrap; margin-top:5px;" onclick="openResultModal('${t.submission_id}', '${t.request_name}', null, '${t.submission_id}')">查看报告</button>` : ''}
-                            ${allDone ? `<button class="btn btn-view" style="width:180px;white-space:nowrap; margin-top:5px; background:#fef3c7; color:#92400e;" onclick="openTaskMistakeReviewModal('${t.submission_id}', '${t.request_name}')">错题复诊</button>` : ''}
+                            ${allDone ? `<button class="btn btn-view" style="width:240px;white-space:nowrap; margin-top:5px;" onclick="openResultModal('${t.submission_id}', '${t.request_name}', null, '${t.submission_id}')">查看报告</button>` : ''}
+                            ${allDone ? `<button class="btn btn-view" style="width:240px;white-space:nowrap; margin-top:5px; background:#fef3c7; color:#92400e;" onclick="openTaskMistakeReviewModal('${t.submission_id}', '${t.request_name}')">错题复诊</button>` : ''}
                         </div>
                     `;
                 } else if (isDualStage) {
