@@ -2519,5 +2519,59 @@ for i, m_id in enumerate(mistake_ids):
 
 ---
 
+### 16.4 项目冗余清理
+
+删除无引用的文件与文档冗余章节：
+
+| 项目 | 说明 |
+|------|------|
+| `dashboard_old.html` | 旧版 dashboard，无路由无引用 |
+| `model/test_compare.py` | 空文件 |
+| `tester.py`、`read_user.py` | 开发调试脚本，未被导入 |
+| `app.log` | 22MB 旧运行日志 |
+| `UI_refine/`（整个目录） | HTML5 UP 第三方模板，与项目无关 |
+| readme 12.16 章节 | 未实施的"三阶段重构计划 Plan A"，已被 12.17 实际方案替代 |
+| readme 重复的"待修复问题"区块 | 与保留版本内容完全相同，删除其中一份 |
+
+---
+
+### 16.5 全局错题弹窗：已纠正错题可选中复诊 (edu_status.html)
+
+**问题**：全局错题回顾弹窗中，已纠正错题（`is_retried && retry_result === 'correct'`）的卡片没有 `onclick` 和 `data-id`，无法被选中再次复诊。
+
+**修复**：已纠正错题卡片加上 `data-id="${m.id}"` 和 `onclick="event.stopPropagation(); toggleGlobalMistakeSelection('${m.id}', this)"`，改为可点击选中样式（`cursor:pointer`）。全选按钮行为不变（仍只全选未纠正的）。
+
+---
+
+### 16.6 错题复诊模式支持病例打乱 (edu_status.html)
+
+**需求**：错题复诊时打乱病例顺序，复用 `diagnosis.html` 现有的 shuffle 机制。
+
+**实现**：全局错题复诊与任务错题复诊两处跳转 URL 均追加 `&shuffle=true`。`diagnosis.html` 现有逻辑已支持通过 URL 参数 `shuffle=true` 触发 Fisher-Yates 打乱，无需改动。错题提交走 `/api/edu/mistakes/submit`，后端通过 `case_id → mistake_id` 映射匹配，与顺序无关，打乱后提交安全。
+
+---
+
+### 16.7 头像配置文件缓存问题修复 (四个页面)
+
+**问题**：新增账号后，`user_avatar_config.json` 被浏览器缓存，`loadAvatarConfig()` 读到旧配置导致新账号头像回退为首字母。
+
+**修复**：`flow.html`、`dashboard.html`、`task_status.html`、`edu_status.html` 四处 `loadAvatarConfig` 的 fetch URL 追加时间戳参数 `?t=' + Date.now()`，每次取最新配置，绕过缓存。
+
+---
+
+### 16.8 诊断上传放弃视频缩略图，改用统一示意图 (dashboard.html)
+
+**问题**：上传时对每个视频调用 `createVideoThumbnail()`（`<video>` 抓帧 → canvas → JPEG），串行执行、有 3 秒超时、对部分编码可能失败。
+
+**修复**：
+
+- 新建 `UI/res/share/video_placeholder.svg`（本地 SVG 示意图，播放按钮 + 超声波形，不依赖网络）
+- 删除所有 `createVideoThumbnail` 调用及函数本身、`thumbDataUrl` 字段、两处"重新生成缩略图"循环
+- 视频卡片渲染改为固定 `<img src="/UI/res/share/video_placeholder.svg">`
+
+`thumbDataUrl` 仅用于前端预览，不参与上传数据（上传的是 `file` 对象），故无后端副作用。
+
+---
+
 *文档版本: 2026-05-28*
-*最后更新: 2026-05-28 - UI改版、帧率修复、模型推理缓存优化*
+*最后更新: 2026-05-28 - 错题可选中复诊、错题打乱、头像缓存修复、上传示意图、冗余清理*

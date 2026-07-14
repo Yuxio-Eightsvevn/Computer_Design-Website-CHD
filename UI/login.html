@@ -269,6 +269,16 @@
             line-height: 1.7;
             margin: 12px 0 0 0;
         }
+        .feature-highlight {
+            color: var(--primary-color);
+            font-weight: 600;
+            /* 荧光笔效果：背景只衬在文字下半部分，不撑行高、可自然换行 */
+            background-image: linear-gradient(transparent 55%, rgba(102,126,234,0.28) 55%);
+            background-repeat: no-repeat;
+            padding: 0 2px;
+            -webkit-box-decoration-break: clone;
+            box-decoration-break: clone;
+        }
 
         /* 登录弹窗 */
         .login-modal {
@@ -487,10 +497,13 @@
             var featuresRow = document.getElementById('featuresRow');
             if (config.features && featuresRow) {
                 featuresRow.innerHTML = config.features.map(function(f) {
+                    // 检测【方括号】格式并强调
+                    var descHtml = (f.description || '').replace(/【([^】]+)】/g,
+                        '<span class="feature-highlight">$1</span>');
                     return '<div class="feature-item">' +
                         '<div class="feature-content">' +
                             '<h3>' + f.title + '</h3>' +
-                            '<p>' + f.description + '</p>' +
+                            '<p>' + descHtml + '</p>' +
                         '</div>' +
                     '</div>';
                 }).join('');

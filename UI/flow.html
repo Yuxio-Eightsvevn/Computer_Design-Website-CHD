@@ -124,7 +124,7 @@
     <div class="hint" style="font-size:18px;margin-bottom:12px;" data-i18n="flow.hint_select">请选择以下模式开始：</div>
 
     <div class="buttons" role="navigation" aria-label="mode-buttons">
-      <div style="display:flex;gap:24px;flex-wrap:wrap;">
+      <div id="btnGroup" style="display:flex;gap:24px;flex-wrap:wrap;">
         <button id="diagnoseBtn" class="btn" data-desc-key="diagnoseBtn" data-i18n="flow.btn_diagnose">诊断模式</button>
         <button id="eduBtn" class="btn secondary" data-desc-key="eduBtn" data-i18n="flow.btn_edu">教育模式</button>
         <button id="tasksBtn" class="btn ghost" style="display: none;" data-desc-key="tasksBtn" data-i18n="flow.btn_tasks">任务管理</button>
@@ -168,7 +168,7 @@
 
       async function loadButtonDescriptions() {
         try {
-          const r = await fetch('/res/flow/descriptions.json');
+          const r = await fetch('/res/flow/descriptions.json', { cache: 'no-cache' });
           if (r.ok) {
             const data = await r.json();
             buttonDescriptions = { ...buttonDescriptions, ...data };
@@ -181,7 +181,7 @@
       let avatarConfig = { avatars: {} };
       async function loadAvatarConfig() {
         try {
-          const r = await fetch('/UI/res/share/user_avatar_config.json');
+          const r = await fetch('/UI/res/share/user_avatar_config.json?t=' + Date.now());
           if (r.ok) {
             avatarConfig = await r.json();
           }
@@ -261,7 +261,43 @@ async function setUserAvatar(avatarElem, username) {
         } else {
           tasksBtn.style.display = 'none';
           usersBtn.style.display = 'none';
+          // 普通用户：按钮分行 + 简介常驻显示
+          renderPlainUserLayout();
         }
+      }
+
+      // 普通用户布局：每个按钮独占一行，右侧常驻显示简介
+      function renderPlainUserLayout() {
+        const group = document.getElementById('btnGroup');
+        if (!group) return;
+        // 纵向排列，拉大按钮间距（简介可能较长）
+        group.style.flexDirection = 'column';
+        group.style.gap = '24px';
+        group.style.alignItems = 'stretch';
+        group.style.marginLeft = '36px'; // 普通用户按钮左边距翻倍（相对容器 36px→72px）
+        // 隐藏 hover 提示区
+        if (buttonDesc) buttonDesc.style.display = 'none';
+        // 只处理可见按钮（诊断、教育）
+        [diagnoseBtn, eduBtn].forEach(btn => {
+          if (!btn || btn.style.display === 'none') return;
+          // 避免重复包装
+          if (btn.parentElement && btn.parentElement.classList.contains('btn-row')) return;
+          const key = btn.getAttribute('data-desc-key');
+          const desc = (key && buttonDescriptions[key]) ? buttonDescriptions[key] : '';
+          // 构造一行：[按钮][简介]
+          const row = document.createElement('div');
+          row.className = 'btn-row';
+          row.style.cssText = 'display:flex; align-items:center; gap:24px;';
+          btn.style.flex = '0 0 auto';
+          btn.style.minWidth = '160px';
+          group.insertBefore(row, btn);
+          row.appendChild(btn);
+          const descSpan = document.createElement('span');
+          descSpan.className = 'btn-row-desc';
+          descSpan.style.cssText = 'color:#6b7280; font-size:16px; line-height:1.6; flex:1;';
+          descSpan.textContent = desc;
+          row.appendChild(descSpan);
+        });
       }
 
       // 按钮导航

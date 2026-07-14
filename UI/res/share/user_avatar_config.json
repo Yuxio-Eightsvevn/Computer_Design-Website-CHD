@@ -1,6 +1,7 @@
 {
   "avatars": {
     "admin": "res/share/icon/admin.png",
-    "TestAccount": "res/share/icon/TestAccount.png"
+    "TestAccount": "res/share/icon/TestAccount.png",
+    "tac":"res/share/icon/TestAccount.png"
   }
 }

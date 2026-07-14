@@ -10,7 +10,7 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f7fa; color: #333; min-height: 100vh; }
     .container { max-width: 1200px; margin: 30px auto; padding: 0 20px; display: flex; gap: 16px; align-items: flex-start; }
-    .sidebar { width: 220px; }
+    .sidebar { width: 288px; flex-shrink: 0; }
     .main { flex: 1; }
     .navbar { background: linear-gradient(135deg,#667eea 0%,#764ba2 100%); color: white; padding: 22px 30px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; font-size: 22px; }
     .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); margin-top: 20px; min-height: 500px; }
@@ -81,10 +81,9 @@
           </div>
         </div>
         <hr style="margin:12px 0;border:none;border-top:1px solid #f0f3ff;">
-        <ul style="margin-top:8px;color:#666;font-size:13px;line-height:1.6">
-          <li data-i18n="dashboard.sidebar_hint_1">每个病例最多 5 个视频。</li>
-          <li data-i18n="dashboard.sidebar_hint_2">支持文件夹拖拽与自动缩略图。</li>
-        </ul>
+        <img id="sidebarImg" src="" alt="" style="width:calc(100% + 32px); margin:0 -16px 10px -16px; border-radius:8px; display:none;">
+        <div id="sidebarTitle" style="font-weight:700; font-size:15px; color:#3730a3; margin-bottom:6px; display:none;"></div>
+        <p id="sidebarText" style="font-size:13px; color:#64748b; line-height:1.6">每个病例最多 5 个视频，支持文件夹拖拽。</p>
       </div>
     </div>
 
@@ -179,7 +178,7 @@
 
       async function loadAvatarConfig() {
           try {
-              const r = await fetch('/UI/res/share/user_avatar_config.json');
+              const r = await fetch('/UI/res/share/user_avatar_config.json?t=' + Date.now());
               if (r.ok) {
                   avatarConfig = await r.json();
               }
@@ -197,9 +196,37 @@
           }
       }
 
+      async function loadSidebarConfig() {
+          try {
+              const r = await fetch('/res/dashboard/sidebar_config.json', { cache: 'no-cache' });
+              if (!r.ok) return; // 失败则保留默认文字
+              const cfg = await r.json();
+              const img = document.getElementById('sidebarImg');
+              const title = document.getElementById('sidebarTitle');
+              const text = document.getElementById('sidebarText');
+              // 配置项为 "none" 时隐藏对应元素
+              if (img) {
+                  if (cfg.image === 'none') { img.style.display = 'none'; }
+                  else if (cfg.image) { img.src = '/res/dashboard/' + cfg.image; img.alt = cfg.title || ''; img.style.display = 'block'; }
+              }
+              if (title) {
+                  if (cfg.title === 'none') { title.style.display = 'none'; }
+                  else if (cfg.title) { title.textContent = cfg.title; title.style.display = 'block'; }
+              }
+              if (text) {
+                  text.removeAttribute('data-i18n');
+                  if (cfg.text === 'none') { text.style.display = 'none'; }
+                  else if (cfg.text) { text.textContent = cfg.text; }
+              }
+          } catch (e) {
+              console.warn('侧边栏配置加载失败，使用默认文字');
+          }
+      }
+
       async function loadCurrentUser() {
         await i18n.load('zh');
         await loadAvatarConfig();
+        await loadSidebarConfig();
         try {
           const r = await fetch('/api/users/current');
           if (r.ok) {
@@ -263,7 +290,7 @@
             for (const [cName, files] of Object.entries(groups)) {
               const row = { caseName: cName, files: [] };
               for (const it of files) {
-                row.files.push({ file: it.file, relativePath: it.rel, thumbDataUrl: await createVideoThumbnail(it.file) });
+                row.files.push({ file: it.file, relativePath: it.rel });
               }
               staging.push(row);
             }
@@ -277,7 +304,7 @@
             for (const [cName, files] of Object.entries(groups)) {
               const row = { caseName: cName, files: [] };
               for (const it of files) {
-                row.files.push({ file: it.file, relativePath: it.rel, thumbDataUrl: await createVideoThumbnail(it.file) });
+                row.files.push({ file: it.file, relativePath: it.rel });
               }
               staging.push(row);
             }
@@ -285,7 +312,7 @@
         } else { // CASE A
           const row = { caseName: `patient ${staging.length + 1}`, files: [] };
           for (const it of fileObjs) {
-            row.files.push({ file: it.file, relativePath: null, thumbDataUrl: await createVideoThumbnail(it.file) });
+            row.files.push({ file: it.file, relativePath: null });
           }
           staging.push(row);
         }
@@ -307,52 +334,6 @@
             handleIncomingFiles(allFiles);
           }
         };
-      }
-
-      async function createVideoThumbnail(file) {
-        return new Promise((resolve) => {
-          const url = URL.createObjectURL(file);
-          const video = document.createElement('video');
-          video.preload = 'metadata'; video.muted = true; video.src = url;
-          
-          video.onloadedmetadata = () => {
-            // 更全面的视频长度检查
-            if (!video.duration || video.duration <= 0 || isNaN(video.duration)) {
-              URL.revokeObjectURL(url);
-              resolve('');
-              return;
-            }
-            
-            const seekTime = Math.min(0.05, video.duration * 0.5);
-            video.currentTime = seekTime;
-            
-            video.onseeked = () => {
-              const canvas = document.createElement('canvas');
-              canvas.width = 320; canvas.height = 180;
-              canvas.getContext('2d').drawImage(video, 0, 0, 320, 180);
-              URL.revokeObjectURL(url);
-              resolve(canvas.toDataURL('image/jpeg'));
-            };
-            
-            video.onerror = () => {
-              URL.revokeObjectURL(url);
-              resolve('');
-            };
-          };
-          
-          video.onerror = () => {
-            URL.revokeObjectURL(url);
-            resolve('');
-          };
-          
-          // 设置更合理的超时
-          setTimeout(() => {
-            if (!video.seeked) {
-              URL.revokeObjectURL(url);
-              resolve('');
-            }
-          }, 3000); // 3秒超时
-        });
       }
 
       function renderRows() {
@@ -392,18 +373,9 @@
                 }
               }
               files.forEach(file => {
-                staging[i].files.push({ file: file, relativePath: null, thumbDataUrl: '' });
+                staging[i].files.push({ file: file, relativePath: null });
               });
               renderRows();
-              // 重新生成缩略图
-              staging[i].files.forEach((f, idx) => {
-                if (!f.thumbDataUrl) {
-                  createVideoThumbnail(f.file).then(thumb => {
-                    staging[i].files[idx].thumbDataUrl = thumb;
-                    renderRows();
-                  });
-                }
-              });
             }
           };
           
@@ -411,7 +383,7 @@
           c.files.forEach((f, fileIndex) => {
             const t = document.createElement('div'); t.className = 'thumb';
             t.innerHTML = `
-              <img src="${f.thumbDataUrl || ''}">
+              <img src="/UI/res/share/video_placeholder.svg">
               <div class="label">${f.file.name}</div>
               <div class="del-single" data-case="${i}" data-file="${fileIndex}">✕</div>
             `;
@@ -495,20 +467,10 @@
           files.forEach(file => {
             staging[caseIndex].files.push({
               file: file,
-              relativePath: null,
-              thumbDataUrl: '' // 将在后续处理中生成
+              relativePath: null
             });
           });
           renderRows();
-          // 重新生成缩略图
-          staging[caseIndex].files.forEach((f, idx) => {
-            if (!f.thumbDataUrl) {
-              createVideoThumbnail(f.file).then(thumb => {
-                staging[caseIndex].files[idx].thumbDataUrl = thumb;
-                renderRows();
-              });
-            }
-          });
         };
       }
       

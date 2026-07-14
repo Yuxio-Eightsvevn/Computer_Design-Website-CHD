@@ -10,7 +10,7 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f7fa; color: #333; min-height: 100vh; }
     .container { max-width: 1200px; margin: 30px auto; padding: 0 20px; display: flex; gap: 16px; align-items: flex-start; }
-    .sidebar { width: 240px; flex-shrink: 0; }
+    .sidebar { width: 288px; flex-shrink: 0; }
     .main { flex: 1; }
     .navbar { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 18px 25px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; }
     .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); margin-top: 20px; }
@@ -70,7 +70,9 @@
               <div><div id="u-name" style="font-weight:700">加载中...</div><div id="currentUserOrg" style="font-size:14px;color:#666">...</div></div>
             </div>
             <hr style="margin:12px 0;border:none;border-top:1px solid #f1f5f9;">
-            <p style="font-size:14px; color:#64748b; line-height:1.6" data-i18n="edu_status.sidebar_hint">点击"开始判读"进行练习。完成后可查收详细评估报告，包含准确率、敏感度等指标。</p>
+            <img id="sidebarImg" src="" alt="" style="width:calc(100% + 32px); margin:0 -16px 10px -16px; border-radius:8px; display:none;">
+            <div id="sidebarTitle" style="font-weight:700; font-size:15px; color:#065f46; margin-bottom:6px; display:none;"></div>
+            <p id="sidebarText" style="font-size:14px; color:#64748b; line-height:1.6" data-i18n="edu_status.sidebar_hint">点击"开始判读"进行练习。完成后可查收详细评估报告，包含准确率、敏感度等指标。</p>
         </div>
     </div>
     <div class="main">
@@ -163,12 +165,39 @@ let avatarConfig = { avatars: {} };
 
 async function loadAvatarConfig() {
     try {
-        const r = await fetch('/UI/res/share/user_avatar_config.json');
+        const r = await fetch('/UI/res/share/user_avatar_config.json?t=' + Date.now());
         if (r.ok) {
             avatarConfig = await r.json();
         }
     } catch (e) {
         console.warn('头像配置加载失败，使用默认头像');
+    }
+}
+
+async function loadSidebarConfig() {
+    try {
+        const r = await fetch('/res/edu/sidebar_config.json', { cache: 'no-cache' });
+        if (!r.ok) return; // 失败则保留默认文字
+        const cfg = await r.json();
+        const img = document.getElementById('sidebarImg');
+        const title = document.getElementById('sidebarTitle');
+        const text = document.getElementById('sidebarText');
+        // 配置项为 "none" 时隐藏对应元素
+        if (img) {
+            if (cfg.image === 'none') { img.style.display = 'none'; }
+            else if (cfg.image) { img.src = '/res/edu/' + cfg.image; img.alt = cfg.title || ''; img.style.display = 'block'; }
+        }
+        if (title) {
+            if (cfg.title === 'none') { title.style.display = 'none'; }
+            else if (cfg.title) { title.textContent = cfg.title; title.style.display = 'block'; }
+        }
+        if (text) {
+            text.removeAttribute('data-i18n'); // 用配置覆盖，避免被 i18n 重置
+            if (cfg.text === 'none') { text.style.display = 'none'; }
+            else if (cfg.text) { text.textContent = cfg.text; }
+        }
+    } catch (e) {
+        console.warn('侧边栏配置加载失败，使用默认文字');
     }
 }
 
@@ -184,6 +213,7 @@ async function setUserAvatar(avatarElem, username) {
 async function loadUser() {
         await i18n.load('zh');
     console.log("🔍 开始加载用户信息...");
+    await loadSidebarConfig();
     await loadAvatarConfig();
     
     try {
